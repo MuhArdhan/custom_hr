@@ -1,0 +1,18 @@
+[
+ {
+  "applicable_for_public_holiday": 1,
+  "applicable_for_weekend": 1,
+  "applicable_salary_component": [],
+  "docstatus": 0,
+  "doctype": "Overtime Type",
+  "hourly_rate": 0.0,
+  "maximum_overtime_hours_allowed": 4.0,
+  "modified": "2026-10-09 17:01:50.075672",
+  "name": "Lembur",
+  "overtime_calculation_method": "Fixed Hourly Rate",
+  "overtime_salary_component": "Lembur",
+  "public_holiday_multiplier": 2.0,
+  "standard_multiplier": 1.5,
+  "weekend_multiplier": 2.0
+ }
+]

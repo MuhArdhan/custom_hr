@@ -1,0 +1,226 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-09 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "outlet",
+  "date",
+  "column_break_head",
+  "company",
+  "overtime_type",
+  "section_time",
+  "start_time",
+  "end_time",
+  "planned_hours",
+  "reason",
+  "section_employees",
+  "employees",
+  "section_approval",
+  "requested_by",
+  "approver_1",
+  "approver_2",
+  "column_break_approval",
+  "status"
+ ],
+ "fields": [
+  {
+   "default": "LEMBUR-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "no_copy": 1,
+   "options": "LEMBUR-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "outlet",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Outlet",
+   "options": "Outlet",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tanggal Lembur",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "overtime_type",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Jenis Lembur",
+   "options": "Overtime Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_time",
+   "fieldtype": "Section Break",
+   "label": "Waktu Lembur"
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "Mulai",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "Selesai",
+   "reqd": 1
+  },
+  {
+   "fieldname": "planned_hours",
+   "fieldtype": "Float",
+   "label": "Jam Rencana",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "description": "Alasan lembur untuk ditinjau atasan",
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Alasan",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_employees",
+   "fieldtype": "Section Break",
+   "label": "Karyawan Lembur"
+  },
+  {
+   "fieldname": "employees",
+   "fieldtype": "Table",
+   "label": "Karyawan",
+   "options": "Overtime Request Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_approval",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Diajukan Oleh",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Disalin dari Outlet saat pengajuan dibuat",
+   "fieldname": "approver_1",
+   "fieldtype": "Link",
+   "label": "Approver 1 (Leader)",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approver_2",
+   "fieldtype": "Link",
+   "label": "Approver 2 (SPV)",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Menunggu Leader",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Menunggu Leader\nMenunggu SPV\nMenunggu HRD\nDisetujui\nDitolak",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "Overtime Request",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Outlet Leader",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SPV Outlet",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

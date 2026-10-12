@@ -1,0 +1,47 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-10-12 09:22:10.172966",
+  "name": "Menunggu Leader",
+  "style": "",
+  "workflow_state_name": "Menunggu Leader"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-10-12 09:22:10.230989",
+  "name": "Menunggu SPV",
+  "style": "",
+  "workflow_state_name": "Menunggu SPV"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-10-12 09:22:10.233686",
+  "name": "Menunggu HRD",
+  "style": "",
+  "workflow_state_name": "Menunggu HRD"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-10-12 09:22:10.236869",
+  "name": "Disetujui",
+  "style": "",
+  "workflow_state_name": "Disetujui"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-10-12 09:22:10.247580",
+  "name": "Ditolak",
+  "style": "",
+  "workflow_state_name": "Ditolak"
+ }
+]

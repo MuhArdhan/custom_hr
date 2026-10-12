@@ -220,16 +220,24 @@ def _remove_assignments(employee, date):
 		ignore_permissions=True,
 	)
 	for row in rows:
+		doc = frappe.get_doc("Shift Assignment", row.name)
 		start, end = getdate(row.start_date), getdate(row.end_date or row.start_date)
+		splits = []
 		if start < getdate(date):
-			_duplicate_assignment(row.name, row.start_date, add_days(date, -1))
+			splits.append((row.start_date, add_days(date, -1)))
 		if end > getdate(date):
-			_duplicate_assignment(row.name, add_days(date, 1), row.end_date)
+			splits.append((add_days(date, 1), row.end_date))
+		# cancel first so the recreated splits don't trip the overlap validation
+		if doc.docstatus == 1:
+			doc.flags.ignore_permissions = True
+			doc.cancel()
+		for split_start, split_end in splits:
+			_duplicate_assignment(doc, split_start, split_end)
 		frappe.delete_doc("Shift Assignment", row.name, ignore_permissions=True, force=True)
 
 
 def _set_assignment(employee, date, shift_type):
-	frappe.get_doc(
+	assignment = frappe.get_doc(
 		{
 			"doctype": "Shift Assignment",
 			"employee": employee,
@@ -240,7 +248,11 @@ def _set_assignment(employee, date, shift_type):
 			"end_date": date,
 			"status": "Active",
 		}
-	).insert(ignore_permissions=True)
+	)
+	assignment.insert(ignore_permissions=True)
+	# HRMS only reads submitted assignments for check-in/attendance
+	assignment.flags.ignore_permissions = True
+	assignment.submit()
 
 
 def _assignment_on(employee, date):
@@ -259,8 +271,10 @@ def _assignment_on(employee, date):
 	return rows[0].shift_type if rows else None
 
 
-def _duplicate_assignment(name, start_date, end_date):
-	copy = frappe.copy_doc(frappe.get_doc("Shift Assignment", name))
+def _duplicate_assignment(source, start_date, end_date):
+	copy = frappe.copy_doc(source)
 	copy.start_date = start_date
 	copy.end_date = end_date
 	copy.insert(ignore_permissions=True)
+	copy.flags.ignore_permissions = True
+	copy.submit()

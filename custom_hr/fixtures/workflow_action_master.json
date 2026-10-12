@@ -1,0 +1,23 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-10-12 09:22:10.252235",
+  "name": "Setujui",
+  "workflow_action_name": "Setujui"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-10-12 09:22:10.257065",
+  "name": "Setujui (HRD)",
+  "workflow_action_name": "Setujui (HRD)"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-10-12 09:22:10.259834",
+  "name": "Tolak",
+  "workflow_action_name": "Tolak"
+ }
+]
