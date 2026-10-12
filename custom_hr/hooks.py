@@ -109,4 +109,8 @@ fixtures = [
 	},
 	{"doctype": "Salary Component", "filters": [["name", "=", "Lembur"]]},
 	{"doctype": "Overtime Type", "filters": [["name", "=", "Lembur"]]},
+	{
+		"doctype": "Custom DocPerm",
+		"filters": [["parent", "in", ["Overtime Type", "Employee", "Shift Type"]]],
+	},
 ]

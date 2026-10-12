@@ -20,15 +20,19 @@ def get_permission_query_conditions(user=None):
 	return "`tabOvertime Request`.`outlet` in ({0})".format(escaped)
 
 
-def has_permission(doc, ptype="read", user=None):
+def has_permission(doc, ptype="read", user=None, debug=False):
+	"""Controller permission hook.
+
+	V16 semantics: True allows, anything falsy denies. Only restrict when the
+	document actually carries an outlet the user is not an approver of.
+	"""
 	user = user or frappe.session.user
 	if _sees_all(user):
 		return True
-	if ptype not in ("read", "write", "delete", "submit", "cancel"):
-		return None
-	if not doc.get("outlet"):
-		return None
-	return doc.outlet in _their_outlets(user)
+	outlet = doc.get("outlet") if hasattr(doc, "get") else None
+	if not outlet:
+		return True
+	return outlet in _their_outlets(user)
 
 
 def _sees_all(user):
