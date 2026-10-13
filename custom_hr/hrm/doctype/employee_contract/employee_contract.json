@@ -1,0 +1,39 @@
+{
+ "doctype": "DocType",
+ "name": "Employee Contract",
+ "module": "HRM",
+ "engine": "InnoDB",
+ "autoname": "naming_series:",
+ "is_submittable": 1,
+ "track_changes": 1,
+ "title_field": "employee_name",
+ "search_fields": "employee,employee_name,contract_number",
+ "field_order": ["naming_series", "contract_number", "employee", "employee_name", "company", "department", "column_break_main", "contract_type", "contract_duration", "contract_status", "start_date", "end_date", "previous_contract", "amended_from", "documents_section", "contract_file", "notes"],
+ "fields": [
+  {"fieldname": "naming_series", "fieldtype": "Select", "label": "Naming Series", "options": "HR-CON-.YYYY.-.#####", "default": "HR-CON-.YYYY.-.#####", "reqd": 1},
+  {"fieldname": "contract_number", "fieldtype": "Data", "label": "Nomor Kontrak", "unique": 1, "no_copy": 1, "in_standard_filter": 1, "description": "Nomor pada dokumen kontrak. ID sistem dibuat otomatis. Isi nomor baru jika membuat amendemen."},
+  {"fieldname": "employee", "fieldtype": "Link", "options": "Employee", "label": "Karyawan", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "employee_name", "fieldtype": "Data", "label": "Nama Karyawan", "fetch_from": "employee.employee_name", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "company", "fieldtype": "Link", "options": "Company", "label": "Perusahaan", "fetch_from": "employee.company", "read_only": 1, "in_standard_filter": 1},
+  {"fieldname": "department", "fieldtype": "Link", "options": "Department", "label": "Departemen", "fetch_from": "employee.department", "read_only": 1},
+  {"fieldname": "column_break_main", "fieldtype": "Column Break"},
+  {"fieldname": "contract_type", "fieldtype": "Select", "label": "Jenis Kontrak", "options": "PKWT\nPKWTT", "default": "PKWT", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "contract_duration", "fieldtype": "Select", "label": "Durasi Kontrak", "options": "Custom\n3 bulan\n6 bulan\n12 bulan\n24 bulan", "default": "Custom", "depends_on": "eval:doc.contract_type==='PKWT'", "description": "Tanggal akhir = tanggal mulai + durasi bulan - 1 hari. Gunakan Custom untuk menentukan tanggal akhir sendiri."},
+  {"fieldname": "contract_status", "fieldtype": "Data", "label": "Status Kontrak", "is_virtual": 1, "read_only": 1, "description": "Dihitung dari status dokumen dan tanggal, tanpa scheduler/notifikasi."},
+  {"fieldname": "start_date", "fieldtype": "Date", "label": "Tanggal Mulai", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "end_date", "fieldtype": "Date", "label": "Tanggal Akhir", "mandatory_depends_on": "eval:doc.contract_type==='PKWT'", "in_list_view": 1, "description": "Wajib untuk PKWT. Kosongkan untuk PKWTT."},
+  {"fieldname": "previous_contract", "fieldtype": "Link", "options": "Employee Contract", "label": "Kontrak Sebelumnya", "no_copy": 1, "in_standard_filter": 1},
+  {"fieldname": "amended_from", "fieldtype": "Link", "options": "Employee Contract", "label": "Amended From", "read_only": 1, "no_copy": 1},
+  {"fieldname": "documents_section", "fieldtype": "Section Break", "label": "Dokumen dan Catatan"},
+  {"fieldname": "contract_file", "fieldtype": "Attach", "label": "Dokumen Kontrak", "no_copy": 1, "description": "Upload sebagai private file. Wajib sebelum Submit."},
+  {"fieldname": "notes", "fieldtype": "Small Text", "label": "Catatan"}
+ ],
+ "links": [],
+ "permissions": [
+  {"role": "HR Manager", "read": 1, "write": 1, "create": 1, "submit": 1, "cancel": 1, "amend": 1, "report": 1, "print": 1},
+  {"role": "HR User", "read": 1, "write": 1, "create": 1, "report": 1, "print": 1},
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "submit": 1, "cancel": 1, "amend": 1, "report": 1, "print": 1}
+ ],
+ "sort_field": "start_date",
+ "sort_order": "DESC"
+}

@@ -1,0 +1,18 @@
+{
+ "doctype": "Workspace Sidebar",
+ "name": "HRM",
+ "title": "HRM",
+ "app": "custom_hr",
+ "standard": 1,
+ "module": "HRM",
+ "header_icon": "tool",
+ "items": [
+  {"label": "Home", "type": "Link", "link_type": "Workspace", "link_to": "HRM", "icon": "house", "child": 0},
+  {"label": "Employee Attendance Gallery", "type": "Link", "link_type": "Page", "link_to": "employee-attendance-gallery", "child": 0},
+  {"label": "Roster Outlet", "type": "Link", "link_type": "Page", "link_to": "outlet-roster", "child": 0},
+  {"label": "Pengajuan Lembur", "type": "Link", "link_type": "DocType", "link_to": "Overtime Request", "child": 0},
+  {"label": "Laporan Lembur", "type": "Link", "link_type": "Report", "link_to": "Laporan Lembur", "child": 0},
+  {"label": "Administrasi", "type": "Section Break", "icon": "file-text", "indent": 1, "collapsible": 1, "keep_closed": 0, "child": 0},
+  {"label": "Kontrak Karyawan", "type": "Link", "link_type": "DocType", "link_to": "Employee Contract", "icon": "file-text", "child": 1}
+ ]
+}

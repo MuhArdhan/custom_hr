@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"hdr1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>HRM</b></span>\",\"col\":12}},{\"id\":\"sc1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Attendance Gallery\",\"col\":4}},{\"id\":\"sc2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Roster Outlet\",\"col\":4}},{\"id\":\"sc3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pengajuan Lembur\",\"col\":4}},{\"id\":\"sc4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Laporan Lembur\",\"col\":4}},{\"id\":\"sp1\",\"type\":\"spacer\",\"data\":{\"col\":12}}]",
+ "content": "[{\"id\":\"hdr1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>HRM</b></span>\",\"col\":12}},{\"id\":\"sc1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Attendance Gallery\",\"col\":4}},{\"id\":\"sc2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Roster Outlet\",\"col\":4}},{\"id\":\"sc3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pengajuan Lembur\",\"col\":4}},{\"id\":\"sc4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Laporan Lembur\",\"col\":4}},{\"id\":\"personalia\",\"type\":\"card\",\"data\":{\"card_name\":\"Administrasi\",\"col\":4}},{\"id\":\"sp1\",\"type\":\"spacer\",\"data\":{\"col\":12}}]",
  "creation": "2026-10-09 00:00:00.000000",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -10,7 +10,10 @@
  "idx": 0,
  "is_hidden": 0,
  "label": "HRM",
- "links": [],
+ "links": [
+  {"label": "Administrasi", "type": "Card Break", "link_count": 1},
+  {"label": "Kontrak Karyawan", "type": "Link", "link_type": "DocType", "link_to": "Employee Contract"}
+ ],
  "modified": "2026-10-09 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
