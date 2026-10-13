@@ -1,0 +1,41 @@
+{% if is_test %}
+<p><strong>[TEST]</strong> Email ini hanya untuk pengujian, bukan pemberitahuan resmi.</p>
+{% endif %}
+<p>Yth. Tim HRD,</p>
+<p>Kontrak kerja karyawan berikut akan berakhir dalam <strong>{{ reminder_days | e }} hari</strong>:</p>
+<table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 600px;">
+	<tr>
+		<th align="left" style="border: 1px solid #ddd;">Informasi</th>
+		<th align="left" style="border: 1px solid #ddd;">Detail</th>
+	</tr>
+	<tr>
+		<td style="border: 1px solid #ddd;">Nama</td>
+		<td style="border: 1px solid #ddd;">{{ employee_name | e }}</td>
+	</tr>
+	<tr>
+		<td style="border: 1px solid #ddd;">ID Karyawan</td>
+		<td style="border: 1px solid #ddd;">{{ employee | e }}</td>
+	</tr>
+	{% if company %}
+	<tr>
+		<td style="border: 1px solid #ddd;">Perusahaan</td>
+		<td style="border: 1px solid #ddd;">{{ company | e }}</td>
+	</tr>
+	{% endif %}
+	{% if department %}
+	<tr>
+		<td style="border: 1px solid #ddd;">Departemen</td>
+		<td style="border: 1px solid #ddd;">{{ department | e }}</td>
+	</tr>
+	{% endif %}
+	<tr>
+		<td style="border: 1px solid #ddd;">Tanggal Akhir Kontrak</td>
+		<td style="border: 1px solid #ddd;">{{ contract_end_date | e }}</td>
+	</tr>
+</table>
+<p>
+	Mohon melakukan evaluasi dan koordinasi dengan penanggung jawab terkait untuk menentukan
+	tindak lanjut sesuai kebijakan perusahaan.
+</p>
+<p><a href="{{ employee_url | e }}"><strong>Lihat Data Karyawan</strong></a></p>
+<p>Terima kasih,<br><strong>Sistem HR</strong></p>

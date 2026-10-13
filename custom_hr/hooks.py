@@ -6,6 +6,10 @@ app_email = "admin@example.com"
 app_license = "mit"
 required_apps = ["hrms"]
 
+scheduler_events = {
+	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],
+}
+
 # ----------------------------------------------------------------------------
 # App switcher entry (own icon, separate from Frappe HR)
 # ----------------------------------------------------------------------------
@@ -63,6 +67,7 @@ has_permission = {
 # attendance marking right after check-out
 override_doctype_class = {
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
+	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
 }
 
 # ----------------------------------------------------------------------------
