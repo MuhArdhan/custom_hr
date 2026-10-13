@@ -2,6 +2,7 @@
 
 import hashlib
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 import frappe
 from frappe.utils import cint, date_diff, get_url_to_form, getdate, validate_email_address
@@ -80,7 +81,7 @@ def build_reminder_plan(settings, today=None, *, test_employee=None):
 	employees = frappe.get_all(
 		"Employee",
 		filters=filters,
-		fields=["name", "employee_name", "contract_end_date", "company", "department",
+		fields=["name", "employee_name", "contract_end_date", "company",
 			"user_id", "company_email", "personal_email", "prefered_contact_email", "prefered_email"],
 		order_by="name",
 	)
@@ -107,7 +108,7 @@ def build_reminder_plan(settings, today=None, *, test_employee=None):
 				"employee": employee.name, "employee_name": employee.employee_name,
 				"contract_end_date": str(employee.contract_end_date), "reminder_days": days,
 				"recipient": recipient, "recipient_type": recipient_type,
-				"company": employee.company, "department": employee.department,
+				"company": employee.company,
 				"skip_reason": skip_reason, "deduplication_key": key,
 			})
 	return plan
@@ -117,60 +118,116 @@ def build_reminder_plan(settings, today=None, *, test_employee=None):
 def preview_contract_expiry_reminders():
 	frappe.only_for(["HR Manager", "System Manager"])
 	settings = frappe.get_single(SETTINGS)
+	plan = build_reminder_plan(settings)
+	groups = group_reminders([item for item in plan if not item["skip_reason"]])
 	return {"enabled": cint(settings.enabled), "dry_run": cint(settings.dry_run),
-		"date": str(getdate()), "reminders": build_reminder_plan(settings)}
+		"date": str(getdate()), "reminders": plan,
+		"email_groups": [{"recipient": group[0]["recipient"],
+			"recipient_type": group[0]["recipient_type"],
+			"contract_end_date": group[0]["contract_end_date"],
+			"reminder_days": group[0]["reminder_days"],
+			"employees": [item["employee"] for item in group]} for group in groups]}
 
 
-def get_test_email_plan(employee):
+def get_test_email_plan(employee=None, *, employees=None):
 	frappe.only_for(["HR Manager"])
-	if not employee:
+	if employees is not None and employee:
+		frappe.throw("Gunakan employee atau employees, bukan keduanya.")
+	if employees is None:
+		employees = [employee] if employee else []
+	elif isinstance(employees, str):
+		employees = frappe.parse_json(employees)
+	if not isinstance(employees, list) or any(not isinstance(name, str) or not name.strip() for name in employees):
+		frappe.throw("Daftar karyawan tidak valid.")
+	employees = list(dict.fromkeys(employees))
+	if not employees:
 		frappe.throw("Pilih karyawan untuk pengujian.")
-	frappe.get_doc("Employee", employee).check_permission("read")
+	if len(employees) > 50:
+		frappe.throw("Maksimal 50 karyawan dalam satu pengujian.")
+	for name in employees:
+		frappe.get_doc("Employee", name).check_permission("read")
 	settings = frappe.get_single(SETTINGS)
 	if not parse_email_list(settings.allowed_recipients):
 		frappe.throw("Isi Allowed Recipients sebelum mengirim email test.")
 	# Tests always enforce the allowlist, even if production Test Mode is off.
 	settings.test_mode = 1
-	plan = build_reminder_plan(settings, test_employee=employee)
-	if not plan:
-		frappe.throw("Pilih karyawan aktif dengan Contract End Date hari ini atau setelahnya.")
+	plan = []
+	for name in employees:
+		items = build_reminder_plan(settings, test_employee=name)
+		if not items:
+			frappe.throw("Karyawan {0} harus aktif dan memiliki Contract End Date hari ini atau setelahnya.".format(name))
+		plan.extend(items)
 	return plan
 
 
 @frappe.whitelist()
-def preview_test_email(employee):
-	return {"reminders": get_test_email_plan(employee)}
+def preview_test_email(employee=None, employees=None):
+	plan = get_test_email_plan(employee, employees=employees)
+	groups = group_reminders([item for item in plan if not item["skip_reason"]])
+	return {"reminders": plan, "email_groups": [
+		{"recipient": group[0]["recipient"], "recipient_type": group[0]["recipient_type"],
+			"reminder_days": group[0]["reminder_days"], "employees": [item["employee"] for item in group]}
+		for group in groups]}
 
 
 @frappe.whitelist(methods=["POST"])
-def send_test_email(employee):
+def send_test_email(employee=None, employees=None):
 	"""Explicit action: real test emails independent of Enabled/Dry Run.
 
 	Never reserve production keys. Recipients are recalculated server-side and
 	constrained to the saved allowlist on every request.
 	"""
-	plan = get_test_email_plan(employee)
+	plan = get_test_email_plan(employee, employees=employees)
 	eligible = [item for item in plan if not item["skip_reason"]]
 	if not eligible:
 		frappe.throw("Tidak ada penerima test yang valid dalam allowlist.")
 	queued = []
 	frappe.db.savepoint("contract_test_email")
 	try:
-		for item in eligible:
-			subject, message = render_email({**item, "is_test": True})
+		for group in group_reminders(eligible):
+			item = group[0]
+			is_summary = len(group) > 1
+			subject, message = render_reminder_group(group, is_test=True)
 			queue = frappe.sendmail(
 				recipients=[item["recipient"]], subject=f"[TEST] {subject}", message=message,
-				reference_doctype="Employee", reference_name=item["employee"],
+				reference_doctype=SETTINGS if is_summary else "Employee",
+				reference_name=SETTINGS if is_summary else item["employee"],
 				now=False, delayed=True,
 			)
 			if not queue:
 				raise RuntimeError("Email Queue was not created")
-			write_log(item, "Queued", f"[TEST] Email Queue: {queue.name}. No production key reserved.")
-			queued.append({"recipient": item["recipient"], "email_queue": queue.name})
+			for reminder in group:
+				write_log(reminder, "Queued", f"[TEST] Email Queue: {queue.name}. No production key reserved.")
+			queued.append({"recipient": item["recipient"], "email_queue": queue.name,
+				"employees": [reminder["employee"] for reminder in group]})
 	except Exception:
 		frappe.db.rollback(save_point="contract_test_email")
 		raise
 	return {"queued": queued, "skipped": [item for item in plan if item["skip_reason"]]}
+
+
+def get_employee_email_url(employee):
+	"""Local sites use their local address; cloud sites use their canonical host."""
+	url = get_url_to_form("Employee", employee)
+	site = getattr(frappe.local, "site", None)
+	if site and (site == "localhost" or site.endswith(".localhost")):
+		# Do not inherit an old tunnel's host_name on the local development site.
+		port = frappe.conf.get("http_port") or frappe.conf.get("webserver_port") or 8000
+		return urlunsplit(("http", f"{site}:{port}", urlsplit(url).path, "", ""))
+	host = frappe.conf.get("host_name") or frappe.conf.get("hostname") or site
+	if not host:
+		return url
+	configured = urlsplit(host if "://" in host else f"//{host}")
+	hostname = (configured.hostname or "").lower()
+	if not hostname:
+		return url
+	is_local = hostname in ("localhost", "127.0.0.1", "::1") or hostname.endswith(".localhost")
+	if is_local and not configured.port:
+		return url
+	# A public hostname without a scheme defaults to HTTPS. Explicit scheme/port
+	# remain authoritative; e.g. ngrok HTTPS uses no internal :8000 suffix.
+	scheme = configured.scheme or ("http" if is_local else "https")
+	return urlunsplit((scheme, configured.netloc, urlsplit(url).path, "", ""))
 
 
 def render_email(item):
@@ -182,10 +239,42 @@ def render_email(item):
 	context = {
 		**item,
 		"employee_name": item["employee_name"] or item["employee"],
-		"employee_url": get_url_to_form("Employee", item["employee"]) if is_hr else None,
+		"employee_url": get_employee_email_url(item["employee"]) if is_hr else None,
 	}
 	message = frappe.render_template(f"templates/emails/{template}", context)
 	return subject, message
+
+
+def group_reminders(items):
+	"""Group HR reminders by recipient and expiry stage; keep employees private."""
+	groups = []
+	hr_groups = {}
+	for item in items:
+		if item["recipient_type"] != "HR":
+			groups.append([item])
+			continue
+		key = (item["recipient"], item["contract_end_date"], item["reminder_days"])
+		if key not in hr_groups:
+			hr_groups[key] = []
+			groups.append(hr_groups[key])
+		hr_groups[key].append(item)
+	return groups
+
+
+def render_reminder_group(items, *, is_test=False):
+	if len(items) == 1:
+		return render_email({**items[0], "is_test": is_test})
+	first = items[0]
+	subject = "Tindak Lanjut Kontrak Karyawan — {0} karyawan (H-{1}, {2})".format(
+		len(items), first["reminder_days"], first["contract_end_date"]
+	)
+	context = {
+		"is_test": is_test,
+		"contract_end_date": first["contract_end_date"],
+		"reminder_days": first["reminder_days"],
+		"employees": [{**item, "employee_url": get_employee_email_url(item["employee"])} for item in items],
+	}
+	return subject, frappe.render_template("templates/emails/contract_expiry_hr_summary.html", context)
 
 
 def write_log(item, status, details=None, reserve=False):
@@ -203,6 +292,7 @@ def send_contract_expiry_reminders():
 	if not cint(settings.enabled):
 		return {"disabled": True}
 	result = {"queued": 0, "dry_run": 0, "skipped": 0, "failed": 0}
+	eligible = []
 	for item in build_reminder_plan(settings):
 		if item["skip_reason"]:
 			write_log(item, "Skipped", item["skip_reason"])
@@ -212,25 +302,42 @@ def send_contract_expiry_reminders():
 			write_log(item, "Dry Run", "No email queued; preview only")
 			result["dry_run"] += 1
 			continue
+		eligible.append(item)
+	for group in group_reminders(eligible):
 		frappe.db.savepoint("contract_reminder")
+		reserved = []
+		duplicates = []
 		try:
-			write_log(item, "Queued", "Delivery status is available in Email Queue", reserve=True)
-			subject, message = render_email(item)
+			for item in group:
+				frappe.db.savepoint("contract_reminder_item")
+				try:
+					write_log(item, "Queued", "Delivery status is available in Email Queue", reserve=True)
+				except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
+					frappe.db.rollback(save_point="contract_reminder_item")
+					duplicates.append(item)
+					result["skipped"] += 1
+				else:
+					reserved.append(item)
+			if not reserved:
+				continue
+			subject, message = render_reminder_group(reserved)
+			first = reserved[0]
+			is_summary = len(reserved) > 1
 			queue = frappe.sendmail(
-				recipients=[item["recipient"]], subject=subject, message=message,
-				reference_doctype="Employee", reference_name=item["employee"],
+				recipients=[first["recipient"]], subject=subject, message=message,
+				reference_doctype=SETTINGS if is_summary else "Employee",
+				reference_name=SETTINGS if is_summary else first["employee"],
 				now=False, delayed=True,
 			)
 			if not queue:
 				raise RuntimeError("Email Queue was not created")
-		except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
-			frappe.db.rollback(save_point="contract_reminder")
-			result["skipped"] += 1
 		except Exception:
 			frappe.db.rollback(save_point="contract_reminder")
 			frappe.log_error(title="Contract reminder queue failed", message=frappe.get_traceback())
-			write_log(item, "Failed", "Queueing failed; see Error Log. Retry is allowed.")
-			result["failed"] += 1
+			for item in group:
+				if item not in duplicates:
+					write_log(item, "Failed", "Queueing failed; see Error Log. Retry is allowed.")
+					result["failed"] += 1
 		else:
 			result["queued"] += 1
 	return result

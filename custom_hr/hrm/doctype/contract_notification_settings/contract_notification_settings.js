@@ -22,13 +22,15 @@ frappe.ui.form.on("Contract Notification Settings", {
 				}
 				const dialog = new frappe.ui.Dialog({
 					title: __("Send Contract Test Email"),
-					fields: [{ fieldname: "employee", label: __("Employee"), fieldtype: "Link", options: "Employee", reqd: 1,
-						get_query: () => ({ filters: { status: "Active", contract_end_date: [">=", frappe.datetime.get_today()] } }) }],
+					fields: [{ fieldname: "employees", label: __("Employees"), fieldtype: "MultiSelectPills", reqd: 1,
+						get_data: (txt) => frappe.db.get_link_options("Employee", txt, {
+							status: "Active", contract_end_date: [">=", frappe.datetime.get_today()],
+						}) }],
 					primary_action_label: __("Preview Recipients"),
-					primary_action({ employee }) {
+					primary_action({ employees }) {
 						frappe.call({
 							method: "custom_hr.contract_notifications.preview_test_email",
-							args: { employee }, freeze: true,
+							args: { employees: JSON.stringify(employees) }, freeze: true,
 							callback({ message }) {
 								const eligible = message.reminders.filter((item) => !item.skip_reason);
 								if (!eligible.length) {
@@ -36,7 +38,9 @@ frappe.ui.form.on("Contract Notification Settings", {
 									return;
 								}
 								const escape = frappe.utils.escape_html;
-								const recipients = eligible.map((item) => escape(item.recipient)).join("<br>");
+								const recipients = message.email_groups.map((group) =>
+									`${escape(group.recipient)} — ${escape(group.recipient_type)}, H-${escape(String(group.reminder_days))}, ` +
+									`${escape(group.employees.join(", "))}`).join("<br>");
 								const skipped = message.reminders.filter((item) => item.skip_reason)
 									.map((item) => `${escape(item.recipient || "Employee")}: ${escape(item.skip_reason)}`).join("<br>");
 								frappe.confirm(
@@ -46,7 +50,7 @@ frappe.ui.form.on("Contract Notification Settings", {
 										dialog.hide();
 										frappe.call({
 											method: "custom_hr.contract_notifications.send_test_email",
-											args: { employee }, type: "POST", freeze: true,
+											args: { employees: JSON.stringify(employees) }, type: "POST", freeze: true,
 											callback({ message: result }) {
 												frappe.msgprint({ title: __("Test Emails Queued"), message:
 													__("Check Email Queue for delivery status.") + "<br><br>" +
