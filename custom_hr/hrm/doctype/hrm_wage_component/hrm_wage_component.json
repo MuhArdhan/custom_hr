@@ -1,0 +1,40 @@
+{
+ "actions": [],
+ "creation": "2026-10-12 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "salary_component",
+  "use_ssa_base"
+ ],
+ "fields": [
+  {
+   "fieldname": "salary_component",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Komponen",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Ambil nilainya dari Base milik Salary Structure Assignment (untuk Basic).",
+   "fieldname": "use_ssa_base",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Dari Base SSA"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM Wage Component",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

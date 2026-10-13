@@ -3,6 +3,10 @@
 
 """Overtime Request: leader mengajukan lembur untuk sekelompok karyawan.
 
+Outlet diisi untuk kru outlet (approval berjenjang Leader/SPV lalu HRD).
+Untuk unit non-outlet (pabrik/gudang) outlet dikosongkan: approver kosong
+sehingga pengajuan langsung masuk antrean HRD.
+
 Approval berjenjang (Workflow "Pengajuan Lembur"):
 Menunggu Leader -> [Menunggu SPV] -> Menunggu HRD -> Disetujui / Ditolak.
 
@@ -105,16 +109,17 @@ class OvertimeRequest(Document):
 			seen.add(row.employee)
 
 			employee = frappe.db.get_value(
-				"Employee", row.employee, ["employee_name", "outlet"], as_dict=True
+				"Employee", row.employee, ["employee_name", "outlet", "company"], as_dict=True
 			)
 			if not employee:
 				frappe.throw(_("Karyawan {0} tidak ditemukan").format(row.employee))
-			if employee.outlet != self.outlet:
+			if self.outlet and employee.outlet != self.outlet:
 				frappe.throw(
 					_("{0} tidak berada di outlet {1}").format(
 						employee.employee_name or row.employee, self.outlet
 					)
 				)
+			self.company = self.company or employee.company
 
 			assignment = frappe.get_all(
 				"Shift Assignment",

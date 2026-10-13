@@ -21,7 +21,11 @@ frappe.ui.form.on("Overtime Request", {
 			return { filters: { name: ["in", frm._allowed_outlets] } };
 		});
 		frm.set_query("employee", "employees", () => {
-			return { filters: { outlet: frm.doc.outlet, status: "Active" } };
+			const filters = { status: "Active" };
+			if (frm.doc.outlet) {
+				filters.outlet = frm.doc.outlet;
+			}
+			return { filters };
 		});
 	},
 	onload(frm) {

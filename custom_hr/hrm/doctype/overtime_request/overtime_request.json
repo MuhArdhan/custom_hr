@@ -36,13 +36,13 @@
    "options": "LEMBUR-.YYYY.-.#####"
   },
   {
+   "description": "Kosongkan untuk unit non-outlet (pabrik/gudang). Karyawan non-outlet langsung ke approval HRD.",
    "fieldname": "outlet",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Outlet",
-   "options": "Outlet",
-   "reqd": 1
+   "options": "Outlet"
   },
   {
    "default": "Today",

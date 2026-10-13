@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "creation": "2026-10-12 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "wage_base_section",
+  "wage_base_components",
+  "column_break_wage",
+  "overtime_salary_component",
+  "overtime_hourly_divisor",
+  "je_section",
+  "outlet_expense_account_number",
+  "intercompany_receivable_account_number",
+  "intercompany_payable_account_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "wage_base_section",
+   "fieldtype": "Section Break",
+   "label": "Basis Upah Lembur (PP 35/2021)"
+  },
+  {
+   "description": "Upah sebulan = jumlah komponen ini. Upah sejam = upah sebulan / 173.",
+   "fieldname": "wage_base_components",
+   "fieldtype": "Table",
+   "label": "Komponen Basis Upah",
+   "options": "HRM Wage Component"
+  },
+  {
+   "fieldname": "column_break_wage",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Lembur",
+   "fieldname": "overtime_salary_component",
+   "fieldtype": "Link",
+   "label": "Komponen Upah Lembur",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "default": "173",
+   "fieldname": "overtime_hourly_divisor",
+   "fieldtype": "Float",
+   "label": "Pembagi Upah Sejam",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "je_section",
+   "fieldtype": "Section Break",
+   "label": "Akun Alokasi (JE Inter-Company)"
+  },
+  {
+   "default": "5120.001",
+   "description": "Nomor akun biaya gaji di CoA tiap outlet (dipakai saat payroll outlet menyusul).",
+   "fieldname": "outlet_expense_account_number",
+   "fieldtype": "Data",
+   "label": "No Akun Biaya Gaji Outlet"
+  },
+  {
+   "default": "1132.003",
+   "fieldname": "intercompany_receivable_account_number",
+   "fieldtype": "Data",
+   "label": "No Akun Piutang Internal JURI"
+  },
+  {
+   "default": "Hutang Internal - JURI",
+   "fieldname": "intercompany_payable_account_name",
+   "fieldtype": "Data",
+   "label": "Nama Akun Hutang Internal Outlet"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM Payroll Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
