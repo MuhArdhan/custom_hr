@@ -1,0 +1,24 @@
+{
+ "doctype": "DocType",
+ "name": "HRM Attendance Payroll Settings",
+ "module": "HRM",
+ "autoname": "format:HRM-APS-{#####}",
+ "title_field": "title",
+ "search_fields": "title,company",
+ "track_changes": 1,
+ "field_order": ["title", "company", "disabled", "from_date", "to_date", "late_tolerance_minutes", "rules", "help_text"],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "label": "Nama Aturan", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "company", "fieldtype": "Link", "options": "Company", "label": "Perusahaan", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "disabled", "fieldtype": "Check", "label": "Nonaktif", "default": "0"},
+  {"fieldname": "from_date", "fieldtype": "Date", "label": "Mulai Berlaku", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "to_date", "fieldtype": "Date", "label": "Sampai Tanggal", "in_list_view": 1},
+  {"fieldname": "late_tolerance_minutes", "fieldtype": "Float", "label": "Toleransi Terlambat (Menit)", "default": "0", "non_negative": 1},
+  {"fieldname": "rules", "fieldtype": "Table", "label": "Aturan Presensi Payroll", "options": "HRM Attendance Payroll Rule"},
+   {"fieldname": "help_text", "fieldtype": "HTML", "options": "<p>Aktifkan Terapkan Potongan Otomatis untuk mengisi Deduction Salary Slip dari aturan dan Base SSA. Tambahkan komponen pada Salary Structure dengan nominal 0, tanpa formula/kondisi dan tanpa Depends on Payment Days. Tidak membuat Additional Salary. Data belum lengkap ditandai pada Draft dan menghalangi Submit; konflik LWP/payment days atau Additional Salary diblokir.</p>"}
+ ],
+ "permissions": [
+   {"role": "HR Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1},
+   {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1}
+ ]
+}

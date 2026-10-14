@@ -119,18 +119,34 @@
                     <div class="heading">POTONGAN</div>
                     <table>
                         {% for row in doc.deductions %}
+                        {% set counters = snapshot_rows(doc) %}
+                        {% set counter = namespace(days=0, hours=0, day_matched=false, hour_matched=false) %}
+                        {% for detail in counters %}
+                            {% if detail.salary_component == row.salary_component or
+                                (not detail.salary_component and detail.category | lower == row.salary_component | lower) %}
+                                {% if detail.unit == "Jam" %}
+                                    {% set counter.hours = counter.hours + detail.quantity %}
+                                    {% set counter.hour_matched = true %}
+                                {% else %}
+                                    {% set counter.days = counter.days + detail.quantity %}
+                                    {% set counter.day_matched = true %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
                         <tr>
                             <td>{{ row.salary_component | e }}</td>
-                            <td class="colon" style="width: 16px;">
-                                {% if row.salary_component in ["KASBON", "BPJS"] %}:{% else %}{% endif %}
+                            <td class="colon">:</td>
+                            <td style="text-align: right; white-space: nowrap;">
+                                {% if counter.day_matched %}
+                                    {{ frappe.format(counter.days, {"fieldtype": "Float", "precision": 2}) }} HARI
+                                {% endif %}
+                                {% if counter.hour_matched %}
+                                    {% if counter.day_matched %}<br>{% endif %}
+                                    {{ frappe.format(counter.hours, {"fieldtype": "Float", "precision": 2}) }} JAM
+                                {% endif %}
                             </td>
                             <td class="amount">
-                                {% if row.salary_component not in ["KASBON", "BPJS"] %}
-                                    <span style="float: left;">{{ row.get_formatted("amount", doc) }}</span>
-                                    <span style="float: right;">HARI</span>
-                                {% else %}
-                                    {{ row.get_formatted("amount", doc) }}
-                                {% endif %}
+                                {{ row.get_formatted("amount", doc) }}
                             </td>
                         </tr>
                         {% endfor %}

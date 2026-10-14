@@ -1,0 +1,22 @@
+{
+ "doctype": "DocType",
+ "name": "HRM Attendance Payroll Rule",
+ "module": "HRM",
+ "istable": 1,
+ "editable_grid": 1,
+ "field_order": ["category", "company", "salary_component", "unit", "hours_per_day", "enabled", "method", "rate", "divisor", "multiplier", "from_date", "to_date"],
+ "fields": [
+  {"fieldname": "category", "fieldtype": "Select", "label": "Kategori", "options": "Alpha\nIzin\nTerlambat\nTidak Absen IN\nTidak Absen OUT", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "company", "fieldtype": "Link", "options": "Company", "label": "Perusahaan", "hidden": 1, "read_only": 1},
+  {"fieldname": "salary_component", "fieldtype": "Link", "options": "Salary Component", "label": "Komponen Potongan", "in_list_view": 1},
+  {"fieldname": "unit", "fieldtype": "Select", "label": "Satuan", "options": "Hari\nJam", "default": "Hari", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "hours_per_day", "fieldtype": "Float", "label": "Jam per Hari", "non_negative": 1, "depends_on": "eval:doc.unit==='Jam' && ['Alpha','Izin'].includes(doc.category)", "description": "Konversi hari native berdasarkan kebijakan HR; bukan bukti izin per jam. Setengah hari memakai separuh nilai ini."},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Terapkan Potongan Otomatis", "default": "0", "in_list_view": 1, "description": "Mengisi komponen Deduction pada Salary Slip Draft saat dihitung/disimpan. Komponen harus ada pada Salary Structure tanpa formula, nominal tetap, atau Depends on Payment Days."},
+  {"fieldname": "method", "fieldtype": "Select", "label": "Metode", "options": "Rekap Saja\nTarif Tetap\nBase / Pembagi", "default": "Rekap Saja"},
+  {"fieldname": "rate", "fieldtype": "Float", "label": "Tarif per Satuan", "non_negative": 1, "depends_on": "eval:doc.method==='Tarif Tetap'", "description": "Tarif per hari atau per jam mengikuti Satuan."},
+  {"fieldname": "divisor", "fieldtype": "Float", "label": "Pembagi Base", "non_negative": 1, "depends_on": "eval:doc.method==='Base / Pembagi'", "description": "Diisi HR sesuai kebijakan. Tidak ada pembagi potongan yang diasumsikan oleh kode."},
+  {"fieldname": "multiplier", "fieldtype": "Float", "label": "Pengali", "default": "1", "non_negative": 1},
+  {"fieldname": "from_date", "fieldtype": "Date", "label": "Mulai Berlaku (Opsional)", "description": "Kosong mengikuti periode dokumen."},
+  {"fieldname": "to_date", "fieldtype": "Date", "label": "Sampai Tanggal"}
+ ]
+}

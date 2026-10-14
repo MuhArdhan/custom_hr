@@ -6,6 +6,15 @@ app_email = "admin@example.com"
 app_license = "mit"
 required_apps = ["hrms"]
 
+after_install = "custom_hr.payroll_setup.install_payroll_setup"
+after_migrate = "custom_hr.payroll_setup.install_payroll_setup"
+
+jinja = {"methods": ["custom_hr.api.payroll_attendance.snapshot_rows"]}
+
+doc_events = {
+	"Salary Slip": {"before_submit": "custom_hr.api.payroll_attendance.validate_snapshot"},
+}
+
 # ----------------------------------------------------------------------------
 # App switcher entry (own icon, separate from Frappe HR)
 # ----------------------------------------------------------------------------
@@ -35,6 +44,7 @@ doctype_js = {
 	"Employee": "public/js/employee_face.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Salary Slip": "public/js/salary_slip_attendance.js",
 }
 
 doctype_list_js = {
@@ -63,6 +73,10 @@ has_permission = {
 # attendance marking right after check-out
 override_doctype_class = {
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
+}
+
+extend_doctype_class = {
+	"Salary Slip": ["custom_hr.overrides.salary_slip.AttendancePayrollMixin"],
 }
 
 # ----------------------------------------------------------------------------
