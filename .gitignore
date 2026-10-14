@@ -1,4 +1,7 @@
 node_modules/
+# This is a symlink, not a directory; ignore it without a trailing slash.
+/custom_hr/public/node_modules
+/custom_hr/public/dist/
 __pycache__/
 *.pyc
 .DS_Store

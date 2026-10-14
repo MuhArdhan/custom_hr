@@ -1,0 +1,199 @@
+{% set employee = frappe.db.get_value("Employee", doc.employee,
+    ["employee_number", "department", "designation"], as_dict=True) or {} %}
+{% set logo = frappe.db.get_value("Company", doc.company, "company_logo") %}
+{% set periode = frappe.utils.getdate(doc.start_date) %}
+{% set tanggal_cetak = frappe.utils.getdate(doc.posting_date) %}
+{% set bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"] %}
+{% set lokasi = "Klaten" %}
+{% set penyerah = "HRD" %}
+{% set disable_rounding = frappe.utils.cint(frappe.db.get_single_value("Payroll Settings", "disable_rounded_total")) %}
+{% set payable_field = "net_pay" if disable_rounding else "rounded_total" %}
+
+<style>
+    .print-format {
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+        color: #111;
+        padding: 0;
+        min-height: 0;
+        page-size: A4;
+        orientation: landscape;
+        margin-top: 10mm;
+        margin-bottom: 10mm;
+        margin-left: 10mm;
+        margin-right: 10mm;
+    }
+    @page { size: A4 landscape; }
+    .juri-slip { border: 1px solid #222; width: 100%; }
+    .juri-slip table { width: 100%; border-collapse: collapse; margin: 0; }
+    .print-format .juri-slip td, .print-format .juri-slip th {
+        padding: 2px 0 !important;
+        vertical-align: top;
+    }
+    .juri-slip .section { padding: 10px 18px; }
+    .juri-slip .divider { border-bottom: 1px solid #222; }
+    .juri-slip .company { font-size: 14px; font-weight: bold; }
+    .juri-slip .confidential { color: #d71920; font-size: 18px; font-weight: bold; margin-top: 8px; }
+    .juri-slip .title { text-align: center; font-size: 14px; font-weight: bold; }
+    .juri-slip .logo { max-width: 100px; max-height: 45px; }
+    .juri-slip .label { font-weight: bold; }
+    .juri-slip .colon { width: 16px; text-align: center; }
+    .juri-slip .heading { font-weight: bold; text-decoration: underline; margin-bottom: 6px; }
+    .juri-slip .amount { text-align: right; white-space: nowrap; }
+    .juri-slip .spacer { width: 8%; }
+    .juri-slip .total { border-top: 1px solid #444; font-weight: bold; }
+    .juri-slip .signature { text-align: center; }
+    .juri-slip .signature-space { height: 35px; }
+    .juri-slip tr { page-break-inside: avoid; }
+</style>
+
+<div class="juri-slip">
+    <div class="section divider">
+        <table>
+            <tr>
+                <td style="width: 40%;">
+                    <div class="company">{{ doc.company | e }}</div>
+                    <div class="confidential">PRIBADI &amp; RAHASIA</div>
+                </td>
+                <td style="width: 40%; vertical-align: middle;">
+                    <div class="title">
+                        SALARY SLIP<br>
+                        <span style="font-size: 11px;">
+                            PERIODE : {{ bulan[periode.month - 1] | upper }} {{ periode.year }}
+                        </span>
+                    </div>
+                </td>
+                <td style="width: 20%; text-align: right;">
+                    {% if logo %}<img src="{{ logo | e }}" class="logo">{% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section divider">
+        <table>
+            <tr>
+                <td class="label" style="width: 15%;">NPK / NAMA</td>
+                <td class="colon">:</td>
+                <td style="width: 35%;">{{ (doc.employee_name or doc.employee) | upper | e }}</td>
+                <td class="label" style="width: 15%;">DIVISI / DEPT</td>
+                <td class="colon" style="width: 16px;">:</td>
+                <td>{{ (doc.department or employee.department or "-") | e }}</td>
+            </tr>
+            <tr>
+                <td class="label">NIP</td>
+                <td class="colon">:</td>
+                <td>{{ (employee.employee_number or doc.employee) | e }}</td>
+                <td class="label">JABATAN</td>
+                <td class="colon">:</td>
+                <td>{{ (doc.designation or employee.designation or "-") | e }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section divider">
+        <table style="margin-bottom: 10px;">
+            <tr>
+                <td class="label" style="width: 15%;">Hari Kerja</td>
+                <td class="colon" style="width: 16px;">:</td>
+                <td>{{ frappe.format(doc.payment_days, {"fieldtype": "Float", "precision": 1}) }}</td>
+            </tr>
+        </table>
+        <table>
+            <tr>
+                <td style="width: 46%;">
+                    <div class="heading">PENDAPATAN</div>
+                    <table>
+                        {% for row in doc.earnings %}
+                        <tr>
+                            <td>{{ row.salary_component | e }}</td>
+                            <td class="colon">:</td>
+                            <td class="amount">{{ row.get_formatted("amount", doc) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </td>
+                <td class="spacer"></td>
+                <td style="width: 46%;">
+                    <div class="heading">POTONGAN</div>
+                    <table>
+                        {% for row in doc.deductions %}
+                        <tr>
+                            <td>{{ row.salary_component | e }}</td>
+                            <td class="colon" style="width: 16px;">
+                                {% if row.salary_component in ["KASBON", "BPJS"] %}:{% else %}{% endif %}
+                            </td>
+                            <td class="amount">
+                                {% if row.salary_component not in ["KASBON", "BPJS"] %}
+                                    <span style="float: left;">{{ row.get_formatted("amount", doc) }}</span>
+                                    <span style="float: right;">HARI</span>
+                                {% else %}
+                                    {{ row.get_formatted("amount", doc) }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </td>
+            </tr>
+            <tr><td colspan="3" style="height: 12px;"></td></tr>
+            <tr>
+                <td>
+                    <table class="total">
+                        <tr>
+                            <td>Jumlah Pendapatan</td>
+                            <td class="colon">:</td>
+                            <td class="amount">{{ doc.get_formatted("gross_pay") }}</td>
+                        </tr>
+                    </table>
+                </td>
+                <td class="spacer"></td>
+                <td>
+                    <table class="total">
+                        <tr>
+                            <td>Jumlah Potongan</td>
+                            <td class="colon">:</td>
+                            <td class="amount">{{ doc.get_formatted("total_deduction") }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <table>
+            <tr>
+                <td style="width: 40%;">
+                    <div class="heading">JUMLAH YANG DITERIMA</div>
+                    <table style="margin-top: 15px; width: 100%;">
+                        <tr>
+                            <td style="width: 25px; font-weight: bold; vertical-align: bottom; padding-bottom: 4px;">Rp</td>
+                            <td>
+                                <div style="border-bottom: 1px solid #222; padding-bottom: 4px; font-size: 14px; font-weight: bold;">
+                                    &nbsp;
+                                </div>
+                                <div style="border-bottom: 1px solid #222; padding-top: 18px; text-align: right; font-size: 14px; font-weight: bold;">
+                                    {{ doc.get_formatted(payable_field) }}
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td class="signature" style="width: 30%;">
+                    <div style="height: 22px;"></div>
+                    Diterima,
+                    <div class="signature-space"></div>
+                    <b>{{ (doc.employee_name or doc.employee) | upper | e }}</b>
+                </td>
+                <td class="signature" style="width: 30%;">
+                    {{ lokasi | e }}, {{ tanggal_cetak.day }} {{ bulan[tanggal_cetak.month - 1] }} {{ tanggal_cetak.year }}
+                    <br><br>Diserahkan,
+                    <div class="signature-space"></div>
+                    <b>{{ penyerah | e }}</b>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

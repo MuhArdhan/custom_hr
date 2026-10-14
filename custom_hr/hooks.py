@@ -71,6 +71,11 @@ override_doctype_class = {
 
 fixtures = [
 	{
+		"doctype": "Property Setter",
+		"filters": [["doc_type", "=", "Salary Slip"], ["property", "=", "default_print_format"],
+			["value", "=", "Slip Gaji JURI"]],
+	},
+	{
 		"doctype": "Custom Field",
 		"filters": [
 			[

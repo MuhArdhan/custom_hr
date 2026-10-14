@@ -1,0 +1,11 @@
+[
+ {
+  "doctype": "Property Setter",
+  "name": "Salary Slip-main-default_print_format",
+  "doctype_or_field": "DocType",
+  "doc_type": "Salary Slip",
+  "property": "default_print_format",
+  "property_type": "Data",
+  "value": "Slip Gaji JURI"
+ }
+]
