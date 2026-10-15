@@ -209,7 +209,12 @@ def _local_datetime(value, timezone: str) -> datetime:
 	return parsed.replace(microsecond=0)
 
 
-def _read_context(employee: str, timestamp) -> tuple[dict, object | None]:
+def normalize_checkin_datetime(timestamp=None) -> datetime:
+	"""Normalize an IN timestamp to the same site-local seconds as the resolver."""
+	return _local_datetime(timestamp, get_system_timezone())
+
+
+def _read_context(employee: str, timestamp, *, for_update: bool = False) -> tuple[dict, object | None]:
 	timezone = get_system_timezone()
 	context = {
 		"employee": employee,
@@ -232,7 +237,8 @@ def _read_context(employee: str, timestamp) -> tuple[dict, object | None]:
 	if not isinstance(employee, str) or not employee.strip():
 		context.update(mode_reason="employee_not_found", message=_("Karyawan tidak ditemukan."))
 		return context, None
-	record = frappe.db.get_value("Employee", employee, ["name", "status", "outlet", "company"], as_dict=True)
+	lock_options = {"for_update": True} if for_update else {}
+	record = frappe.db.get_value("Employee", employee, ["name", "status", "outlet", "company"], as_dict=True, **lock_options)
 	if not record:
 		context.update(mode_reason="employee_not_found", message=_("Karyawan tidak ditemukan."))
 		return context, None
@@ -244,7 +250,7 @@ def _read_context(employee: str, timestamp) -> tuple[dict, object | None]:
 		context.update(mode="Native", mode_reason="no_outlet", message=_("Karyawan tidak terhubung ke outlet; gunakan alur HRMS native."))
 		return context, None
 	try:
-		outlet = frappe.get_doc("Outlet", record.outlet)
+		outlet = frappe.get_doc("Outlet", record.outlet, **lock_options)
 	except frappe.DoesNotExistError:
 		context.update(mode_reason="outlet_not_found", message=_("Outlet karyawan tidak ditemukan."))
 		return context, None
@@ -273,19 +279,19 @@ def _read_context(employee: str, timestamp) -> tuple[dict, object | None]:
 	return context, outlet
 
 
-def get_employee_attendance_mode(employee: str, timestamp=None) -> dict:
+def get_employee_attendance_mode(employee: str, timestamp=None, *, for_update: bool = False) -> dict:
 	"""Internal mode lookup; does not choose a shift or authorize a user."""
-	context, _outlet = _read_context(employee, timestamp)
+	context, _outlet = _read_context(employee, timestamp, for_update=for_update)
 	return context
 
 
-def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False) -> dict:
+def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False, for_update: bool = False) -> dict:
 	"""Return selection + JSON-ready snapshot, or a stable code and reason.
 
 	No writes, activation, historical backfill, Shift Assignment fallback, user
 	permission bypass or HTTP exposure. Expected failures are returned, not thrown.
 	"""
-	context, outlet = _read_context(employee, timestamp)
+	context, outlet = _read_context(employee, timestamp, for_update=for_update)
 	result = {
 		**context,
 		"preview": preview,
@@ -306,7 +312,15 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 			raise ShiftConfigurationError(_("Outlet belum memiliki daftar shift aktif yang lengkap."))
 		if len(active_names) != len(set(active_names)):
 			raise ShiftConfigurationError(_("Shift Type aktif tercantum lebih dari sekali pada outlet."))
-		shifts = frappe.get_all("Shift Type", filters={"name": ["in", sorted(active_names)]}, fields=list(SHIFT_FIELDS))
+		if for_update:
+			shift_table = frappe.qb.DocType("Shift Type")
+			shifts = (
+				frappe.qb.from_(shift_table).select(*(shift_table[field] for field in SHIFT_FIELDS))
+				.where(shift_table.name.isin(sorted(active_names))).orderby(shift_table.name)
+				.for_update().run(as_dict=True)
+			)
+		else:
+			shifts = frappe.get_all("Shift Type", filters={"name": ["in", sorted(active_names)]}, fields=list(SHIFT_FIELDS))
 		if {shift.name for shift in shifts} != set(active_names):
 			raise ShiftConfigurationError(_("Salah satu Shift Type aktif outlet tidak ditemukan."))
 		local_time = get_datetime(context["evaluated_at"])

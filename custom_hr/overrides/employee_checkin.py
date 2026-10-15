@@ -20,6 +20,12 @@ from hrms.hr.doctype.employee_checkin.employee_checkin import (
 	EmployeeCheckin as BaseEmployeeCheckin,
 )
 
+from custom_hr.services.outlet_checkin import (
+	prepare_or_protect_checkin,
+	prevent_locked_checkin_deletion,
+)
+from custom_hr.services.outlet_shift import normalize_checkin_datetime
+
 # users with any of these roles bypass the self-service checkin restrictions
 SELF_SERVICE_BYPASS_ROLES = {"HR Manager", "HR User", "System Manager"}
 # allowed clock drift between server time and the submitted log time (in seconds)
@@ -27,9 +33,31 @@ SELF_CHECKIN_TIME_TOLERANCE_SECONDS = 900
 
 
 class CustomEmployeeCheckin(BaseEmployeeCheckin):
+	def before_validate(self):
+		if self.is_new() or not self.get("name"):
+			try:
+				self.time = normalize_checkin_datetime(self.time)
+			except (ValueError, TypeError, OverflowError, KeyError):
+				frappe.throw(_("Waktu absen atau timezone site tidak valid."))
+			super().before_validate()
+			prepare_or_protect_checkin(self)
+		else:
+			# Check immutable fields against DB before even normalizing a
+			# potentially forged timestamp on an existing locked document.
+			prepare_or_protect_checkin(self)
+			super().before_validate()
+
 	def validate(self):
 		super().validate()
 		self.validate_self_service_checkin()
+
+	@frappe.whitelist()
+	def fetch_shift(self):
+		if not prepare_or_protect_checkin(self):
+			return super().fetch_shift()
+
+	def on_trash(self):
+		prevent_locked_checkin_deletion(self)
 
 	def set_geolocation(self):
 		# upstream gates this behind HR Settings; store the payload whenever
@@ -58,6 +86,10 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		- check-out only allowed when there is an open check-in within the allowed window
 		"""
 		if not self.is_new() or self.flags.get("ignore_checkin_restrictions"):
+			return
+		if self.get("attendance_source") == "Outlet":
+			# Enforced under the employee lock in before_validate/fetch_shift,
+			# including when a caller sets flags.ignore_validate.
 			return
 
 		if frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES:
