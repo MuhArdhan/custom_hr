@@ -111,7 +111,7 @@ def _reject_native_source_payload(doc):
 			frappe.throw(_("Field {0} hanya boleh ditentukan backend untuk mode outlet.").format(field))
 
 
-def _relevant_ins(employee: str, timestamp: datetime, work_date, *, outlet_only: bool) -> list[dict]:
+def _relevant_ins(employee: str, timestamp: datetime, work_date, *, outlet_only: bool, for_update: bool = True) -> list[dict]:
 	"""Current locking reads, not an earlier repeatable-read snapshot/cache."""
 	day_start = datetime.combine(getdate(work_date), time.min)
 	day_end = day_start + timedelta(days=1)
@@ -129,10 +129,11 @@ def _relevant_ins(employee: str, timestamp: datetime, work_date, *, outlet_only:
 	)
 	if outlet_only:
 		condition &= log.attendance_source == "Outlet"
-	return (
+	query = (
 		frappe.qb.from_(log).select(*(log[field] for field in SESSION_FIELDS))
-		.where(condition).orderby(log.time).for_update().run(as_dict=True)
+		.where(condition).orderby(log.time)
 	)
+	return (query.for_update() if for_update else query).run(as_dict=True)
 
 
 def _cutoff(row: dict) -> datetime:
@@ -141,36 +142,39 @@ def _cutoff(row: dict) -> datetime:
 	return get_datetime(row.shift_actual_end or row.time).replace(hour=23, minute=59, second=59, microsecond=0)
 
 
-def _has_out(row: dict) -> bool:
+def _has_out(row: dict, *, for_update: bool = True) -> bool:
 	if row.attendance_source == "Outlet":
-		return bool(_linked_checkout(row))
+		return bool(_linked_checkout(row, for_update=for_update))
 	log = frappe.qb.DocType("Employee Checkin")
 	condition = (
 		(log.employee == row.employee) & (log.log_type == "OUT")
 		& (log.time >= get_datetime(row.time)) & (log.time <= _cutoff(row))
 	)
-	return bool(frappe.qb.from_(log).select(log.name).where(condition).for_update().run())
+	query = frappe.qb.from_(log).select(log.name).where(condition)
+	return bool((query.for_update() if for_update else query).run())
 
 
-def _linked_checkout(row: dict) -> dict | None:
+def _linked_checkout(row: dict, *, for_update: bool = True) -> dict | None:
 	"""Any stored OUT linked to this IN closes the slot, not just today's OUT."""
 	log = frappe.qb.DocType("Employee Checkin")
-	rows = (
+	query = (
 		frappe.qb.from_(log).select(log.name, log.time)
 		.where((log.employee == row.employee) & (log.log_type == "OUT") & (log.paired_checkin == row.name))
-		.limit(1).for_update().run(as_dict=True)
+		.limit(1)
 	)
+	rows = (query.for_update() if for_update else query).run(as_dict=True)
 	return rows[0] if rows else None
 
 
-def _latest_in_for_checkout(employee: str) -> dict | None:
+def _latest_in_for_checkout(employee: str, *, for_update: bool = True) -> dict | None:
 	"""Use persisted chronology, never a paired_checkin selected by the client."""
 	log = frappe.qb.DocType("Employee Checkin")
-	rows = (
+	query = (
 		frappe.qb.from_(log).select(log.name, *(log[field] for field in LOCKED_FIELDS))
 		.where((log.employee == employee) & (log.log_type == "IN"))
-		.orderby(log.time, log.name, order=frappe.qb.desc).limit(2).for_update().run(as_dict=True)
+		.orderby(log.time, log.name, order=frappe.qb.desc).limit(2)
 	)
+	rows = (query.for_update() if for_update else query).run(as_dict=True)
 	if len(rows) > 1 and get_datetime(rows[0].time) == get_datetime(rows[1].time) and any(row.attendance_source == "Outlet" for row in rows):
 		frappe.throw(_("Ada beberapa IN pada waktu yang sama. Hubungi HR untuk memeriksa riwayat sesi; sistem tidak memilih pasangan secara sembarang."))
 	return rows[0] if rows else None
@@ -233,16 +237,17 @@ def prepare_outlet_checkout(doc, row: dict) -> bool:
 	return True
 
 
-def validate_new_in_session(doc, *, outlet_only: bool = False):
+def validate_new_in_session(doc, *, outlet_only: bool = False, for_update: bool = True):
 	"""One IN per work date and no concurrent still-open session, even for HR."""
 	timestamp = get_datetime(doc.time)
 	work_date = getdate(doc.get("shift_work_date") or timestamp)
-	for row in _relevant_ins(doc.employee, timestamp, work_date, outlet_only=outlet_only):
+	options = {} if for_update else {"for_update": False}
+	for row in _relevant_ins(doc.employee, timestamp, work_date, outlet_only=outlet_only, **options):
 		locked_date = row.shift_work_date if row.attendance_source == "Outlet" else None
 		previous_date = getdate(locked_date or row.shift_start or row.time)
 		if previous_date == work_date:
 			frappe.throw(_("Anda sudah memiliki check-in pada tanggal kerja ini. Double shift tidak diperbolehkan."), title=_("Sudah Check-in"))
-		if get_datetime(row.time) <= timestamp <= _cutoff(row) and not _has_out(row):
+		if get_datetime(row.time) <= timestamp <= _cutoff(row) and not _has_out(row, **options):
 			frappe.throw(_("Masih ada check-in terbuka yang belum melewati batas OUT. Selesaikan sesi tersebut terlebih dahulu."))
 
 

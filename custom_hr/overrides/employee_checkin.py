@@ -22,10 +22,12 @@ from hrms.hr.doctype.employee_checkin.employee_checkin import (
 )
 
 from custom_hr.services.outlet_checkin import (
+	_employee_record,
 	prepare_or_protect_checkin,
 	prevent_locked_checkin_deletion,
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime
+from custom_hr.services.checkin_submission import apply_verified_face
 
 # users with any of these roles bypass the self-service checkin restrictions
 SELF_SERVICE_BYPASS_ROLES = {"HR Manager", "HR User", "System Manager"}
@@ -36,12 +38,22 @@ SELF_CHECKIN_TIME_TOLERANCE_SECONDS = 900
 class CustomEmployeeCheckin(BaseEmployeeCheckin):
 	def before_validate(self):
 		if self.is_new() or not self.get("name"):
+			if not (frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES):
+				# Device time/flags and face_verified in raw REST payloads are not proof.
+				_employee_record(self.employee, for_update=True)
+				self.time = now_datetime()
+				apply_verified_face(self)
 			try:
 				self.time = normalize_checkin_datetime(self.time)
 			except (ValueError, TypeError, OverflowError, KeyError):
 				frappe.throw(_("Waktu absen atau timezone site tidak valid."))
 			super().before_validate()
-			prepare_or_protect_checkin(self)
+			uses_outlet = prepare_or_protect_checkin(self)
+			if not uses_outlet and not (frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES):
+				self.validate_self_service_time()
+				self.validate_daily_checkin_limit()
+				self.validate_face_verification()
+				self.validate_checkout_window()
 		else:
 			# Check immutable fields against DB before even normalizing a
 			# potentially forged timestamp on an existing locked document.
@@ -108,15 +120,14 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 
 		day_start = get_datetime(self.time).replace(hour=0, minute=0, second=0, microsecond=0)
 		day_end = day_start + timedelta(days=1)
-		if frappe.db.exists(
-			"Employee Checkin",
-			{
-				"employee": self.employee,
-				"log_type": "IN",
-				"time": ["between", [day_start, day_end]],
-				"name": ("!=", self.name),
-			},
-		):
+		log = frappe.qb.DocType("Employee Checkin")
+		condition = (
+			(log.employee == self.employee) & (log.log_type == "IN")
+			& (log.time >= day_start) & (log.time < day_end)
+		)
+		if self.name:
+			condition &= log.name != self.name
+		if frappe.qb.from_(log).select(log.name).where(condition).limit(1).for_update().run():
 			frappe.throw(
 				title=_("Already Checked In"),
 				msg=_("You have already checked in today. Please check out instead."),
@@ -154,12 +165,14 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		if self.log_type != "OUT":
 			return
 
-		last_log = frappe.get_all(
-			"Employee Checkin",
-			filters={"employee": self.employee, "name": ("!=", self.name)},
-			fields=["name", "log_type", "time", "shift_actual_end"],
-			order_by="time desc",
-			limit=1,
+		log = frappe.qb.DocType("Employee Checkin")
+		condition = log.employee == self.employee
+		if self.name:
+			condition &= log.name != self.name
+		last_log = (
+			frappe.qb.from_(log).select(log.name, log.log_type, log.time, log.shift_actual_end)
+			.where(condition).orderby(log.time, log.name, order=frappe.qb.desc)
+			.limit(1).for_update().run(as_dict=True)
 		)
 		if not last_log or last_log[0].log_type != "IN":
 			frappe.throw(_("No open check-in found. Please check in before checking out."))

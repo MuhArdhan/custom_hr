@@ -3,6 +3,7 @@
 
 
 import json
+from math import isfinite
 
 import frappe
 from frappe import _
@@ -11,6 +12,7 @@ from frappe.utils import flt, now_datetime
 from hrms.api import get_current_employee
 from custom_hr.hrm.doctype.employee_face_profile.employee_face_profile import FACE_DESCRIPTOR_LENGTH
 from hrms.hr.utils import validate_active_employee
+from custom_hr.services.checkin_submission import checkin_response, submit_self_checkin, verified_face
 
 HR_ROLES = ("HR Manager", "HR User", "System Manager")
 DEFAULT_MATCH_THRESHOLD = 0.5
@@ -41,7 +43,13 @@ def _validate_descriptor(descriptor: str | list) -> list[float]:
 	if not isinstance(descriptor, (list, tuple)) or len(descriptor) != FACE_DESCRIPTOR_LENGTH:
 		frappe.throw(_("Invalid face descriptor."))
 
-	return [float(value) for value in descriptor]
+	try:
+		values = [float(value) for value in descriptor]
+	except (TypeError, ValueError, OverflowError):
+		frappe.throw(_("Invalid face descriptor."))
+	if not all(isfinite(value) for value in values):
+		frappe.throw(_("Invalid face descriptor."))
+	return values
 
 
 def _euclidean_distance(first: list[float], second: list[float]) -> float:
@@ -149,6 +157,7 @@ def face_checkin(
 	latitude: float | str | None = None,
 	longitude: float | str | None = None,
 	photo: str | None = None,
+	request_id: str | None = None,
 ) -> dict:
 	employee = get_current_employee()
 	log_type = (log_type or "").upper()
@@ -171,7 +180,9 @@ def face_checkin(
 		flt(frappe.db.get_single_value("HR Settings", "face_match_threshold"))
 		or DEFAULT_MATCH_THRESHOLD
 	)
-	score = _euclidean_distance(descriptor, json.loads(profile.descriptor))
+	if not isfinite(threshold) or threshold < 0:
+		frappe.throw(_("Face match threshold is invalid. Please contact HR."))
+	score = _euclidean_distance(descriptor, _validate_descriptor(profile.descriptor))
 	if score > threshold:
 		frappe.throw(
 			title=_("Face Verification Failed"),
@@ -180,21 +191,12 @@ def face_checkin(
 			),
 		)
 
-	checkin = frappe.get_doc(
-		{
-			"doctype": "Employee Checkin",
-			"employee": employee,
-			"log_type": log_type,
-			"time": now_datetime(),
-			"latitude": latitude or None,
-			"longitude": longitude or None,
-			"face_verified": 1,
-			"face_score": round(score, 4),
-		}
-	)
-	checkin.insert()
+	with verified_face(employee, round(score, 4)):
+		checkin, replayed = submit_self_checkin(
+			employee, log_type, latitude=latitude, longitude=longitude, request_id=request_id,
+		)
 
-	if photo:
+	if photo and not replayed:
 		photo_url = _save_photo_data_url(
 			photo, "Employee Checkin", checkin.name, f"checkin-{checkin.name}"
 		)
@@ -203,10 +205,4 @@ def face_checkin(
 				"Employee Checkin", checkin.name, "face_photo", photo_url, update_modified=False
 			)
 
-	frappe.db.commit()
-	return {
-		"name": checkin.name,
-		"log_type": checkin.log_type,
-		"time": checkin.time,
-		"face_score": checkin.face_score,
-	}
+	return checkin_response(checkin, replayed=replayed)
