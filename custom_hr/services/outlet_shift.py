@@ -246,6 +246,9 @@ def _read_context(employee: str, timestamp, *, for_update: bool = False) -> tupl
 	if record.status != "Active":
 		context.update(mode_reason="employee_inactive", message=_("Karyawan tidak aktif."))
 		return context, None
+	if not record.company:
+		context.update(mode_reason="invalid_configuration", message=_("Company karyawan belum ditentukan."))
+		return context, None
 	if not record.outlet:
 		context.update(mode="Native", mode_reason="no_outlet", message=_("Karyawan tidak terhubung ke outlet; gunakan alur HRMS native."))
 		return context, None
@@ -257,9 +260,8 @@ def _read_context(employee: str, timestamp, *, for_update: bool = False) -> tupl
 	if not outlet.is_active:
 		context.update(mode_reason="outlet_inactive", message=_("Outlet karyawan tidak aktif."))
 		return context, None
-	if record.company != outlet.company:
-		context.update(mode_reason="invalid_configuration", message=_("Company karyawan tidak sesuai dengan Company outlet."))
-		return context, None
+	# Outlet is the operational schedule/holiday/location source, not the
+	# employing company. Its legacy Company mapping need not match Employee.
 	if not outlet.get("enable_outlet_auto_shift"):
 		context.update(mode="Native", mode_reason="mode_disabled", message=_("Mode shift otomatis outlet belum diaktifkan."))
 		return context, outlet
@@ -350,6 +352,7 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 		"attendance_source": "Outlet",
 		"employee": employee,
 		"company": context["company"],
+		"company_source": "Employee",
 		"outlet": outlet.name,
 		"outlet_modified": str(outlet.modified or ""),
 		"holiday_list": outlet.holiday_list,

@@ -307,9 +307,27 @@ class TestOutletShiftResolver(unittest.TestCase):
 		self.outlet.is_active = 0
 		self.assertEqual(self.resolve(preview=True)["code"], "outlet_inactive")
 
-	def test_employee_outlet_company_mismatch_is_rejected(self):
+	def test_employee_outlet_company_mismatch_uses_employee_company(self):
 		self.outlet.company = "Other Company"
+		result = self.resolve()
+		self.assertTrue(result["matched"])
+		policy = result["checkin_values"]["shift_policy_snapshot"]
+		self.assertEqual(policy["company"], self.employee.company)
+		self.assertEqual(policy["company_source"], "Employee")
+		self.assertEqual(policy["outlet"], self.outlet.name)
+		self.assertEqual(policy["holiday_list"], self.outlet.holiday_list)
+
+	def test_missing_employee_company_is_rejected_without_outlet_fallback(self):
+		self.employee.company = None
 		self.assertEqual(self.resolve()["code"], "invalid_configuration")
+
+	def test_preview_with_different_company_preserves_employee_company_source(self):
+		self.outlet.company = "Other Company"
+		self.outlet.enable_outlet_auto_shift = 0
+		result = self.resolve(preview=True)
+		self.assertTrue(result["matched"])
+		self.assertFalse(result["mode_applies"])
+		self.assertEqual(result["checkin_values"]["shift_policy_snapshot"]["company"], self.employee.company)
 
 	def test_empty_employee_identifier_does_not_query_db(self):
 		result = resolve_outlet_shift("", "2026-10-15 10:00:00")

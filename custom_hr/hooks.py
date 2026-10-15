@@ -63,6 +63,11 @@ has_permission = {
 # attendance marking right after check-out
 override_doctype_class = {
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
+	"Shift Type": "custom_hr.overrides.shift_type.CustomShiftType",
+}
+
+scheduler_events = {
+	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
 }
 
 # ----------------------------------------------------------------------------

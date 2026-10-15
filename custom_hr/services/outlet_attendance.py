@@ -3,8 +3,8 @@
 
 """Pair-scoped attendance. Internal jobs only, no commits or shift-wide sync.
 
-Employee -> IN -> paired OUTs -> Attendance is the locking order. T09 will
-schedule recovery/missing-OUT finalization; this module does not scan employees.
+Employee -> IN -> paired OUTs -> Attendance is the locking order. The outlet
+scheduler handles discovery; this module does not scan employees.
 """
 
 from copy import deepcopy
@@ -55,6 +55,9 @@ def _session_policy(entry):
 		standard = (get_datetime(entry.shift_end) - get_datetime(entry.shift_start)).total_seconds() / 3600
 		valid = (
 			snapshot["company"] and snapshot["holiday_list"]
+			# Additive v1 marker: old snapshots retain their original company;
+			# never recompute historical logs from either live master.
+			and snapshot.get("company_source", "Employee") == "Employee"
 			and snapshot["attendance_source"] == "Outlet" and snapshot["holiday_source"] == "Outlet"
 			and getdate(entry.shift_work_date) == get_datetime(entry.shift_start).date()
 			and get_datetime(entry.checkout_deadline) == datetime.combine(get_datetime(entry.shift_end).date(), time(23, 59, 59))
@@ -276,7 +279,7 @@ def _process_session(source_checkin, source_checkout, *, finalize_missing=False)
 def process_outlet_attendance(source_checkin: str, source_checkout: str | None = None, *, finalize_missing=False):
 	"""Internal queue entry point; not whitelisted. Caller owns commit/rollback.
 
-	The finalize_missing primitive is ready for T09 but is not scheduled here.
+	The outlet scheduler calls finalize_missing only after the stored deadline.
 	Failures revert only this session and include both IDs in a deferred Error Log.
 	"""
 	user = frappe.session.user

@@ -222,9 +222,13 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 	still unmarked, and pulls `last_sync_of_checkin` forward so the standard
 	shift-type processor picks the logs up.
 	"""
-	pending_in = frappe.db.exists(
-		"Employee Checkin",
-		{"employee": employee, "shift": shift, "log_type": "IN", "attendance": ("is", "not set")},
+	log = frappe.qb.DocType("Employee Checkin")
+	native = log.attendance_source.isnull() | (log.attendance_source != "Outlet")
+	pending_in = (
+		frappe.qb.from_(log).select(log.name).where(
+			(log.employee == employee) & (log.shift == shift) & (log.log_type == "IN")
+			& (log.attendance.isnull() | (log.attendance == "")) & native
+		).limit(1).run()
 	)
 	if not pending_in:
 		return
@@ -236,12 +240,11 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 	if not cint(shift_doc.enable_auto_attendance):
 		return
 
-	last_log = frappe.get_all(
-		"Employee Checkin",
-		filters={"employee": employee, "shift": shift, "attendance": ("is", "not set")},
-		fields=["shift_actual_end"],
-		order_by="shift_actual_end desc",
-		limit=1,
+	last_log = (
+		frappe.qb.from_(log).select(log.shift_actual_end).where(
+			(log.employee == employee) & (log.shift == shift)
+			& (log.attendance.isnull() | (log.attendance == "")) & native
+		).orderby(log.shift_actual_end, order=frappe.qb.desc).limit(1).run(as_dict=True)
 	)
 	if last_log and last_log[0].shift_actual_end:
 		last_sync = get_datetime(last_log[0].shift_actual_end) + timedelta(minutes=1)

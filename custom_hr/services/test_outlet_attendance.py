@@ -192,6 +192,19 @@ class TestAttendanceCalculation(TestCase):
 		self.calculate()
 		self.assertEqual((self.entry, self.out), before)
 
+	def test_explicit_employee_company_source_is_accepted(self):
+		self.policy(company_source="Employee")
+		self.assertEqual(self.calculate().company, "Original Company")
+
+	def test_company_source_cannot_be_changed_to_outlet(self):
+		self.policy(company_source="Outlet")
+		with self.assertRaises(frappe.ValidationError):
+			self.calculate()
+
+	def test_legacy_v1_snapshot_without_company_source_keeps_locked_company(self):
+		self.assertNotIn("company_source", json.loads(self.entry.shift_policy_snapshot))
+		self.assertEqual(self.calculate().company, "Original Company")
+
 	def test_work_date_must_match_locked_shift_start_date(self):
 		self.entry.shift_work_date = self.out.shift_work_date = "2026-10-14"
 		self.policy(shift_work_date="2026-10-14")
