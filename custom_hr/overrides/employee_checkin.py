@@ -15,7 +15,7 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_datetime, now_datetime
+from frappe.utils import cint, flt, get_datetime, now_datetime
 
 from hrms.hr.doctype.employee_checkin.employee_checkin import (
 	EmployeeCheckin as BaseEmployeeCheckin,
@@ -28,6 +28,7 @@ from custom_hr.services.outlet_checkin import (
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime
 from custom_hr.services.checkin_submission import apply_verified_face
+from custom_hr.services.outlet_geofence import coordinates, validate_outlet_geofence
 
 # users with any of these roles bypass the self-service checkin restrictions
 SELF_SERVICE_BYPASS_ROLES = {"HR Manager", "HR User", "System Manager"}
@@ -49,6 +50,11 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 				frappe.throw(_("Waktu absen atau timezone site tidak valid."))
 			super().before_validate()
 			uses_outlet = prepare_or_protect_checkin(self)
+			if uses_outlet:
+				# before_validate still runs with ignore_validate: no raw REST,
+				# face/ordinary endpoint, or HR flag can skip outlet geofencing.
+				self.validate_distance_from_shift_location()
+				self.set_geolocation()
 			if not uses_outlet and not (frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES):
 				self.validate_self_service_time()
 				self.validate_daily_checkin_limit()
@@ -72,10 +78,21 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 	def on_trash(self):
 		prevent_locked_checkin_deletion(self)
 
+	def validate_distance_from_shift_location(self):
+		if not validate_outlet_geofence(self):
+			return super().validate_distance_from_shift_location()
+
 	def set_geolocation(self):
 		# upstream gates this behind HR Settings; store the payload whenever
 		# coordinates are present so the check-in history can show a location
-		if not (self.latitude and self.longitude):
+		if self.get("attendance_source") == "Outlet":
+			try:
+				lat, lon = coordinates(self.latitude, self.longitude)
+			except ValueError:
+				return  # No fictitious (0, 0) map when optional GPS is absent.
+			self.latitude = flt(lat, self.precision("latitude"))
+			self.longitude = flt(lon, self.precision("longitude"))
+		elif not (self.latitude and self.longitude):
 			return
 
 		self.geolocation = frappe.json.dumps(

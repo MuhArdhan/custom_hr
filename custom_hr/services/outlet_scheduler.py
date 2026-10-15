@@ -22,6 +22,7 @@ from custom_hr.services.outlet_attendance import (
 	_holiday_state,
 )
 from custom_hr.services.outlet_checkin import _linked_checkout
+from custom_hr.services.outlet_geofence import read_outlet_geofence
 from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_outlet_shift
 
 
@@ -152,6 +153,10 @@ def _day_context(employee, work_date):
 		return None, "mode_disabled"
 	if not outlet.is_active or not record.company:
 		frappe.throw(_("Outlet harus aktif dan Company karyawan harus terisi untuk evaluasi Absent."))
+	if cint(frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking")):
+		# Broken location configuration must not both reject every punch and
+		# then turn the resulting lack of logs into automatic Absent.
+		read_outlet_geofence(record.outlet)
 	if day < _stable_start(record, outlet) or (record.relieving_date and day > getdate(record.relieving_date)):
 		return None, "before_stable_activation_or_employment"
 	resolution = resolve_outlet_shift(employee, datetime.combine(day, time.min), for_update=True)
