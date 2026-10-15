@@ -27,6 +27,12 @@ frappe.listview_settings["Outlet"] = {
 
 frappe.ui.form.on("Outlet", {
 	refresh(frm) {
+		frm.set_intro(
+			__(
+				"Pengaturan shift outlet masih tahap persiapan. Mode otomatis belum dapat diaktifkan sampai integrasi absen selesai. Jeda Peralihan IN bukan toleransi terlambat; toleransi tetap diatur pada Shift Type."
+			),
+			"orange"
+		);
 		if (frm.is_new()) return;
 		frm.add_custom_button(__("Provision Karyawan"), () => {
 			frappe.call({

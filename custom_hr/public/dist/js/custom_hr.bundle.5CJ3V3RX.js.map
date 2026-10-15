@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../apps/custom_hr/custom_hr/public/js/custom_hr.bundle.js"],
+  "sourcesContent": ["// Frappe desk caches standard pages in localStorage, which keeps stale page\n// scripts/styles after an update. Drop cached app pages on every desk boot so\n// they always load the current version from the app.\nfor (const page of [\"employee-attendance-gallery\", \"outlet-roster\"]) {\n\ttry {\n\t\tlocalStorage.removeItem(`_page:${page}`);\n\t} catch (e) {\n\t\t// ignore storage errors (private mode etc.)\n\t}\n}\n"],
+  "mappings": ";;AAGA,aAAW,QAAQ,CAAC,+BAA+B,eAAe,GAAG;AACpE,QAAI;AACH,mBAAa,WAAW,SAAS,MAAM;AAAA,IACxC,SAAS,GAAP;AAAA,IAEF;AAAA,EACD;",
+  "names": []
+}

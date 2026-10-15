@@ -17,6 +17,9 @@
   "longitude",
   "geofence_radius_m",
   "shift_section",
+  "enable_outlet_auto_shift",
+  "outlet_auto_shift_effective_from",
+  "shift_transition_minutes",
   "shifts",
   "approval_section",
   "approver_1",
@@ -92,6 +95,31 @@
    "label": "Shift"
   },
   {
+   "default": "0",
+   "description": "Persiapan mode shift outlet. Aktivasi dikunci sampai resolver, pairing, dan pemrosesan attendance siap; penambahan field ini tidak mengubah alur absen.",
+   "fieldname": "enable_outlet_auto_shift",
+   "fieldtype": "Check",
+   "label": "Shift Otomatis Outlet",
+   "read_only": 1
+  },
+  {
+   "description": "Tanggal dan waktu mulai mode otomatis. Diisi saat aktivasi setelah integrasi selesai, bukan saat persiapan schema.",
+   "fieldname": "outlet_auto_shift_effective_from",
+   "fieldtype": "Datetime",
+   "label": "Shift Otomatis Berlaku Mulai",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "30",
+   "description": "IN berpindah ke shift berikutnya sejumlah menit sebelum jam mulainya. Bukan toleransi keterlambatan; Toleransi Terlambat dan Toleransi Pulang Awal tetap diatur pada Shift Type. Shift terakhir menerima IN sampai jam selesai.",
+   "fieldname": "shift_transition_minutes",
+   "fieldtype": "Int",
+   "label": "Jeda Peralihan IN (Menit)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
    "fieldname": "shifts",
    "fieldtype": "Table",
    "label": "Shift Berlaku",
@@ -123,7 +151,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-09 00:00:00.000000",
+ "modified": "2026-10-15 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "Outlet",

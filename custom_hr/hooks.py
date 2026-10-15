@@ -71,6 +71,21 @@ override_doctype_class = {
 
 fixtures = [
 	{
+		"doctype": "Property Setter",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"Shift Type-late_entry_grace_period-label",
+					"Shift Type-late_entry_grace_period-description",
+					"Shift Type-early_exit_grace_period-label",
+					"Shift Type-early_exit_grace_period-description",
+				],
+			]
+		],
+	},
+	{
 		"doctype": "Custom Field",
 		"filters": [
 			[
@@ -83,6 +98,22 @@ fixtures = [
 					"Employee Checkin-face_score",
 					"Employee Checkin-column_break_face",
 					"Employee Checkin-face_photo",
+					"Employee Checkin-outlet_shift_section",
+					"Employee Checkin-attendance_source",
+					"Employee Checkin-outlet_at_checkin",
+					"Employee Checkin-shift_work_date",
+					"Employee Checkin-outlet_shift_column",
+					"Employee Checkin-paired_checkin",
+					"Employee Checkin-checkout_deadline",
+					"Employee Checkin-shift_policy_snapshot",
+					"Attendance-outlet_attendance_section",
+					"Attendance-attendance_source",
+					"Attendance-outlet_at_checkin",
+					"Attendance-source_checkin",
+					"Attendance-source_checkout",
+					"Attendance-outlet_attendance_column",
+					"Attendance-missing_checkout",
+					"Attendance-working_hours_source",
 					"HR Settings-enable_face_checkin",
 					"HR Settings-require_face_checkin",
 					"HR Settings-face_match_threshold",
