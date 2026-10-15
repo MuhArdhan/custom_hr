@@ -8,9 +8,9 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, get_time
 
-# T03 only prepares configuration. Remove this gate only after the resolver,
-# pairing and attendance/scheduler integrations are ready for a controlled rollout.
-OUTLET_AUTO_SHIFT_READY = False
+# Local testing opened explicitly by the user after T11. Each outlet still
+# requires its own valid schedule, holiday list and activation timestamp.
+OUTLET_AUTO_SHIFT_READY = True
 
 SHIFT_NUMERIC_FIELDS = {
 	"begin_check_in_before_shift_start_time": "Batas Datang Awal",

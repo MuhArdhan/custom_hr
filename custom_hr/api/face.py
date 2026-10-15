@@ -158,6 +158,7 @@ def face_checkin(
 	longitude: float | str | None = None,
 	photo: str | None = None,
 	request_id: str | None = None,
+	expected_checkin: str | None = None,
 ) -> dict:
 	employee = get_current_employee()
 	log_type = (log_type or "").upper()
@@ -193,7 +194,7 @@ def face_checkin(
 
 	with verified_face(employee, round(score, 4)):
 		checkin, replayed = submit_self_checkin(
-			employee, log_type, latitude=latitude, longitude=longitude, request_id=request_id,
+			employee, log_type, latitude=latitude, longitude=longitude, request_id=request_id, expected_checkin=expected_checkin,
 		)
 
 	if photo and not replayed:

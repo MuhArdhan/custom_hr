@@ -172,9 +172,14 @@ class TestOutletConfiguration(unittest.TestCase):
 
 	def test_activation_is_blocked_before_attendance_integration(self):
 		self.prepare_activation()
-		with self.assertRaisesRegex(frappe.ValidationError, "belum dapat diaktifkan"):
+		with patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", False), self.assertRaisesRegex(frappe.ValidationError, "belum dapat diaktifkan"):
 			self.validate()
 		self.assertIsInstance(self.outlet, Outlet)
+
+	def test_valid_outlet_can_be_enabled_after_local_readiness_is_opened(self):
+		self.prepare_activation()
+		with patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", True):
+			self.validate()
 
 
 class TestOutletShiftSchema(unittest.TestCase):
@@ -209,7 +214,8 @@ class TestOutletShiftSchema(unittest.TestCase):
 		)
 		fields = {field["fieldname"]: field for field in definition["fields"]}
 		self.assertEqual(fields["enable_outlet_auto_shift"]["default"], "0")
-		self.assertEqual(fields["enable_outlet_auto_shift"]["read_only"], 1)
+		self.assertEqual(fields["enable_outlet_auto_shift"]["read_only"], 0)
+		self.assertEqual(fields["outlet_auto_shift_effective_from"]["read_only"], 0)
 		self.assertEqual(fields["shift_transition_minutes"]["default"], "30")
 		self.assertEqual(fields["shift_transition_minutes"]["non_negative"], 1)
 		self.assertFalse(fields["outlet_auto_shift_effective_from"].get("default"))

@@ -10,7 +10,9 @@ from frappe.utils import get_datetime, getdate, now_datetime
 from hrms.api import get_current_employee
 
 from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
-from custom_hr.services.checkin_submission import checkin_response, submit_self_checkin
+from custom_hr.services.checkin_submission import (
+	RESPONSE_FIELDS, checkin_response, request_log_name, submit_self_checkin,
+)
 from custom_hr.services.outlet_checkin import (
 	_checkout_snapshot,
 	_cutoff,
@@ -23,12 +25,34 @@ from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_
 
 
 @frappe.whitelist(methods=["POST"])
-def submit_checkin(log_type: str, latitude=None, longitude=None, request_id: str | None = None):
+def submit_checkin(log_type: str, latitude=None, longitude=None, request_id: str | None = None, expected_checkin: str | None = None):
 	doc, replayed = submit_self_checkin(
 		get_current_employee(), log_type,
-		latitude=latitude, longitude=longitude, request_id=request_id,
+		latitude=latitude, longitude=longitude, request_id=request_id, expected_checkin=expected_checkin,
 	)
 	return checkin_response(doc, replayed=replayed)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_checkin_request_result(request_id: str):
+	"""Read only one's committed result after an uncertain network response.
+
+	Not found is NOT permission to create a new action: the original request
+	may still be running. Clients must retain the UUID until resolved/retried.
+	"""
+	employee = get_current_employee()
+	record = _employee_record(employee, for_update=False)
+	if record.user_id != frappe.session.user or record.status != "Active":
+		frappe.throw(_("Akun harus terhubung ke karyawan aktif yang sedang login."), frappe.PermissionError)
+	name = request_log_name(employee, request_id)
+	if not name:
+		frappe.throw(_("request_id wajib diisi untuk memeriksa hasil permintaan."))
+	row = frappe.db.get_value(
+		"Employee Checkin", name, list(RESPONSE_FIELDS), as_dict=True,
+	)
+	if row and row.employee != employee:
+		frappe.throw(_("Hasil permintaan bukan milik karyawan ini."), frappe.PermissionError)
+	return checkin_response(row, replayed=True) if row else None
 
 
 @frappe.whitelist()
@@ -43,6 +67,7 @@ def get_checkin_context():
 		"mode": "Native", "next_action": "IN", "allowed": True, "reason": None,
 		"message": "", "candidate_shift": None, "shift_work_date": str(now.date()),
 		"checkout_deadline": None, "paired_checkin": None,
+		"incomplete_session": None,
 	}
 
 	def block(reason, message, action=None):
@@ -66,7 +91,17 @@ def get_checkin_context():
 			_checkout_snapshot(latest)
 		if latest and get_datetime(latest.time) > now:
 			return block("future_in", _("Riwayat IN berada setelah waktu server. Hubungi HR."))
-		if latest and get_datetime(latest.time) <= now <= _cutoff(latest) and not _has_out(latest, for_update=False):
+		is_open = bool(latest and not _has_out(latest, for_update=False))
+		if is_open and now > _cutoff(latest):
+			context["incomplete_session"] = {
+				"checkin": latest.name, "in_time": str(latest.time), "shift": latest.shift,
+				"outlet": latest.outlet_at_checkin or record.outlet,
+				"shift_work_date": str(getdate(latest.shift_work_date or latest.shift_start or latest.time)),
+				"checkout_deadline": str(_cutoff(latest)),
+				"reason": "missing_checkout",
+				"message": _("Sesi melewati batas OUT tanpa check-out. Jam OUT tetap kosong; hubungi HR melalui Attendance Request atau koreksi Attendance yang sesuai."),
+			}
+		if is_open and get_datetime(latest.time) <= now <= _cutoff(latest):
 			use_session(latest)
 			context["next_action"] = "OUT"
 			return context

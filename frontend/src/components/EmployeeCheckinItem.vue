@@ -7,13 +7,17 @@
 					{{ __("Log Type: {0}", [props.doc.log_type]) }}
 				</div>
 				<div class="text-xs font-normal text-gray-500">
-					<span>{{ formatTimestamp(props.doc.time) }}</span>
+					<span>{{ formatSiteDateTime(props.doc.time) }}</span>
 					<span v-if="props.doc.face_verified" class="ml-1 text-green-600">
 						&middot; {{ __("Face Verified") }}
 					</span>
 				</div>
+				<div v-if="props.doc.shift" class="text-xs text-gray-700">{{ __("Shift") }}: {{ props.doc.shift }}</div>
+				<div v-if="props.doc.outlet_at_checkin" class="text-xs text-gray-500">{{ __("Outlet") }}: {{ props.doc.outlet_at_checkin }}</div>
+				<div v-if="props.doc.shift_work_date" class="text-xs text-gray-500">{{ __("Work Date") }}: {{ props.doc.shift_work_date }}</div>
+				<div v-if="props.doc.checkout_deadline && props.doc.log_type === 'IN'" class="text-xs text-gray-500">{{ __("Check-out Deadline") }}: {{ formatSiteDateTime(props.doc.checkout_deadline) }}</div>
 				<div
-					v-if="props.doc.latitude && props.doc.longitude"
+					v-if="hasCoordinates(props.doc.latitude, props.doc.longitude)"
 					class="text-xs font-normal text-gray-500"
 				>
 					{{ Number(props.doc.latitude).toFixed(5) }}, {{ Number(props.doc.longitude).toFixed(5) }}
@@ -33,9 +37,12 @@
 
 <script setup>
 import { FeatherIcon } from "frappe-ui"
+import { inject } from "vue"
 
 import ListItem from "@/components/ListItem.vue"
-import { formatTimestamp } from "@/utils/formatters"
+import { formatSiteDateTime, hasCoordinates } from "@/utils/checkin"
+
+const __ = inject("$translate")
 
 const props = defineProps({
 	doc: {

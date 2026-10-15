@@ -102,7 +102,10 @@ class TestCheckinContext(CheckinTestCase):
 		self.entry.time = "2026-10-14 05:04:00"
 		self.entry.attendance_source = None
 		self.entry.shift_actual_end = "2026-10-14 23:59:59"
-		self.assertEqual(checkin.get_checkin_context()["next_action"], "IN")
+		result = checkin.get_checkin_context()
+		self.assertEqual(result["next_action"], "IN")
+		self.assertEqual(result["incomplete_session"]["reason"], "missing_checkout")
+		self.assertEqual(result["incomplete_session"]["checkin"], "IN-ORIGINAL")
 
 	def test_no_candidate_has_clear_reason(self):
 		self.resolution.update(matched=False, code="outside_checkin_window", message="Tidak ada shift")

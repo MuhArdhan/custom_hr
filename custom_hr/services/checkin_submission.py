@@ -12,7 +12,7 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 
-from custom_hr.services.outlet_checkin import _employee_record
+from custom_hr.services.outlet_checkin import _employee_record, _latest_in_for_checkout
 
 _verified_face = ContextVar("custom_hr_verified_face", default=None)
 RESPONSE_FIELDS = (
@@ -52,7 +52,7 @@ def checkin_response(doc, *, replayed=False):
 	return {**{field: doc.get(field) for field in RESPONSE_FIELDS}, "replayed": replayed}
 
 
-def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, request_id=None):
+def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, request_id=None, expected_checkin=None):
 	log_type = (log_type or "").upper()
 	if log_type not in ("IN", "OUT"):
 		frappe.throw(_("Log Type must be either IN or OUT."))
@@ -69,6 +69,12 @@ def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, re
 			if stored.employee != employee or stored.log_type != log_type:
 				frappe.throw(_("request_id sudah digunakan untuk tindakan lain. Gunakan identitas permintaan baru."))
 			return stored, True
+	if expected_checkin is not None:
+		# A precondition, never a client-selected pair: retries of an old OUT
+		# must not close a newer IN after the employee starts another session.
+		latest = _latest_in_for_checkout(employee) if log_type == "OUT" else None
+		if not expected_checkin or not latest or latest.name != expected_checkin:
+			frappe.throw(_("Sesi IN sudah berubah atau tidak sesuai dengan percobaan OUT ini. Muat ulang status dan hubungi HR bila hasil permintaan lama belum terkonfirmasi."))
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin", "employee": employee, "log_type": log_type,
 		"time": now_datetime(), "latitude": latitude, "longitude": longitude,
