@@ -347,11 +347,15 @@ class TestOutletCheckout(unittest.TestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "tidak boleh dihapus"):
 			self.doc.on_trash()
 
-	def test_outlet_out_does_not_enqueue_native_attendance_processor(self):
+	def test_outlet_out_queues_only_its_pair_after_commit(self):
 		prepare_or_protect_checkin(self.doc)
 		with patch("frappe.enqueue") as enqueue:
 			self.doc.queue_realtime_attendance()
-			enqueue.assert_not_called()
+			enqueue.assert_called_once()
+			self.assertEqual(enqueue.call_args.args[0], "custom_hr.services.outlet_attendance.process_outlet_attendance")
+			self.assertTrue(enqueue.call_args.kwargs["enqueue_after_commit"])
+			self.assertEqual(enqueue.call_args.kwargs["source_checkin"], "IN-ORIGINAL")
+			self.assertEqual(enqueue.call_args.kwargs["source_checkout"], self.doc.name)
 
 	def test_native_out_still_queues_existing_processor(self):
 		self.doc.shift = "Native Shift"

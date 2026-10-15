@@ -6,7 +6,7 @@
 Adds, without touching the hrms app:
 - self-service restrictions (one IN per day, no backdating, check-out window)
 - face verification requirement
-- native realtime attendance marking after check-out (outlet pairs wait for T08)
+- pair-scoped outlet attendance and native realtime marking after check-out
 - immutable outlet IN snapshots and OUT pairing, with activation still gated
 - coordinates are stored even when geolocation tracking is off
 """
@@ -200,8 +200,11 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		if self.log_type != "OUT" or not self.shift or cint(self.skip_auto_attendance):
 			return
 		if self.get("attendance_source") == "Outlet":
-			# T06 records the pair only. T08 will enqueue the pair-scoped
-			# processor; never advance a native shift-wide sync from this OUT.
+			frappe.enqueue(
+				"custom_hr.services.outlet_attendance.process_outlet_attendance",
+				queue="short", enqueue_after_commit=True,
+				source_checkin=self.paired_checkin, source_checkout=self.name,
+			)
 			return
 		frappe.enqueue(
 			"custom_hr.overrides.employee_checkin.process_shift_attendance_now",
