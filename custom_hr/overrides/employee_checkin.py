@@ -6,7 +6,8 @@
 Adds, without touching the hrms app:
 - self-service restrictions (one IN per day, no backdating, check-out window)
 - face verification requirement
-- realtime attendance marking right after a check-out completes the pair
+- native realtime attendance marking after check-out (outlet pairs wait for T08)
+- immutable outlet IN snapshots and OUT pairing, with activation still gated
 - coordinates are stored even when geolocation tracking is off
 """
 
@@ -122,7 +123,14 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 			)
 
 	def validate_self_service_time(self):
-		drift = abs((get_datetime(self.time) - now_datetime()).total_seconds())
+		server_time = now_datetime()
+		if (
+			self.get("attendance_source") == "Outlet" and self.log_type == "OUT"
+			and self.get("checkout_deadline")
+			and server_time.replace(microsecond=0) > get_datetime(self.checkout_deadline)
+		):
+			frappe.throw(_("Batas check-out sesi sudah lewat menurut waktu server. OUT kemarin tidak dapat dicatat dengan mengubah waktu perangkat; hubungi HR untuk koreksi Attendance."))
+		drift = abs((get_datetime(self.time) - server_time).total_seconds())
 		if drift > SELF_CHECKIN_TIME_TOLERANCE_SECONDS:
 			frappe.throw(
 				title=_("Invalid Check-in Time"),
@@ -178,6 +186,10 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		"""
 		if self.log_type != "OUT" or not self.shift or cint(self.skip_auto_attendance):
 			return
+		if self.get("attendance_source") == "Outlet":
+			# T06 records the pair only. T08 will enqueue the pair-scoped
+			# processor; never advance a native shift-wide sync from this OUT.
+			return
 		frappe.enqueue(
 			"custom_hr.overrides.employee_checkin.process_shift_attendance_now",
 			queue="short",
@@ -225,5 +237,7 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 
 def get_checkout_cutoff(open_checkin) -> "datetime":
 	"""Check-out is allowed until the end of the day the shift (or check-in) belongs to."""
+	if open_checkin.get("attendance_source") == "Outlet" and open_checkin.get("checkout_deadline"):
+		return get_datetime(open_checkin.get("checkout_deadline"))
 	reference_time = open_checkin.get("shift_actual_end") or open_checkin.get("time")
 	return get_datetime(reference_time).replace(hour=23, minute=59, second=59, microsecond=0)

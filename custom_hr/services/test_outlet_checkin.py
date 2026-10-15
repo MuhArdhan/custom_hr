@@ -50,6 +50,8 @@ class TestOutletCheckin(unittest.TestCase):
 		self.value_query = self.mock("frappe.db.get_value", side_effect=self.read_value)
 		self.mock("is_hr_operator", side_effect=lambda: self.hr)
 		self.resolver = self.mock("resolve_outlet_shift", side_effect=lambda *args, **kwargs: deepcopy(self.resolution))
+		self.mode_query = self.mock("get_employee_attendance_mode", side_effect=lambda *args, **kwargs: deepcopy(self.resolution))
+		self.latest_in = self.mock("_latest_in_for_checkout", return_value=None)
 		self.session_query = self.mock("_relevant_ins", side_effect=lambda *args, **kwargs: deepcopy(self.ins))
 		self.out_query = self.mock("_has_out", side_effect=lambda row: self.closed)
 		self.ready = patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", True)
@@ -171,7 +173,7 @@ class TestOutletCheckin(unittest.TestCase):
 
 	def test_readiness_gate_stays_closed_without_test_patch(self):
 		with patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", False):
-			with self.assertRaisesRegex(frappe.ValidationError, "integrasi OUT dan attendance"):
+			with self.assertRaisesRegex(frappe.ValidationError, "integrasi attendance dan scheduler"):
 				prepare_or_protect_checkin(self.doc)
 
 	def test_client_supplied_outlet_snapshot_is_overwritten(self):
@@ -329,21 +331,22 @@ class TestOutletCheckin(unittest.TestCase):
 		self.assertEqual(self.value_query.call_args_list[0].args[0], "Employee Checkin")
 		self.assertTrue(self.value_query.call_args_list[0].kwargs["for_update"])
 
-	def test_out_route_is_blocked_until_t06_for_outlet_mode(self):
+	def test_out_route_requires_in_without_running_in_resolver(self):
 		self.doc.log_type = "OUT"
-		with self.assertRaisesRegex(frappe.ValidationError, "menunggu T06"):
+		with self.assertRaisesRegex(frappe.ValidationError, "Tidak ada IN outlet"):
 			prepare_or_protect_checkin(self.doc)
+		self.resolver.assert_not_called()
 
 	def test_native_out_route_stays_native_if_no_pending_outlet_in(self):
 		self.doc.log_type = "OUT"
 		self.configured = 0
 		self.assertFalse(prepare_or_protect_checkin(self.doc))
 
-	def test_pending_outlet_in_is_not_closed_using_native_out(self):
+	def test_native_out_rejects_client_selected_outlet_pair(self):
 		self.doc.log_type = "OUT"
 		self.configured = 0
-		self.ins = [self.previous_in()]
-		with self.assertRaisesRegex(frappe.ValidationError, "menunggu T06"):
+		self.doc.paired_checkin = "FORGED-IN"
+		with self.assertRaisesRegex(frappe.ValidationError, "hanya boleh ditentukan backend"):
 			prepare_or_protect_checkin(self.doc)
 
 
