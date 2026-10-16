@@ -232,6 +232,7 @@ async function handleEnrolled({ descriptors, photo }) {
 async function submitAttempt() {
 	if (!canSubmit.value || submission.busy || !modalOpen.value) return
 	verifyError.value = ""
+	let rejectedLocation = false
 	try {
 		const payload = { latitude: latitude.value, longitude: longitude.value }
 		if (useFace.value) {
@@ -241,13 +242,26 @@ async function submitAttempt() {
 		const result = await submission.submit((params) => (useFace.value ? faceCheckin : standardCheckin).submit(params), payload)
 		if (!disposed && result) saved(result)
 	} catch (error) {
-		verifyError.value = message(error)
-		submitError.value = message(error)
-		if (!submission.pending) closeModal()
+		rejectedLocation = error?.exc_type === "CheckinRadiusExceededError"
+		if (rejectedLocation) {
+			// Keep the native server message verbatim inside the location section.
+			locationValid.value = false
+			locationStatus.value = message(error)
+			submitError.value = ""
+		} else {
+			verifyError.value = message(error)
+			submitError.value = message(error)
+			if (!submission.pending) closeModal()
+		}
 	} finally {
 		faceCheckin.reset()
 		standardCheckin.reset()
 		if (!disposed) await syncState()
+		if (rejectedLocation && !disposed && sameEmployee.value && modalOpen.value && !submission.pending && context.value?.allowed) {
+			// A definitive rejection cleared the UUID. Prepare an unsent retry;
+			// another GPS check and explicit confirmation are still required.
+			submission.begin(context.value.next_action, useFace.value ? "face" : "standard", { checkin: context.value.paired_checkin, workDate: context.value.shift_work_date })
+		}
 	}
 }
 

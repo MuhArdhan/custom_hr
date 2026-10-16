@@ -39,7 +39,10 @@ def validate_checkin_location(latitude=None, longitude=None, log_type=None, expe
 		return {"valid": True}
 	probe = frappe.get_doc({
 		"doctype": "Employee Checkin", "employee": context["employee"],
-		"time": context["server_time"], "log_type": log_type,
+		# Native assignment Date filters normalize datetime values, but not
+		# timestamp strings. Keep the same type as a real check-in, otherwise
+		# assignments ending today can be skipped and incorrectly pass preflight.
+		"time": get_datetime(context["server_time"]), "log_type": log_type,
 		"latitude": latitude, "longitude": longitude,
 		"attendance_source": context["mode"], "outlet_at_checkin": context["outlet"],
 	})

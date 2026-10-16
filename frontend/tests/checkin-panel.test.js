@@ -105,6 +105,37 @@ test("location is checked before confirmation and outside radius disables submit
 	} finally { ui.unmount() }
 })
 
+test("native company preflight shows unchanged radius warning inside modal before confirmation", async () => {
+	const warning = "You must be within 100 meters of your shift location to check in."
+	const ui = mount({ context: { mode: "Native", outlet: null }, settings: { allow_geolocation_tracking: 1 }, locationCheck: async () => {
+		throw Object.assign(new Error("request failed"), { exc_type: "CheckinRadiusExceededError", messages: [warning] })
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.ok(ui.text(ui.nodes("modal")[0]).includes(warning))
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
+	} finally { ui.unmount() }
+})
+
+test("native radius rejection at confirm stays in modal with unchanged text and permits GPS retry", async () => {
+	const warning = "You must be within 100 meters of your shift location to check in."
+	const ui = mount({ context: { mode: "Native", outlet: null }, settings: { allow_geolocation_tracking: 1 }, post: async () => {
+		throw Object.assign(new Error("request failed"), { response: { status: 417 }, exc_type: "CheckinRadiusExceededError", messages: [warning] })
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		await ui.click("Confirm Check In"); await flush()
+		assert.equal(ui.nodes("modal").length, 1)
+		assert.ok(ui.text(ui.nodes("modal")[0]).includes(warning))
+		assert.equal(ui.text().split(warning).length - 1, 1)
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		await ui.click("Retry location"); await flush()
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
+	} finally { ui.unmount() }
+})
+
 test("pending location validation blocks confirmation and late responses cannot validate a reopened modal", async () => {
 	const resolves = []
 	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: () => new Promise(resolve => resolves.push(resolve)) })

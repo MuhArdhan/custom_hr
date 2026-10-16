@@ -1,6 +1,7 @@
 """Location preflight must reuse authoritative validators without saving logs."""
 
 from unittest.mock import MagicMock
+from datetime import datetime
 
 import frappe
 
@@ -65,3 +66,9 @@ class TestLocationPreflight(CheckinTestCase):
 		checkin.validate_checkin_location(-7, 110, "IN")
 		self.native_shift.assert_called_once_with(self.probe)
 		self.native_distance.assert_called_once_with(self.probe)
+
+	def test_native_assignment_date_filters_receive_datetime_not_timestamp_text(self):
+		self.context["mode"] = "Native"
+		self.geofence.return_value = False
+		checkin.validate_checkin_location(-7, 110, "IN")
+		self.assertEqual(self.make_doc.call_args.args[0]["time"], datetime(2026, 10, 16, 10))
