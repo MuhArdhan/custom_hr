@@ -58,6 +58,7 @@ import { IonModal } from "@ionic/vue"
 import FaceCapture from "@/components/FaceCapture.vue"
 import { settings } from "@/data/settings"
 import { CheckinSubmission, hasCoordinates, validContext } from "@/utils/checkin"
+import { requireAndroidAttendanceDevice } from "@/utils/androidDevice"
 
 const employee = inject("$employee")
 const socket = inject("$socket")
@@ -86,6 +87,7 @@ const online = ref(navigator.onLine !== false)
 let disposed = false
 let locationGeneration = 0
 let refreshTimer
+let confirming = false
 
 const requestContext = createResource({ url: "custom_hr.api.checkin.get_checkin_context", method: "GET", onError() {} })
 const locationCheck = createResource({ url: "custom_hr.api.checkin.validate_checkin_location", method: "POST", onError() {} })
@@ -149,6 +151,8 @@ async function openCheckin() {
 	if (!canOpen.value) return
 	opening.value = true
 	try {
+		await requireAndroidAttendanceDevice()
+		if (disposed || !sameEmployee.value) return
 		const wasUncertain = !!submission.pending?.uncertain
 		if (!(await syncState()) && !submission.pending?.uncertain) return
 		if (!sameEmployee.value || disposed || (wasUncertain && !submission.pending)) return
@@ -230,10 +234,14 @@ async function handleEnrolled({ descriptors, photo }) {
 }
 
 async function submitAttempt() {
-	if (!canSubmit.value || submission.busy || !modalOpen.value) return
+	if (!canSubmit.value || submission.busy || !modalOpen.value || confirming) return
+	confirming = true
 	verifyError.value = ""
 	let rejectedLocation = false
 	try {
+		await requireAndroidAttendanceDevice()
+		// Native checks are asynchronous: the modal/account may have changed.
+		if (disposed || !sameEmployee.value || !modalOpen.value || !canSubmit.value) return
 		const payload = { latitude: latitude.value, longitude: longitude.value }
 		if (useFace.value) {
 			payload.descriptor = JSON.stringify(capturedDescriptor.value)
@@ -254,6 +262,7 @@ async function submitAttempt() {
 			if (!submission.pending) closeModal()
 		}
 	} finally {
+		confirming = false
 		faceCheckin.reset()
 		standardCheckin.reset()
 		if (!disposed) await syncState()

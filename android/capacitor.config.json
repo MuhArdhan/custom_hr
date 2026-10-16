@@ -1,7 +1,11 @@
 {
   "appId": "com.customhr.checkin.prototype",
-  "appName": "Custom HR Prototype",
+  "appName": "Custom HR",
   "webDir": "dist",
   "android": { "path": "native", "allowMixedContent": false },
-  "server": { "androidScheme": "https", "cleartext": false }
+  "server": {
+    "url": "https://sea-beyond-expansion-respond.trycloudflare.com/hrms",
+    "androidScheme": "https",
+    "cleartext": false
+  }
 }

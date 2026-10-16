@@ -52,6 +52,7 @@ function mount(options = {}) {
 	const Face = defineComponent({ setup(_, { emit }) { return () => h("face", { onClick: () => emit("captured", { descriptors: [[0]], photo: "temporary-photo" }) }) } })
 	const storage = { getItem: (k) => data.get(k) || null, setItem: (k, v) => data.set(k, v), removeItem: (k) => data.delete(k) }
 	const window = { sessionStorage: storage, crypto: { randomUUID: () => ID }, setInterval() { return 1 }, clearInterval() {}, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) }
+	window.Capacitor = options.capacitor
 	const document = { visibilityState: "visible", addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) }
 	let gpsCalls = 0
 	const navigator = { onLine: true, geolocation: { getCurrentPosition(success) { gpsCalls++; success({ coords: { latitude: 0, longitude: 110 } }) } } }
@@ -82,6 +83,38 @@ function mount(options = {}) {
 	const nodes = (type, n = host) => [...(n.type === type ? [n] : []), ...(n.children || []).flatMap((c) => nodes(type, c))]
 	return { calls, listeners, data, toasts, employee, settings, text, nodes, get gpsCalls() { return gpsCalls }, setContext: (v) => { current = v }, failContext: () => { failContext = true }, setLookup: (v) => { lookupResult = v }, setPost: (v) => { post = v }, click(label) { const n = nodes("button").find((b) => text(b).trim() === label); assert.ok(n, `Missing button ${label}: ${text()}`); if (!n.props.disabled) return n.props.onClick?.() }, unmount: () => app.unmount() }
 }
+
+test("Android developer options block opening the existing check-in modal", async () => {
+	const ui = mount({ capacitor: {
+		isNativePlatform: () => true, getPlatform: () => "android",
+		Plugins: { DevicePolicy: { getStatus: async () => ({ developerOptionsEnabled: true }) } },
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.match(ui.text(), /Matikan Opsi Pengembang/)
+		assert.equal(ui.nodes("modal").length, 0)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
+	} finally { ui.unmount() }
+})
+
+test("Android policy is rechecked at confirmation without changing Home UI", async () => {
+	let enabled = false
+	const ui = mount({ capacitor: {
+		isNativePlatform: () => true, getPlatform: () => "android",
+		Plugins: { DevicePolicy: { getStatus: async () => ({ developerOptionsEnabled: enabled }) } },
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.equal(ui.nodes("modal").length, 1)
+		enabled = true
+		await ui.click("Confirm Check In"); await flush()
+		assert.match(ui.text(), /Matikan Opsi Pengembang/)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
+		enabled = false
+		await ui.click("Confirm Check In"); await flush()
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
+	} finally { ui.unmount() }
+})
 
 test("location is checked before confirmation and outside radius disables submit until retry succeeds", async () => {
 	let allowed = false
