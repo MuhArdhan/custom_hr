@@ -14,6 +14,20 @@ test("wrapper loads the existing HTTPS HRMS, without wildcard navigation", async
   assert.equal(config.server.url, "https://sea-beyond-expansion-respond.trycloudflare.com/hrms")
   assert.equal(config.server.cleartext, false)
   assert.equal(config.server.allowNavigation, undefined)
+  assert.equal(config.android.adjustMarginsForEdgeToEdge, "auto")
+  assert.equal(config.appName, "ROPI HRMS")
+})
+
+test("native launcher uses ROPI HRMS and the bundled Frappe HR icon", async () => {
+  const resource = async (path) => readFile(new URL(`../native/app/src/main/res/${path}`, import.meta.url), "utf8")
+  const strings = await resource("values/strings.xml")
+  assert.match(strings, /name="app_name">ROPI HRMS</)
+  assert.match(strings, /name="title_activity_main">ROPI HRMS</)
+  assert.match(await resource("values/ic_launcher_background.xml"), /#A1EEC9/)
+  for (const name of ["ic_launcher", "ic_launcher_round"]) {
+    assert.match(await resource(`mipmap-anydpi-v26/${name}.xml`), /@drawable\/frappe_hr_foreground/)
+    assert.match(await resource(`mipmap-anydpi/${name}.xml`), /@drawable\/frappe_hr_foreground/)
+  }
 })
 
 test("ordinary browsers keep the existing attendance flow", async () => {
