@@ -26,14 +26,10 @@
 	<ion-modal :is-open="modalOpen && sameEmployee && settings.data?.allow_employee_checkin_from_mobile_app" :initial-breakpoint="1" :breakpoints="[0, 1]" :can-dismiss="!submission.busy || !sameEmployee" @didDismiss="closeModal">
 		<div v-if="modalOpen && sameEmployee && settings.data?.allow_employee_checkin_from_mobile_app" class="w-full min-h-full flex flex-col items-center gap-4 px-4 pt-6 pb-10 overflow-y-auto">
 			<h3 class="font-bold text-xl">{{ actionLabel }}</h3>
-			<div class="text-sm text-gray-600 text-center space-y-1">
-				<div>{{ context?.outlet || '—' }}</div>
-				<div v-if="displayShift">{{ displayShift }}</div>
-			</div>
 			<template v-if="settings.data?.allow_geolocation_tracking">
-				<p class="text-sm text-gray-600">{{ locationStatus }}</p>
+				<p class="text-sm text-center" :class="locationValid ? 'text-green-700' : 'text-orange-700'" role="status" aria-live="polite">{{ locationStatus }}</p>
 				<iframe v-if="gpsAvailable" class="w-full rounded border" height="170" :src="mapUrl" :title="__('Current location')" />
-				<Button v-if="!gpsAvailable" variant="ghost" @click="fetchLocation">{{ __("Retry location") }}</Button>
+				<Button :disabled="locationChecking || submission.busy" variant="ghost" @click="fetchLocation">{{ __("Retry location") }}</Button>
 			</template>
 			<p v-if="verifyError" class="text-sm text-red-600 text-center" role="alert">{{ verifyError }}</p>
 			<template v-if="useFace">
@@ -78,6 +74,8 @@ const modalOpen = ref(false)
 const latitude = ref(null)
 const longitude = ref(null)
 const locationStatus = ref("")
+const locationValid = ref(false)
+const locationChecking = ref(false)
 const faceStep = ref("capture")
 const faceStatusChecked = ref(false)
 const capturedDescriptor = ref(null)
@@ -90,6 +88,7 @@ let locationGeneration = 0
 let refreshTimer
 
 const requestContext = createResource({ url: "custom_hr.api.checkin.get_checkin_context", method: "GET", onError() {} })
+const locationCheck = createResource({ url: "custom_hr.api.checkin.validate_checkin_location", method: "POST", onError() {} })
 const requestResult = createResource({ url: "custom_hr.api.checkin.get_checkin_request_result", method: "GET", onError() {} })
 const standardCheckin = createResource({ url: "custom_hr.api.checkin.submit_checkin", method: "POST", onError() {} })
 const faceCheckin = createResource({ url: "custom_hr.api.face.face_checkin", method: "POST", onError() {} })
@@ -109,7 +108,7 @@ const gpsAvailable = computed(() => hasCoordinates(latitude.value, longitude.val
 const mapUrl = computed(() => `https://maps.google.com/maps?q=${latitude.value},${longitude.value}&hl=en&z=15&output=embed`)
 const sameEmployee = computed(() => employee.data?.name === employeeName)
 const canOpen = computed(() => sameEmployee.value && online.value && !syncing.value && !opening.value && !submission.busy && (submission.pending?.uncertain || (context.value?.allowed && ["IN", "OUT"].includes(context.value.next_action))))
-const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || gpsAvailable.value) && (!useFace.value || !!capturedDescriptor.value))
+const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || (gpsAvailable.value && locationValid.value && !locationChecking.value)) && (!useFace.value || !!capturedDescriptor.value))
 
 function message(error) {
 	return error?.messages?.filter(Boolean).join("\n") || error?.message || __("Unable to confirm attendance. Refresh the status and retry.")
@@ -175,18 +174,32 @@ async function openCheckin() {
 }
 
 function fetchLocation() {
+	if (submission.busy || !modalOpen.value || !sameEmployee.value) return
 	const generation = ++locationGeneration
 	latitude.value = longitude.value = null
+	locationValid.value = false
+	locationChecking.value = false
 	if (!navigator.geolocation) {
 		locationStatus.value = __("Geolocation is not supported by your current browser")
 		return
 	}
 	locationStatus.value = __("Locating...")
-	navigator.geolocation.getCurrentPosition((position) => {
-		if (disposed || !modalOpen.value || generation !== locationGeneration) return
+	navigator.geolocation.getCurrentPosition(async (position) => {
+		if (disposed || !sameEmployee.value || !modalOpen.value || generation !== locationGeneration) return
 		latitude.value = position.coords.latitude
 		longitude.value = position.coords.longitude
-		locationStatus.value = __("Location available")
+		locationStatus.value = __("Checking location...")
+		locationChecking.value = true
+		try {
+			const result = await locationCheck.submit({ latitude: latitude.value, longitude: longitude.value, log_type: submission.pending?.log_type, expected_checkin: submission.pending?.expected_checkin })
+			if (disposed || !sameEmployee.value || !modalOpen.value || generation !== locationGeneration) return
+			locationValid.value = result?.valid === true
+			locationStatus.value = locationValid.value ? __("Location verified") : __("Unable to verify location. Please retry.")
+		} catch (error) {
+			if (!disposed && sameEmployee.value && modalOpen.value && generation === locationGeneration) locationStatus.value = message(error)
+		} finally {
+			if (generation === locationGeneration) locationChecking.value = false
+		}
 	}, () => {
 		if (!disposed && modalOpen.value && generation === locationGeneration) locationStatus.value = __("Unable to retrieve your location. Enable location permission and retry.")
 	}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
@@ -242,6 +255,8 @@ function closeModal() {
 	if (submission.busy) return
 	modalOpen.value = false
 	locationGeneration++
+	locationValid.value = false
+	locationChecking.value = false
 	latitude.value = longitude.value = null
 	retakeFace()
 	faceCheckin.reset()

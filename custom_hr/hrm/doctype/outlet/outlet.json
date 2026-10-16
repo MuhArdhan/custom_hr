@@ -82,9 +82,7 @@
    "fieldname": "checkin_radius",
    "fieldtype": "Int",
    "label": "Checkin Radius (m)",
-   "fetch_from": "shift_location.checkin_radius",
-   "read_only": 1,
-   "description": "Mengikuti Shift Location. Nilai 0 berarti tanpa pembatasan jarak; GPS tetap diperlukan jika geolocation aktif."
+   "description": "Tersinkron dua arah dengan Shift Location saat disimpan. Nilai 0 berarti tanpa pembatasan jarak; GPS tetap diperlukan jika geolocation aktif."
   },
   {
    "fieldname": "column_break_geo",

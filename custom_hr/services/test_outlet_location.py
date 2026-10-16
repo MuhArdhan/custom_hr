@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import frappe
 
-from custom_hr.services.outlet_location import sync_outlet_location
+from custom_hr.services.outlet_location import radius_value, sync_location_radius_to_outlet, sync_outlet_location
 
 
 class TestOutletLocation(unittest.TestCase):
@@ -110,3 +110,62 @@ class TestOutletLocation(unittest.TestCase):
 		with patch("frappe.db.exists", return_value=False), patch("frappe.get_doc", return_value=self.location) as factory:
 			sync_outlet_location(self.doc)
 		self.assertLessEqual(len(factory.call_args.args[0]["location_name"]), 140)
+
+	def test_explicit_outlet_radius_updates_native_location_including_zero(self):
+		for radius in (75, 0):
+			self.location.save.reset_mock()
+			self.doc.shift_location = "LINKED"
+			self.doc.checkin_radius = radius
+			old = frappe._dict(shift_location="LINKED", checkin_radius=250, latitude=self.doc.latitude, longitude=self.doc.longitude)
+			with patch.object(self.doc, "get_doc_before_save", return_value=old), patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location):
+				sync_outlet_location(self.doc)
+			self.assertEqual(self.location.checkin_radius, radius)
+			self.assertEqual(self.doc.checkin_radius, radius)
+			self.assertEqual(self.location.flags.outlet_sync_origin, self.doc.name)
+			self.location.save.assert_called_once_with(ignore_permissions=True)
+
+	def test_unchanged_stale_radius_adopts_native_value(self):
+		self.doc.shift_location = "LINKED"
+		self.doc.checkin_radius = 100
+		old = frappe._dict(shift_location="LINKED", checkin_radius=100, latitude=self.doc.latitude, longitude=self.doc.longitude)
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location):
+			sync_outlet_location(self.doc)
+		self.assertEqual(self.doc.checkin_radius, 250)
+		self.location.save.assert_not_called()
+
+	def test_replacement_link_adopts_native_radius_not_old_outlet_radius(self):
+		self.doc.shift_location = "LINKED"
+		self.doc.checkin_radius = 100
+		old = frappe._dict(shift_location="PREVIOUS", checkin_radius=50, latitude=self.doc.latitude, longitude=self.doc.longitude)
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location):
+			sync_outlet_location(self.doc)
+		self.assertEqual(self.doc.checkin_radius, 250)
+		self.location.save.assert_not_called()
+
+	def test_new_outlet_explicit_radius_used_in_native_location(self):
+		self.doc.checkin_radius = 80
+		with patch("frappe.db.exists", return_value=False), patch("frappe.get_doc", return_value=self.location) as factory:
+			sync_outlet_location(self.doc)
+		self.assertEqual(factory.call_args.args[0]["checkin_radius"], 80)
+
+	def test_invalid_radius_rejected(self):
+		for value in (-1, 0.5, "NaN", "Infinity", True, "abc"):
+			with self.subTest(value=value), self.assertRaises(frappe.ValidationError):
+				radius_value(value)
+
+	def test_native_edit_updates_outlet_without_recursive_save(self):
+		location = frappe._dict(name="LINKED", checkin_radius=60, flags=frappe._dict())
+		rows = [frappe._dict(name="TEST-OUTLET", checkin_radius=250)]
+		with patch("frappe.get_all", return_value=rows), patch("frappe.db.set_value") as setter, patch("frappe.clear_document_cache") as cache, patch("frappe.get_doc") as factory:
+			sync_location_radius_to_outlet(location)
+		setter.assert_called_once_with("Outlet", "TEST-OUTLET", "checkin_radius", 60)
+		cache.assert_called_once_with("Outlet", "TEST-OUTLET")
+		factory.return_value.notify_update.assert_called_once()
+		factory.return_value.save.assert_not_called()
+
+	def test_native_hook_is_idempotent_and_skips_originating_outlet(self):
+		location = frappe._dict(name="LINKED", checkin_radius=60, flags=frappe._dict(outlet_sync_origin="ORIGIN"))
+		rows = [frappe._dict(name="ORIGIN", checkin_radius=100), frappe._dict(name="MATCHED", checkin_radius=60)]
+		with patch("frappe.get_all", return_value=rows), patch("frappe.db.set_value") as setter:
+			sync_location_radius_to_outlet(location)
+		setter.assert_not_called()

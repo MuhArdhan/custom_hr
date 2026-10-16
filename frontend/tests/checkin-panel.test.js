@@ -36,6 +36,7 @@ function mount(options = {}) {
 		if (url.endsWith("get_checkin_context")) { if (failContext) throw new Error("context offline"); return current }
 		if (url.endsWith("get_checkin_request_result")) return lookupResult
 		if (url.endsWith("get_face_status")) return { enrolled: true }
+		if (url.endsWith("validate_checkin_location")) return options.locationCheck ? options.locationCheck(params) : { valid: true }
 		return post(params)
 	}
 	const settings = reactive({ data: { allow_employee_checkin_from_mobile_app: 1, enable_face_checkin: 0, require_face_checkin: 0, allow_geolocation_tracking: 0, ...options.settings } })
@@ -82,19 +83,68 @@ function mount(options = {}) {
 	return { calls, listeners, data, toasts, employee, settings, text, nodes, get gpsCalls() { return gpsCalls }, setContext: (v) => { current = v }, failContext: () => { failContext = true }, setLookup: (v) => { lookupResult = v }, setPost: (v) => { post = v }, click(label) { const n = nodes("button").find((b) => text(b).trim() === label); assert.ok(n, `Missing button ${label}: ${text()}`); if (!n.props.disabled) return n.props.onClick?.() }, unmount: () => app.unmount() }
 }
 
+test("location is checked before confirmation and outside radius disables submit until retry succeeds", async () => {
+	let allowed = false
+	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: async () => {
+		if (!allowed) throw new Error("Outside outlet radius")
+		return { valid: true }
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.match(ui.text(), /Outside outlet radius/)
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
+		allowed = true
+		await ui.click("Retry location"); await flush()
+		assert.match(ui.text(), /Location verified/)
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
+		const checks = ui.calls.filter(c => c.url.endsWith("validate_checkin_location"))
+		assert.equal(checks.length, 2)
+		assert.equal(checks[0].params.latitude, 0)
+		assert.equal(checks[0].params.log_type, "IN")
+	} finally { ui.unmount() }
+})
+
+test("pending location validation blocks confirmation and late responses cannot validate a reopened modal", async () => {
+	const resolves = []
+	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: () => new Promise(resolve => resolves.push(resolve)) })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.match(ui.text(), /Checking location/)
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		await ui.click("Close"); await ui.click("Check In"); await flush()
+		resolves[0]({ valid: true }); await flush()
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		resolves[1]({ valid: true }); await flush()
+		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
+	} finally { ui.unmount() }
+})
+
+test("location preflight sends original IN reference for checkout", async () => {
+	const ui = mount({ context: { next_action: "OUT", paired_checkin: "IN-ORIGINAL" }, settings: { allow_geolocation_tracking: 1 } })
+	try {
+		await flush(); await ui.click("Check Out"); await flush()
+		const call = ui.calls.find(c => c.url.endsWith("validate_checkin_location"))
+		assert.equal(call.params.expected_checkin, "IN-ORIGINAL")
+		assert.equal(call.params.log_type, "OUT")
+	} finally { ui.unmount() }
+})
+
 test("component uses backend context and shows outlet and shift", async () => {
 	const ui = mount(); try { await flush(); assert.match(ui.text(), /Original Outlet/); assert.match(ui.text(), /Shift 1/); assert.ok(ui.calls.some((c) => c.url.endsWith("get_checkin_context"))) } finally { ui.unmount() }
 })
 
-test("simple panel omits attendance details and modal shows only outlet and shift", async () => {
+test("panel retains outlet and shift while compact modal omits both", async () => {
 	const ui = mount(); try {
 		await flush()
 		assert.equal(ui.nodes("details").length, 0)
 		assert.ok(!ui.text().includes("Attendance details"))
+		assert.match(ui.text(), /Original Outlet/)
+		assert.match(ui.text(), /Shift 1/)
 		await ui.click("Check In"); await flush()
 		const modalText = ui.text(ui.nodes("modal")[0])
-		assert.match(modalText, /Original Outlet/)
-		assert.match(modalText, /Shift 1/)
+		assert.ok(!modalText.includes("Original Outlet"))
+		assert.ok(!modalText.includes("Shift 1"))
 		assert.ok(!modalText.includes("Outlet:"))
 		assert.ok(!modalText.includes("Shift:"))
 		for (const label of ["Work Date", "Check-out Deadline", "Server time", "Candidate Shift", "Locked Shift"]) assert.ok(!modalText.includes(label))

@@ -5,7 +5,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, getdate, now_datetime
+from frappe.utils import cint, get_datetime, getdate, now_datetime
 
 from hrms.api import get_current_employee
 
@@ -22,6 +22,33 @@ from custom_hr.services.outlet_checkin import (
 	validate_new_in_session,
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_outlet_shift
+
+
+@frappe.whitelist(methods=["POST"])
+def validate_checkin_location(latitude=None, longitude=None, log_type=None, expected_checkin=None):
+	"""Advisory preflight only: no punch, face verification or attendance writes."""
+	from hrms.hr.doctype.employee_checkin.employee_checkin import EmployeeCheckin
+	from custom_hr.services.outlet_geofence import validate_outlet_geofence
+
+	context = get_checkin_context()
+	if not context["allowed"]:
+		frappe.throw(context["message"] or _("Attendance is not available."))
+	if log_type != context["next_action"] or (expected_checkin or None) != context["paired_checkin"]:
+		frappe.throw(_("Attendance status changed. Close this dialog and try again."))
+	if not cint(frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking")):
+		return {"valid": True}
+	probe = frappe.get_doc({
+		"doctype": "Employee Checkin", "employee": context["employee"],
+		"time": context["server_time"], "log_type": log_type,
+		"latitude": latitude, "longitude": longitude,
+		"attendance_source": context["mode"], "outlet_at_checkin": context["outlet"],
+	})
+	if not validate_outlet_geofence(probe):
+		# Call native methods directly; the override prepares a real session and
+		# requires face verification, neither of which belongs in a location probe.
+		EmployeeCheckin.fetch_shift(probe)
+		EmployeeCheckin.validate_distance_from_shift_location(probe)
+	return {"valid": True}
 
 
 @frappe.whitelist(methods=["POST"])

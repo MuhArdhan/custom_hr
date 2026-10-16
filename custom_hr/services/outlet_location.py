@@ -1,6 +1,7 @@
 """One linked native Shift Location per Outlet; no Shift Assignments created."""
 
 from hashlib import sha256
+from decimal import Decimal, InvalidOperation
 
 import frappe
 from frappe import _
@@ -8,8 +9,32 @@ from frappe import _
 from custom_hr.services.outlet_geofence import coordinates
 
 
+def radius_value(value):
+	try:
+		number = Decimal(str(value))
+		if isinstance(value, bool) or not number.is_finite() or number < 0 or number != number.to_integral_value():
+			raise ValueError
+		return int(number)
+	except (InvalidOperation, ValueError, TypeError):
+		frappe.throw(_("Checkin Radius harus berupa bilangan bulat 0 atau lebih (meter)."))
+
+
+def sync_location_radius_to_outlet(doc, method=None):
+	"""Update the display copy without saving Outlet or recursing into its sync."""
+	outlets = frappe.get_all("Outlet", filters={"shift_location": doc.name}, fields=["name", "checkin_radius"])
+	if not outlets:
+		return
+	radius = radius_value(doc.checkin_radius)
+	for outlet in outlets:
+		if outlet.name == doc.flags.get("outlet_sync_origin") or outlet.checkin_radius == radius:
+			continue
+		frappe.db.set_value("Outlet", outlet.name, "checkin_radius", radius)
+		frappe.clear_document_cache("Outlet", outlet.name)
+		frappe.get_doc("Outlet", outlet.name).notify_update()
+
+
 def sync_outlet_location(doc, *, migrate=False):
-	"""Outlet coordinate edits update the linked location, never its radius.
+	"""Explicit Outlet coordinate/radius edits update its linked native master.
 
 	Unchanged Outlet coordinates must not overwrite a later edit made directly
 	in Shift Location. A new link without coordinate edits adopts that master.
@@ -19,6 +44,11 @@ def sync_outlet_location(doc, *, migrate=False):
 	old = doc.get_doc_before_save()
 	linked = doc.get("shift_location")
 	coordinates_changed = bool(old and any(doc.get(f) != old.get(f) for f in ("latitude", "longitude")))
+	radius_changed = not migrate and doc.get("checkin_radius") is not None and (
+		(old and old.get("shift_location") == linked and doc.get("checkin_radius") != old.get("checkin_radius"))
+		or (not old and not linked and doc.get("checkin_radius") != 0)
+	)
+	radius = radius_value(doc.checkin_radius) if radius_changed else None
 	point = None
 	try:
 		point = coordinates(doc.get("latitude"), doc.get("longitude"))
@@ -35,15 +65,23 @@ def sync_outlet_location(doc, *, migrate=False):
 		if other:
 			frappe.throw(_("Shift Location ini sudah dipakai Outlet {0}. Gunakan lokasi tersendiri agar perubahan koordinat tidak memengaruhi Outlet lain.").format(other))
 		location = frappe.get_doc("Shift Location", linked, for_update=True)
+		location_changed = False
 		if coordinates_changed and point:
 			location.latitude, location.longitude = point
-			location.save(ignore_permissions=True)
+			location_changed = True
 		else:
 			try:
 				point = coordinates(location.latitude, location.longitude)
 			except ValueError:
 				frappe.throw(_("Koordinat Shift Location belum valid. Perbaiki lokasi terkait atau isi ulang koordinat Outlet."))
 			doc.latitude, doc.longitude = point
+		# A replacement link always adopts the selected master's settings.
+		if radius_changed and old and old.get("shift_location") == linked:
+			location.checkin_radius = radius
+			location_changed = True
+		if location_changed:
+			location.flags.outlet_sync_origin = doc.name
+			location.save(ignore_permissions=True)
 	else:
 		name = "Outlet - " + (doc.name or doc.company)
 		if len(name) > 140:
@@ -51,7 +89,7 @@ def sync_outlet_location(doc, *, migrate=False):
 		# Never silently adopt an unrelated existing master with the same name.
 		if frappe.db.exists("Shift Location", name):
 			frappe.throw(_("Shift Location {0} sudah ada. Pilih lokasi tersebut secara eksplisit atau gunakan nama lokasi lain.").format(name))
-		radius = doc.get("geofence_radius_m") if migrate or old else 0
+		radius = radius if radius_changed else doc.get("geofence_radius_m") if migrate or old else 0
 		if radius is None:
 			radius = 0
 		if isinstance(radius, bool) or float(radius) < 0 or float(radius) != int(radius):

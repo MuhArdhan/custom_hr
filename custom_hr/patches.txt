@@ -6,4 +6,5 @@
 custom_hr.patches.add_outlet_shift_fields
 custom_hr.patches.link_outlet_shift_locations
 custom_hr.patches.shift_location_coordinate_precision
+custom_hr.patches.sync_outlet_radius_display
 # Patches added in this section will be executed after doctypes are migrated

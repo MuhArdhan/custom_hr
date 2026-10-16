@@ -70,6 +70,12 @@ scheduler_events = {
 	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
 }
 
+doc_events = {
+	"Shift Location": {
+		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
+	},
+}
+
 # ----------------------------------------------------------------------------
 # Fixtures
 # ----------------------------------------------------------------------------
