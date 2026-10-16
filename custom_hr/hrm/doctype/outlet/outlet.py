@@ -32,6 +32,8 @@ class Outlet(Document):
 		self.shift_transition_minutes = int(transition)
 		self.validate_shifts()
 		self.validate_auto_shift_activation()
+		from custom_hr.services.outlet_location import sync_outlet_location
+		sync_outlet_location(self)
 
 	def validate_shifts(self):
 		rows = self.get("shifts") or []

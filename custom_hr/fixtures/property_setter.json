@@ -1,6 +1,30 @@
 [
  {
   "doctype": "Property Setter",
+  "name": "Shift Location-latitude-precision",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Location",
+  "field_name": "latitude",
+  "property": "precision",
+  "property_type": "Int",
+  "value": "7",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Location-longitude-precision",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Location",
+  "field_name": "longitude",
+  "property": "precision",
+  "property_type": "Int",
+  "value": "7",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
   "name": "Shift Type-late_entry_grace_period-label",
   "doctype_or_field": "DocField",
   "doc_type": "Shift Type",

@@ -17,7 +17,7 @@ MODULE = "custom_hr.services.outlet_geofence"
 
 
 def outlet(**changes):
-	row = frappe._dict(name="Original Outlet", latitude=-7.0, longitude=110.0, geofence_radius_m=100)
+	row = frappe._dict(name="Original Outlet", shift_location="Original Location", latitude=-7.0, longitude=110.0, checkin_radius=100)
 	row.update(changes)
 	return row
 
@@ -73,14 +73,21 @@ class TestCoordinatesAndRadius(TestCase):
 
 	def test_radius_comes_from_configuration_not_a_fixed_buffer(self):
 		with patch(f"{MODULE}.get_distance_between_coordinates", return_value=150):
-			self.assertEqual(service.check_position(outlet(geofence_radius_m=200), -7, 110), 150)
+			self.assertEqual(service.check_position(outlet(checkin_radius=200), -7, 110), 150)
 			with self.assertRaises(CheckinRadiusExceededError):
-				service.check_position(outlet(geofence_radius_m=149), -7, 110)
+				service.check_position(outlet(checkin_radius=149), -7, 110)
 
-	def test_missing_zero_negative_and_nonfinite_radius_are_configuration_errors(self):
-		for radius in (None, "", 0, -1, float("nan"), float("inf"), "bad", True):
+	def test_missing_negative_fractional_and_nonfinite_radius_are_configuration_errors(self):
+		for radius in (None, "", -1, 0.5, float("nan"), float("inf"), "bad", True):
 			with self.subTest(radius=radius), self.assertRaisesRegex(frappe.ValidationError, "Konfigurasi lokasi Outlet"):
-				service.check_position(outlet(geofence_radius_m=radius), -7, 110)
+				service.check_position(outlet(checkin_radius=radius), -7, 110)
+
+	def test_native_zero_radius_records_valid_gps_without_distance_limit(self):
+		with patch(f"{MODULE}.get_distance_between_coordinates") as distance:
+			self.assertIsNone(service.check_position(outlet(checkin_radius=0), 40, -70))
+			distance.assert_not_called()
+		with self.assertRaisesRegex(frappe.ValidationError, "GPS tidak tersedia"):
+			service.check_position(outlet(checkin_radius=0), None, None)
 
 	def test_incomplete_outlet_coordinates_are_configuration_errors_not_assignment_fallback(self):
 		for changes in ({"latitude": None}, {"longitude": None}, {"latitude": 0, "longitude": 0}, {"latitude": float("nan")}, {"longitude": 181}):
@@ -113,29 +120,29 @@ class TestGeofenceLifecycle(TestCase):
 		self.reader = self.mock("frappe.db.get_value", side_effect=self.read_outlet)
 
 	def read_outlet(self, dt, name, fields, **kwargs):
-		self.assertEqual(dt, "Outlet")
-		self.assertEqual(name, "Original Outlet")
+		self.assertIn(dt, ("Outlet", "Shift Location"))
+		self.assertEqual(name, "Original Outlet" if dt == "Outlet" else "Original Location")
 		self.assertTrue(kwargs["for_update"])
-		return self.config
+		return self.config.copy() if self.config else None
 
 	def test_in_and_out_both_use_original_outlet_with_no_assignments(self):
 		with patch("frappe.get_all", side_effect=AssertionError("No Shift Assignment lookup")):
 			for log_type in ("IN", "OUT"):
 				self.doc.log_type = log_type
 				self.assertTrue(service.validate_outlet_geofence(self.doc))
-		self.assertEqual(self.reader.call_count, 2)
+		self.assertEqual(self.reader.call_count, 4)
 
 	def test_out_does_not_look_up_current_employee_outlet_or_company(self):
 		self.doc.log_type = "OUT"
 		self.doc.paired_checkin = "PERSISTED-IN"
 		service.validate_outlet_geofence(self.doc)
-		self.assertEqual([call.args[0] for call in self.reader.call_args_list], ["Outlet"])
+		self.assertEqual([call.args[0] for call in self.reader.call_args_list], ["Outlet", "Shift Location"])
 
 	def test_out_reads_current_radius_of_original_outlet(self):
 		self.doc.log_type = "OUT"
 		with patch(f"{MODULE}.get_distance_between_coordinates", return_value=50):
 			service.validate_outlet_geofence(self.doc)
-			self.config.geofence_radius_m = 40
+			self.config.checkin_radius = 40
 			with self.assertRaises(CheckinRadiusExceededError):
 				service.validate_outlet_geofence(self.doc)
 
@@ -161,6 +168,21 @@ class TestGeofenceLifecycle(TestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "Outlet asal sesi tidak ditemukan"):
 			service.validate_outlet_geofence(self.doc)
 		self.reader.assert_not_called()
+
+	def test_missing_link_rejects_even_when_legacy_outlet_coordinates_are_valid(self):
+		self.config.shift_location = None
+		with self.assertRaisesRegex(frappe.ValidationError, "Shift Location belum dihubungkan"):
+			service.validate_outlet_geofence(self.doc)
+		self.assertEqual(self.reader.call_count, 1)
+
+	def test_deleted_link_target_does_not_fall_back_to_legacy_radius(self):
+		self.reader.side_effect = [self.config, None]
+		with self.assertRaisesRegex(frappe.ValidationError, "Shift Location belum dihubungkan"):
+			service.validate_outlet_geofence(self.doc)
+
+	def test_unlinked_outlet_values_are_not_runtime_sources(self):
+		self.reader.side_effect = [outlet(latitude=80, longitude=80, checkin_radius=1), outlet()]
+		self.assertTrue(service.validate_outlet_geofence(self.doc))
 
 	def test_existing_log_is_not_revalidated_against_changed_master(self):
 		self.doc.name = "STORED"

@@ -82,6 +82,8 @@ fixtures = [
 				"name",
 				"in",
 				[
+					"Shift Location-latitude-precision",
+					"Shift Location-longitude-precision",
 					"Shift Type-late_entry_grace_period-label",
 					"Shift Type-late_entry_grace_period-description",
 					"Shift Type-early_exit_grace_period-label",

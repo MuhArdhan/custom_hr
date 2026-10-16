@@ -39,14 +39,14 @@ def validate_configuration(outlet):
 	"""Validate master coordinates/radius independently of a device position."""
 	try:
 		lat, lon = coordinates(outlet.latitude, outlet.longitude)
-		if isinstance(outlet.geofence_radius_m, bool):
+		if isinstance(outlet.checkin_radius, bool):
 			raise ValueError("invalid radius")
-		radius = float(outlet.geofence_radius_m)
-		if not isfinite(radius) or radius <= 0:
+		radius = float(outlet.checkin_radius)
+		if not isfinite(radius) or radius < 0 or not radius.is_integer():
 			raise ValueError("invalid radius")
 	except (ValueError, TypeError, OverflowError):
 		frappe.throw(
-			_("Konfigurasi lokasi Outlet {0} belum lengkap atau tidak valid. HR perlu mengisi Latitude, Longitude, dan Radius Geofence yang lebih besar dari 0.").format(outlet.name),
+			_("Konfigurasi lokasi Outlet {0} belum lengkap atau tidak valid. Periksa Shift Location terkait, Latitude, Longitude, dan Checkin Radius (0 atau lebih).").format(outlet.name),
 			title=_("Konfigurasi Geofence Outlet"),
 		)
 	return lat, lon, radius
@@ -54,13 +54,21 @@ def validate_configuration(outlet):
 
 def read_outlet_geofence(outlet_name):
 	outlet = frappe.db.get_value(
-		"Outlet", outlet_name, ["name", "latitude", "longitude", "geofence_radius_m"],
+		"Outlet", outlet_name, ["name", "shift_location"],
 		as_dict=True, for_update=True,
 	) if outlet_name else None
 	if not outlet:
 		frappe.throw(_("Outlet asal sesi tidak ditemukan. Hubungi HR untuk memeriksa konfigurasi lokasi; sistem tidak memakai lokasi shift pengganti."))
-	validate_configuration(outlet)
-	return outlet
+	location = frappe.db.get_value(
+		"Shift Location", outlet.shift_location, ["name", "latitude", "longitude", "checkin_radius"],
+		as_dict=True, for_update=True,
+	) if outlet.shift_location else None
+	if not location:
+		frappe.throw(_("Konfigurasi lokasi Outlet {0} belum lengkap: Shift Location belum dihubungkan atau tidak ditemukan.").format(outlet.name))
+	location["shift_location"] = location.name
+	location["name"] = outlet.name
+	validate_configuration(location)
+	return location
 
 
 def check_position(outlet, latitude, longitude):
@@ -70,6 +78,8 @@ def check_position(outlet, latitude, longitude):
 		gps_lat, gps_lon = coordinates(latitude, longitude)
 	except ValueError:
 		frappe.throw(_("GPS tidak tersedia atau koordinat tidak valid. Aktifkan izin lokasi dan kirim Latitude serta Longitude yang lengkap."), title=_("Lokasi Diperlukan"))
+	if radius == 0:
+		return None  # Native HRMS semantics: record GPS, no radius enforcement.
 	try:
 		distance = get_distance_between_coordinates(lat, lon, gps_lat, gps_lon)
 	except (ValueError, OverflowError):

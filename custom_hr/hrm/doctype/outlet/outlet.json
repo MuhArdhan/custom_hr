@@ -12,6 +12,8 @@
   "holiday_list",
   "geo_section",
   "address",
+  "shift_location",
+  "checkin_radius",
   "column_break_geo",
   "latitude",
   "longitude",
@@ -68,6 +70,23 @@
    "label": "Alamat"
   },
   {
+   "fieldname": "shift_location",
+   "fieldtype": "Link",
+   "label": "Shift Location",
+   "options": "Shift Location",
+   "unique": 1,
+   "no_copy": 1,
+   "description": "Dibuat otomatis saat koordinat Outlet diisi. Radius dikelola di Shift Location. Satu lokasi khusus per Outlet."
+  },
+  {
+   "fieldname": "checkin_radius",
+   "fieldtype": "Int",
+   "label": "Checkin Radius (m)",
+   "fetch_from": "shift_location.checkin_radius",
+   "read_only": 1,
+   "description": "Mengikuti Shift Location. Nilai 0 berarti tanpa pembatasan jarak; GPS tetap diperlukan jika geolocation aktif."
+  },
+  {
    "fieldname": "column_break_geo",
    "fieldtype": "Column Break"
   },
@@ -75,19 +94,21 @@
    "fieldname": "latitude",
    "fieldtype": "Float",
    "label": "Latitude",
-   "precision": "6"
+    "precision": "7"
   },
   {
    "fieldname": "longitude",
    "fieldtype": "Float",
    "label": "Longitude",
-   "precision": "6"
+    "precision": "7"
   },
   {
-   "default": "100",
-   "fieldname": "geofence_radius_m",
-   "fieldtype": "Int",
-   "label": "Radius Geofence (m)"
+    "fieldname": "geofence_radius_m",
+    "fieldtype": "Int",
+    "label": "Radius Geofence (m) — Legacy",
+    "hidden": 1,
+    "read_only": 1,
+    "description": "Data lama dipertahankan untuk migrasi saja. Validasi memakai Checkin Radius pada Shift Location."
   },
   {
    "fieldname": "shift_section",

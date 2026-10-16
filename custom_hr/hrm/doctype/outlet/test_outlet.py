@@ -241,6 +241,17 @@ class TestOutletShiftSchema(unittest.TestCase):
 			frappe._dict(module="Other App", fieldtype="Select", options="\nOutlet")
 		)
 
+	def test_native_location_coordinate_precision_is_seven_decimals(self):
+		definitions = json.loads(Path(frappe.get_app_path("custom_hr", "fixtures", "property_setter.json")).read_text(encoding="utf-8"))
+		precision = {row["field_name"]: row["value"] for row in definitions if row["doc_type"] == "Shift Location" and row["property"] == "precision"}
+		self.assertEqual(precision, {"latitude": "7", "longitude": "7"})
+		from custom_hr.patches.shift_location_coordinate_precision import execute
+		with patch("custom_hr.patches.shift_location_coordinate_precision.make_property_setter") as setter:
+			execute()
+		self.assertEqual(setter.call_count, 2)
+		for fieldname in ("latitude", "longitude"):
+			setter.assert_any_call("Shift Location", fieldname, "precision", "7", "Int")
+
 	def test_migration_rejects_existing_type_change_before_ddl(self):
 		self.assert_migration_conflict(frappe._dict(module="HRM", fieldtype="Data", options=""))
 
