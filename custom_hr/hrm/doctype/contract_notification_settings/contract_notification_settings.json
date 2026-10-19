@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType",
+ "name": "Contract Notification Settings",
+ "module": "HRM",
+ "issingle": 1,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": ["enabled", "dry_run", "reminder_days", "hr_recipients", "test_mode", "allowed_recipients"],
+ "fields": [
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "0"},
+  {"fieldname": "dry_run", "fieldtype": "Check", "label": "Dry Run", "default": "1", "description": "Hanya mencatat calon penerima; tidak membuat Email Queue."},
+  {"fieldname": "reminder_days", "fieldtype": "Data", "label": "Reminder Days", "default": "30,14,7,3", "reqd": 1, "description": "Jumlah hari sebelum kontrak berakhir, dipisahkan koma. Pencocokan tepat pada hari tersebut."},
+  {"fieldname": "hr_recipients", "fieldtype": "Small Text", "label": "HR Recipients", "default": "upalmrobot@gmail.com", "description": "Email HRD, satu per baris atau dipisahkan koma. Tidak mengambil semua user ber-role HR."},
+  {"fieldname": "test_mode", "fieldtype": "Check", "label": "Test Mode", "default": "1"},
+  {"fieldname": "allowed_recipients", "fieldtype": "Small Text", "label": "Allowed Recipients", "default": "upalmrobot@gmail.com\nhetiayasiwa@gmail.com", "description": "Saat Test Mode aktif, hanya email dalam daftar ini yang boleh menerima. Alamat di luar daftar diblokir, bukan diganti dengan fallback."}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1},
+  {"role": "HR Manager", "read": 1, "write": 1}
+ ]
+}

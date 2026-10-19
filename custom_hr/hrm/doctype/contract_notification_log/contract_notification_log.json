@@ -1,0 +1,24 @@
+{
+ "doctype": "DocType",
+ "name": "Contract Notification Log",
+ "module": "HRM",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "field_order": ["deduplication_key", "employee", "contract_end_date", "reminder_days", "recipient", "recipient_type", "status", "details"],
+ "fields": [
+  {"fieldname": "deduplication_key", "fieldtype": "Data", "label": "Deduplication Key", "unique": 1, "read_only": 1},
+  {"fieldname": "employee", "fieldtype": "Link", "options": "Employee", "label": "Employee", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "contract_end_date", "fieldtype": "Date", "label": "Contract End Date", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "reminder_days", "fieldtype": "Int", "label": "Reminder Days", "read_only": 1},
+  {"fieldname": "recipient", "fieldtype": "Data", "label": "Recipient", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "recipient_type", "fieldtype": "Select", "options": "HR\nEmployee", "label": "Recipient Type", "read_only": 1},
+  {"fieldname": "status", "fieldtype": "Select", "options": "Queued\nDry Run\nSkipped\nFailed", "label": "Status", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "details", "fieldtype": "Small Text", "label": "Details", "read_only": 1}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "report": 1},
+  {"role": "HR Manager", "read": 1, "report": 1}
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}

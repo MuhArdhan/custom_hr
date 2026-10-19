@@ -1,0 +1,29 @@
+{% if is_test %}
+<p><strong>[TEST]</strong> Email ini hanya untuk pengujian, bukan pemberitahuan resmi.</p>
+{% endif %}
+<p>Yth. Tim HRD,</p>
+<p>
+	Kontrak kerja <strong>{{ employees | length }} karyawan</strong> berikut akan berakhir
+	pada <strong>{{ contract_end_date | e }}</strong>, dalam <strong>{{ reminder_days | e }} hari</strong>.
+</p>
+<table cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+	<tr>
+		<th align="left" style="border: 1px solid #ddd;">ID Karyawan</th>
+		<th align="left" style="border: 1px solid #ddd;">Nama</th>
+		<th align="left" style="border: 1px solid #ddd;">Perusahaan</th>
+		<th align="left" style="border: 1px solid #ddd;">Tanggal Akhir Kontrak</th>
+	</tr>
+	{% for employee in employees %}
+	<tr>
+		<td style="border: 1px solid #ddd;"><a href="{{ employee.employee_url | e }}">{{ employee.employee | e }}</a></td>
+		<td style="border: 1px solid #ddd;">{{ (employee.employee_name or employee.employee) | e }}</td>
+		<td style="border: 1px solid #ddd;">{{ (employee.company or '-') | e }}</td>
+		<td style="border: 1px solid #ddd;">{{ employee.contract_end_date | e }}</td>
+	</tr>
+	{% endfor %}
+</table>
+<p>
+	Mohon melakukan evaluasi dan koordinasi dengan penanggung jawab terkait untuk menentukan
+	tindak lanjut sesuai kebijakan perusahaan.
+</p>
+<p>Terima kasih,<br><strong>Sistem HR</strong></p>
