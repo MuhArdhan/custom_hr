@@ -2,6 +2,13 @@
 	<div class="flex flex-col bg-white rounded w-full py-6 px-4 border-none">
 		<h2 class="text-lg font-bold text-gray-900">{{ __("Hey, {0} 👋", [employee?.data?.first_name]) }}</h2>
 		<template v-if="settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee">
+			<div class="font-medium text-sm text-gray-500 mt-1.5">
+				<template v-if="lastLog">
+					<span>{{ __("Last {0} was at {1}", [__(lastLog.log_type === 'IN' ? 'check-in' : 'check-out'), formatSiteDateTime(lastLog.time)]) }}</span>
+					<span class="whitespace-pre"> &middot; </span>
+				</template>
+				<router-link :to="{ name: 'EmployeeCheckinListView' }" class="underline">{{ __("View List") }}</router-link>
+			</div>
 			<div v-if="context" class="mt-3 text-sm text-gray-700 space-y-1" aria-live="polite">
 				<div v-if="context.outlet">{{ context.outlet }}</div>
 				<div v-if="displayShift">{{ displayShift }}</div>
@@ -57,7 +64,7 @@ import { createListResource, createResource, FeatherIcon, toast } from "frappe-u
 import { IonModal } from "@ionic/vue"
 import FaceCapture from "@/components/FaceCapture.vue"
 import { settings } from "@/data/settings"
-import { CheckinSubmission, hasCoordinates, validContext } from "@/utils/checkin"
+import { CheckinSubmission, formatSiteDateTime, hasCoordinates, validContext } from "@/utils/checkin"
 import { requireAndroidAttendanceDevice } from "@/utils/androidDevice"
 
 const employee = inject("$employee")

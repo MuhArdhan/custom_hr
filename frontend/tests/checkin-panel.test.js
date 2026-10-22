@@ -59,7 +59,7 @@ function mount(options = {}) {
 	const module = { exports: {} }
 	const sandbox = { module, exports: module.exports, require, console, window, navigator, document,
 		__mocks: {
-			"frappe-ui": { createResource: resource, createListResource: () => reactive({ data: [], async reload() { return [] } }), FeatherIcon: "span", toast: (v) => toasts.push(v) },
+			"frappe-ui": { createResource: resource, createListResource: () => reactive({ data: options.checkins || [], async reload() { return options.checkins || [] } }), FeatherIcon: "span", toast: (v) => toasts.push(v) },
 			"@ionic/vue": { IonModal: Modal }, "@/components/FaceCapture.vue": Face, "@/data/settings": { settings },
 		},
 	}
@@ -83,6 +83,40 @@ function mount(options = {}) {
 	const nodes = (type, n = host) => [...(n.type === type ? [n] : []), ...(n.children || []).flatMap((c) => nodes(type, c))]
 	return { calls, listeners, data, toasts, employee, settings, text, nodes, get gpsCalls() { return gpsCalls }, setContext: (v) => { current = v }, failContext: () => { failContext = true }, setLookup: (v) => { lookupResult = v }, setPost: (v) => { post = v }, click(label) { const n = nodes("button").find((b) => text(b).trim() === label); assert.ok(n, `Missing button ${label}: ${text()}`); if (!n.props.disabled) return n.props.onClick?.() }, unmount: () => app.unmount() }
 }
+
+test("history link is available even without recent checkins and targets the existing photo history", async () => {
+	const ui = mount()
+	try {
+		await flush()
+		const link = ui.nodes("a").find(node => ui.text(node).trim() === "View List")
+		assert.ok(link)
+		assert.equal(link.props.to.name, "EmployeeCheckinListView")
+		assert.ok(!ui.text().includes("Last check-"))
+	} finally { ui.unmount() }
+})
+
+test("history shortcut restores the latest log timestamp without opening the checkin modal", async () => {
+	for (const type of ["IN", "OUT"]) {
+		const ui = mount({ checkins: [{ log_type: type, time: "2026-10-15 09:30:00" }] })
+		try {
+			await flush()
+			assert.ok(ui.text().includes(`Last ${type === "IN" ? "check-in" : "check-out"} was at`))
+			assert.match(ui.text(), /09:30/)
+			assert.match(ui.text(), /View List/)
+			assert.equal(ui.nodes("modal").length, 0)
+		} finally { ui.unmount() }
+	}
+})
+
+test("history shortcut is hidden after switching employees", async () => {
+	const ui = mount()
+	try {
+		await flush()
+		ui.employee.data.name = "OTHER"
+		await flush()
+		assert.ok(!ui.text().includes("View List"))
+	} finally { ui.unmount() }
+})
 
 test("Android developer options block opening the existing check-in modal", async () => {
 	const ui = mount({ capacitor: {
