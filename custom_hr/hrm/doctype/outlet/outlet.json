@@ -53,9 +53,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Daftar libur yang berlaku untuk karyawan outlet ini",
+   "description": "Data kalender lama dipertahankan untuk referensi. Tidak membatasi presensi atau pemrosesan Attendance Outlet.",
    "fieldname": "holiday_list",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Holiday List",
    "options": "Holiday List"
   },

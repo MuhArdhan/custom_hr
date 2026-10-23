@@ -307,8 +307,6 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 	if context["mode"] == "Unavailable" or (not context["mode_applies"] and not preview) or outlet is None:
 		return result
 	try:
-		if not outlet.holiday_list:
-			raise ShiftConfigurationError(_("Holiday List outlet belum ditentukan."))
 		active_names = [row.shift_type for row in (outlet.get("shifts") or []) if row.enabled]
 		if not active_names or any(not name for name in active_names):
 			raise ShiftConfigurationError(_("Outlet belum memiliki daftar shift aktif yang lengkap."))

@@ -10,6 +10,7 @@
 		"ionic:build": "npm run build",
 		"ionic:serve": "vite dev --host",
 		"test:checkin": "node --test tests/checkin.test.js tests/checkin-panel.test.js",
+		"test:leave-calendar": "node --test tests/leave-calendar.test.js",
 		"copy-html-entry": "cp ../custom_hr/public/frontend/index.html ../custom_hr/www/hrms.html"
 	},
 	"dependencies": {

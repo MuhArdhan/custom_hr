@@ -161,7 +161,7 @@ class TestAttendanceCalculation(TestCase):
 		self.assertEqual(values.actual_overtime_duration, 0)
 
 	def test_invalid_or_incomplete_snapshot_never_falls_back_to_master(self):
-		for changes in ({"standard_working_hours": 99}, {"holiday_source": "Employee"}, {"holiday_list": None}, {"late_entry_grace_period": -1}):
+		for changes in ({"standard_working_hours": 99}, {"holiday_source": "Employee"}, {"late_entry_grace_period": -1}):
 			self.entry, self.out = session()
 			self.policy(**changes)
 			with self.subTest(changes=changes), self.assertRaises(frappe.ValidationError):
@@ -350,23 +350,28 @@ class TestSessionPersistence(TestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.run_session()
 
-	def test_outlet_holiday_skips_new_attendance_without_setting_skip_flag(self):
+	def test_outlet_holiday_does_not_skip_real_session_attendance(self):
 		self.holiday.return_value = (True, False)
-		self.assertEqual(self.run_session()["reason"], "outlet_holiday")
-		self.db_write.assert_not_called()
-		self.writer.assert_not_called()
+		self.assertEqual(self.run_session()["status"], "created")
+		self.holiday.assert_not_called()
 
 	def test_snapshot_allows_attendance_on_outlet_holiday(self):
 		self.holiday.return_value = (True, False)
 		self.policy["mark_auto_attendance_on_holidays"] = 1
 		self.assertEqual(self.run_session()["status"], "created")
 
-	def test_half_holiday_uses_outlet_list_and_passes_half_threshold_flag(self):
+	def test_half_holiday_does_not_reduce_working_hour_thresholds(self):
 		self.holiday.return_value = (False, True)
 		with patch.object(service, "calculate_session_attendance", wraps=service.calculate_session_attendance) as calc:
 			self.run_session()
-		self.assertTrue(calc.call_args.kwargs["half_holiday"])
-		self.assertEqual(self.holiday.call_args.args[0]["holiday_list"], "Outlet Holidays")
+		self.assertFalse(calc.call_args.kwargs.get("half_holiday", False))
+		self.holiday.assert_not_called()
+
+	def test_empty_or_deleted_holiday_list_never_blocks_real_session(self):
+		for holiday_list in (None, "", "DELETED-LIST"):
+			self.policy["holiday_list"] = holiday_list
+			self.assertEqual(self.run_session()["status"], "created")
+		self.holiday.assert_not_called()
 
 	def test_authorized_skip_or_offshift_is_respected(self):
 		for field in ("skip_auto_attendance", "offshift"):

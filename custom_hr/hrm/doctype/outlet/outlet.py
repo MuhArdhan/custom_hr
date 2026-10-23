@@ -88,8 +88,6 @@ class Outlet(Document):
 			return
 		if not cint(self.is_active):
 			frappe.throw(_("Mode shift otomatis hanya dapat digunakan pada outlet aktif."))
-		if not self.holiday_list:
-			frappe.throw(_("Pilih Holiday List outlet sebelum mengaktifkan mode shift otomatis."))
 		if not self.get("outlet_auto_shift_effective_from"):
 			frappe.throw(_("Tanggal mulai mode shift otomatis wajib ditentukan saat aktivasi."))
 		if not OUTLET_AUTO_SHIFT_READY:

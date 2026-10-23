@@ -22,6 +22,7 @@ from frappe.model.document import Document
 from frappe.utils import flt, getdate, time_diff_in_hours
 
 from custom_hr.api.roster import HR_ROLES
+from custom_hr.services.overtime_approval import DECISION_TOKEN, employee_state, protect_employee_decisions
 
 FINAL_STATES = ("Disetujui", "Ditolak")
 MAX_OVERTIME_HOURS = 4
@@ -29,6 +30,7 @@ MAX_OVERTIME_HOURS = 4
 
 class OvertimeRequest(Document):
 	def validate(self):
+		protect_employee_decisions(self)
 		self.fetch_outlet_details()
 		self.validate_editable()
 		self.validate_times()
@@ -59,10 +61,20 @@ class OvertimeRequest(Document):
 			(t.action for t in transitions if t.next_state == target), None
 		)
 		if action:
-			apply_workflow(self, action)
+			self.flags.employee_initialization_token = DECISION_TOKEN
+			try:
+				apply_workflow(self, action)
+			finally:
+				self.flags.pop("employee_initialization_token", None)
+
+	def validate_workflow(self):
+		# The employee transition was checked against the same Workflow before
+		# save. Parent status is only an aggregate and can differ from that row.
+		if self.flags.get("employee_decision_token") is not DECISION_TOKEN:
+			return super().validate_workflow()
 
 	def on_update(self):
-		if self.status == "Disetujui":
+		if self.status == "Disetujui" or self.flags.get("employee_decision_token") is DECISION_TOKEN:
 			self.stamp_assignments()
 
 	def fetch_outlet_details(self):
@@ -144,7 +156,9 @@ class OvertimeRequest(Document):
 			row.shift = assignment[0].shift_type
 
 	def validate_no_duplicate(self):
-		employees = [row.employee for row in self.employees]
+		employees = [row.employee for row in self.employees if employee_state(self, row) != "Ditolak"]
+		if not employees:
+			return
 		other_requests = frappe.get_all(
 			"Overtime Request",
 			filters={
@@ -160,9 +174,10 @@ class OvertimeRequest(Document):
 		duplicates = frappe.get_all(
 			"Overtime Request Employee",
 			filters={"parent": ["in", other_requests], "employee": ["in", employees]},
-			fields=["employee"],
+			fields=["employee", "approval_state"],
 			ignore_permissions=True,
 		)
+		duplicates = [row for row in duplicates if row.get("approval_state") != "Ditolak"]
 		if duplicates:
 			names = ", ".join(
 				frappe.db.get_value("Employee", row.employee, "employee_name") or row.employee
@@ -195,6 +210,8 @@ class OvertimeRequest(Document):
 	def stamp_assignments(self):
 		stamped = 0
 		for row in self.employees:
+			if employee_state(self, row) != "Disetujui":
+				continue
 			assignments = frappe.get_all(
 				"Shift Assignment",
 				filters={

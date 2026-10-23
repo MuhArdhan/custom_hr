@@ -1,7 +1,7 @@
 # Copyright (c) 2026, callmevan1120 and contributors
 # For license information, please see license.txt
 
-"""Recovery uses persisted sessions; no-log absence requires a stable full day.
+"""Recover real Outlet sessions; missing presences never imply auto-Absent.
 
 No API exposure, commits, native shift sync or invented log timestamps. The
 modified-time bounds deliberately avoid inferring historical outlet membership
@@ -178,58 +178,9 @@ def _day_context(employee, work_date):
 
 
 def _process_day(employee, work_date):
-	context, reason = _day_context(employee, work_date)
-	if not context:
-		return {"status": "skipped", "reason": reason}
-	day = getdate(work_date)
-	if _day_logs(employee, day):
-		return {"status": "skipped", "reason": "logs_exist"}
-	probe = frappe._dict(employee=employee, shift_work_date=day)
-	attendances = _attendance_for_date(probe)
-	active = [row for row in attendances if cint(row.docstatus) < 2]
-	if len(active) > 1:
-		frappe.throw(_("Beberapa Attendance aktif ditemukan; evaluasi Absent memerlukan pemeriksaan HR."))
-	if attendances and not active:
-		return {"status": "skipped", "reason": "cancelled_attendance"}
-	existing = active[0] if active else None
-	if existing and (cint(existing.docstatus) != 1 or existing.status != "Half Day" or not cint(existing.modify_half_day_status) or existing.attendance_request or existing.source_checkin):
-		return {"status": "skipped", "reason": "official_attendance_exists"}
-	full_holiday, half_holiday = _holiday_state({"holiday_list": context.outlet.holiday_list}, day)
-	if full_holiday:
-		return {"status": "skipped", "reason": "outlet_holiday"}
-	leaves = _approved_leaves(probe)
-	if len(leaves) > 1:
-		frappe.throw(_("Beberapa cuti disetujui ditemukan; evaluasi Absent memerlukan pemeriksaan HR."))
-	leave = leaves[0] if leaves else None
-	half_leave = bool(leave and cint(leave.half_day) and leave.half_day_date and getdate(leave.half_day_date) == day)
-	if leave and not half_leave:
-		return {"status": "skipped", "reason": "approved_leave"}
-	if half_leave and half_holiday:
-		return {"status": "skipped", "reason": "half_day_coverage_requires_hr"}
-	if existing and (not half_leave or existing.leave_application != leave.name or existing.leave_type != leave.leave_type):
-		return {"status": "skipped", "reason": "unverified_half_day_leave"}
-	values = {
-		"employee": employee, "company": context.employee.company, "attendance_date": day,
-		"status": "Half Day" if half_leave else "Absent", "shift": None,
-		"half_day_status": "Absent" if half_leave else None, "modify_half_day_status": 0,
-		"attendance_source": "Outlet", "outlet_at_checkin": context.outlet.name,
-		"in_time": None, "out_time": None, "working_hours": 0, "standard_working_hours": 0,
-		"late_entry": 0, "early_exit": 0, "missing_checkout": 0, "working_hours_source": None,
-		"source_checkin": None, "source_checkout": None,
-	}
-	if half_leave:
-		values.update(leave_application=leave.name, leave_type=leave.leave_type)
-	if existing:
-		# Only resolve the pending working half; retain the official leave's
-		# company/shift/metrics and references, never invent a selected shift.
-		frappe.db.set_value("Attendance", existing.name, {"half_day_status": "Absent", "modify_half_day_status": 0, "attendance_source": "Outlet", "outlet_at_checkin": context.outlet.name})
-		doc = frappe.get_doc("Attendance", existing.name)
-		doc.publish_update()
-	else:
-		doc = frappe.get_doc({"doctype": "Attendance", **values}).insert(ignore_permissions=True)
-		doc.submit()
-	doc.add_comment(text=_("Evaluasi hari kerja outlet {0}: tidak ada log IN maupun OUT; batas sesi {1} sudah lewat. Tidak memilih shift atau mengisi jam absen fiktif.").format(context.outlet.name, context.deadline))
-	return {"status": "updated_half_day" if existing else "created", "attendance": doc.name}
+	# Compatibility for already queued jobs: no calendar/roster can infer
+	# absence when work days are decided by management, not a fixed schedule.
+	return {"status": "skipped", "reason": "no_log_absence_disabled"}
 
 
 def process_outlet_day(employee: str, work_date):
@@ -271,43 +222,9 @@ def _settled_dates(employee, start, end):
 
 
 def finalize_outlet_days(employee: str):
-	"""One employee job, bounded by stable context; each date rechecks under lock."""
-	if not configuration.OUTLET_AUTO_SHIFT_READY:
-		return
-	record = frappe.db.get_value("Employee", employee, ["name", "outlet", "modified", "creation", "date_of_joining"], as_dict=True)
-	if not record or not record.outlet:
-		return
-	outlet = frappe.db.get_value("Outlet", record.outlet, ["modified", "outlet_auto_shift_effective_from", "enable_outlet_auto_shift"], as_dict=True)
-	if not outlet or not outlet.enable_outlet_auto_shift or not outlet.outlet_auto_shift_effective_from:
-		return
-	day = _stable_start(record, outlet)
-	last_day = normalize_checkin_datetime().date() - timedelta(days=1)
-	if day > last_day:
-		return
-	settled = _settled_dates(employee, day, last_day)
-	while day <= last_day:
-		try:
-			if day not in settled:
-				process_outlet_day(employee, day)
-		except frappe.ValidationError:
-			# Each failure was rolled back/logged with its employee/date. A bad
-			# date must not starve later dates; DB/deadlock failures still bubble.
-			frappe.clear_messages()
-		day += timedelta(days=1)
+	"""Retained as a safe no-op for legacy queued employee/day scan jobs."""
+	return {"status": "skipped", "reason": "no_log_absence_disabled"}
 
 
 def run_outlet_attendance_scheduler():
-	queued = recover_outlet_sessions()
-	if not configuration.OUTLET_AUTO_SHIFT_READY:
-		return queued
-	outlets = frappe.get_all("Outlet", filters={"enable_outlet_auto_shift": 1, "is_active": 1}, pluck="name")
-	if not outlets:
-		return queued
-	for employee in frappe.get_all("Employee", filters={"status": "Active", "outlet": ["in", outlets]}, pluck="name"):
-		frappe.enqueue(
-			"custom_hr.services.outlet_scheduler.finalize_outlet_days",
-			queue="long", enqueue_after_commit=True, deduplicate=True,
-			job_id="outlet-days-" + sha256(employee.encode()).hexdigest(), employee=employee,
-		)
-		queued += 1
-	return queued
+	return recover_outlet_sessions()

@@ -387,9 +387,11 @@ class TestOutletShiftResolver(unittest.TestCase):
 		self.assertEqual(result["mode"], "Outlet")
 		self.assertFalse(result["matched"])
 
-	def test_missing_holiday_list_is_invalid(self):
+	def test_missing_holiday_list_still_resolves_outlet_shift(self):
 		self.outlet.holiday_list = None
-		self.assertEqual(self.resolve()["code"], "invalid_configuration")
+		result = self.resolve()
+		self.assertTrue(result["matched"])
+		self.assertEqual(result["mode"], "Outlet")
 
 	def test_bad_configuration_returns_a_reason_instead_of_throwing(self):
 		self.shifts[0].late_entry_grace_period = -1

@@ -5,6 +5,12 @@ app_description = "HRM: HR app with attendance gallery, face check-in and realti
 app_email = "admin@example.com"
 app_license = "mit"
 required_apps = ["hrms"]
+after_install = [
+	"custom_hr.patches.setup_native_leave_workflow.execute",
+	"custom_hr.patches.remove_legacy_leave_approval_fields.execute",
+	"custom_hr.patches.add_leave_calendar_sidebar.execute",
+]
+after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
 
 scheduler_events = {
 	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],

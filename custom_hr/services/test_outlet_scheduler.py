@@ -121,118 +121,25 @@ class TestDayContext(TestCase):
 
 class TestNoLogDay(TestCase):
 	def setUp(self):
-		employee, outlet = stable_records()
-		self.context = self.mock("_day_context", return_value=(frappe._dict(employee=employee, outlet=outlet, deadline=datetime(2026, 10, 15, 23, 59, 59)), None))
-		self.logs = self.mock("_day_logs", return_value=[])
-		self.attendance_query = self.mock("_attendance_for_date", return_value=[])
-		self.leaves = self.mock("_approved_leaves", return_value=[])
-		self.holiday = self.mock("_holiday_state", return_value=(False, False))
-		self.doc = MagicMock()
-		self.doc.name = "ATT"
-		self.doc.insert.return_value = self.doc
-		self.writer = self.mock("frappe.get_doc", return_value=self.doc)
+		self.writer = self.mock("frappe.get_doc")
 		self.write = self.mock("frappe.db.set_value")
 
-	def run_day(self):
-		return service._process_day("EMP", "2026-10-15")
-
-	def half_leave(self):
-		leave = frappe._dict(name="LEAVE", half_day=1, half_day_date="2026-10-15", leave_type="Annual")
-		self.leaves.return_value = [leave]
-		return leave
-
-	def existing(self, **changes):
-		row = frappe._dict(name="ATT-OLD", docstatus=1, status="Present")
-		row.update(changes)
-		self.attendance_query.return_value = [row]
-		return row
-
-	def test_no_logs_creates_one_absent_without_shift_or_timestamps(self):
-		self.assertEqual(self.run_day()["status"], "created")
-		values = self.writer.call_args.args[0]
-		self.assertEqual(values["status"], "Absent")
-		self.assertEqual(values["company"], "Company")
-		for field in ("shift", "in_time", "out_time", "source_checkin", "source_checkout", "working_hours_source"):
-			self.assertIsNone(values[field])
-		self.assertEqual(values["working_hours"], 0)
-		self.assertEqual(values["missing_checkout"], 0)
-		self.doc.submit.assert_called_once()
-
-	def test_in_only_and_out_only_both_prevent_no_log_absence(self):
-		for log_type in ("IN", "OUT"):
-			self.logs.return_value = [frappe._dict(name="LOG", log_type=log_type)]
-			self.assertEqual(self.run_day()["reason"], "logs_exist")
+	def test_no_logs_never_creates_or_modifies_attendance(self):
+		self.assertEqual(service._process_day("EMP", "2026-10-15"), {"status": "skipped", "reason": "no_log_absence_disabled"})
 		self.writer.assert_not_called()
+		self.write.assert_not_called()
 
-	def test_open_or_ineligible_day_does_not_inspect_logs_or_write(self):
-		self.context.return_value = (None, "day_still_open")
-		self.assertEqual(self.run_day()["reason"], "day_still_open")
-		self.logs.assert_not_called()
-
-	def test_existing_official_and_draft_are_not_overwritten(self):
-		for changes in ({}, {"docstatus": 0}, {"status": "On Leave"}, {"attendance_request": "REQUEST"}):
-			self.existing(**changes)
-			self.assertEqual(self.run_day()["reason"], "official_attendance_exists")
+	def test_legacy_queued_day_worker_is_also_safe(self):
+		self.assertEqual(service.process_outlet_day("EMP", "2026-10-15")["reason"], "no_log_absence_disabled")
 		self.writer.assert_not_called()
+		self.write.assert_not_called()
 
-	def test_cancelled_day_is_not_recreated(self):
-		self.existing(docstatus=2)
-		self.assertEqual(self.run_day()["reason"], "cancelled_attendance")
-		self.writer.assert_not_called()
-
-	def test_multiple_active_attendances_are_not_guessed(self):
-		self.attendance_query.return_value = [frappe._dict(docstatus=1), frappe._dict(docstatus=1)]
-		with self.assertRaises(frappe.ValidationError):
-			self.run_day()
-
-	def test_full_outlet_holiday_never_creates_absent(self):
-		self.holiday.return_value = (True, False)
-		self.assertEqual(self.run_day()["reason"], "outlet_holiday")
-		self.writer.assert_not_called()
-
-	def test_full_approved_leave_never_creates_absent(self):
-		self.leaves.return_value = [frappe._dict(name="LEAVE", half_day=0)]
-		self.assertEqual(self.run_day()["reason"], "approved_leave")
-		self.writer.assert_not_called()
-
-	def test_half_holiday_alone_still_has_a_working_half(self):
-		self.holiday.return_value = (False, True)
-		self.assertEqual(self.run_day()["status"], "created")
-		self.assertEqual(self.writer.call_args.args[0]["status"], "Absent")
-
-	def test_half_leave_without_attendance_creates_half_day_other_half_absent(self):
-		self.half_leave()
-		self.run_day()
-		values = self.writer.call_args.args[0]
-		self.assertEqual(values["status"], "Half Day")
-		self.assertEqual(values["half_day_status"], "Absent")
-		self.assertEqual(values["leave_application"], "LEAVE")
-
-	def test_pending_half_leave_updates_only_other_half_and_source_metadata(self):
-		self.half_leave()
-		self.existing(status="Half Day", modify_half_day_status=1, leave_application="LEAVE", leave_type="Annual")
-		self.assertEqual(self.run_day()["status"], "updated_half_day")
-		values = self.write.call_args.args[2]
-		self.assertEqual(values["half_day_status"], "Absent")
-		self.assertNotIn("shift", values)
-		self.assertNotIn("leave_application", values)
-		self.doc.insert.assert_not_called()
-
-	def test_half_day_holiday_and_half_leave_require_coverage_decision(self):
-		self.half_leave()
-		self.holiday.return_value = (False, True)
-		self.assertEqual(self.run_day()["reason"], "half_day_coverage_requires_hr")
-		self.writer.assert_not_called()
-
-	def test_unverified_half_day_leave_is_not_finalized(self):
-		self.existing(status="Half Day", modify_half_day_status=1, leave_application="UNKNOWN", leave_type="Annual")
-		self.assertEqual(self.run_day()["reason"], "unverified_half_day_leave")
-
-	def test_multiple_leaves_require_hr(self):
-		leave = self.half_leave()
-		self.leaves.return_value = [leave, leave]
-		with self.assertRaises(frappe.ValidationError):
-			self.run_day()
+	def test_no_log_policy_does_not_consult_holidays_or_infer_leave_absence(self):
+		with patch.object(service, "_day_context") as context, patch.object(service, "_holiday_state") as holiday, patch.object(service, "_approved_leaves") as leaves:
+			service._process_day("EMP", "2026-10-15")
+		context.assert_not_called()
+		holiday.assert_not_called()
+		leaves.assert_not_called()
 
 
 class TestRecoveryAndDispatch(TestCase):
@@ -295,32 +202,32 @@ class TestRecoveryAndDispatch(TestCase):
 			self.assertEqual(service.run_outlet_attendance_scheduler(), 3)
 		query.assert_not_called()
 
-	def test_ready_dispatches_active_outlet_employees_without_assignment_lookup(self):
-		with patch(f"{MODULE}.configuration.OUTLET_AUTO_SHIFT_READY", True), patch.object(service, "recover_outlet_sessions", return_value=0), patch("frappe.get_all", side_effect=[["Outlet"], ["EMP"]]) as query:
-			self.assertEqual(service.run_outlet_attendance_scheduler(), 1)
-		self.assertEqual([call.args[0] for call in query.call_args_list], ["Outlet", "Employee"])
-		self.assertEqual(self.enqueue.call_args.kwargs["employee"], "EMP")
+	def test_ready_scheduler_only_recovers_real_sessions_without_absence_jobs(self):
+		with patch(f"{MODULE}.configuration.OUTLET_AUTO_SHIFT_READY", True), patch.object(service, "recover_outlet_sessions", return_value=2), patch("frappe.get_all") as query:
+			self.assertEqual(service.run_outlet_attendance_scheduler(), 2)
+		query.assert_not_called()
+		self.enqueue.assert_not_called()
 
-	def test_finalize_employee_range_respects_stable_start_and_excludes_today(self):
+	def test_finalize_employee_range_is_noop_for_legacy_jobs(self):
 		employee, outlet = stable_records()
 		self.now.return_value = datetime(2026, 10, 17)
 		with patch(f"{MODULE}.configuration.OUTLET_AUTO_SHIFT_READY", True), patch("frappe.db.get_value", side_effect=[employee, outlet]), patch.object(service, "process_outlet_day") as process:
 			service.finalize_outlet_days("EMP")
-		self.assertEqual([str(call.args[1]) for call in process.call_args_list], ["2026-10-15", "2026-10-16"])
+		process.assert_not_called()
 
-	def test_day_failure_does_not_starve_later_dates(self):
+	def test_legacy_employee_job_never_attempts_date_processing(self):
 		employee, outlet = stable_records()
 		self.now.return_value = datetime(2026, 10, 17)
 		with patch(f"{MODULE}.configuration.OUTLET_AUTO_SHIFT_READY", True), patch("frappe.db.get_value", side_effect=[employee, outlet]), patch.object(service, "process_outlet_day", side_effect=[frappe.ValidationError("bad date"), None]) as process:
 			service.finalize_outlet_days("EMP")
-		self.assertEqual(process.call_count, 2)
+		process.assert_not_called()
 
-	def test_already_settled_dates_are_not_reprocessed_hourly(self):
+	def test_employee_scan_does_not_touch_settled_or_unsettled_dates(self):
 		employee, outlet = stable_records()
 		self.now.return_value = datetime(2026, 10, 17)
 		with patch(f"{MODULE}.configuration.OUTLET_AUTO_SHIFT_READY", True), patch("frappe.db.get_value", side_effect=[employee, outlet]), patch.object(service, "_settled_dates", return_value={datetime(2026, 10, 15).date()}), patch.object(service, "process_outlet_day") as process:
 			service.finalize_outlet_days("EMP")
-		self.assertEqual([str(call.args[1]) for call in process.call_args_list], ["2026-10-16"])
+		process.assert_not_called()
 
 	def test_day_log_query_uses_locked_work_date_and_falls_back_only_when_unknown(self):
 		with patch("frappe.db.sql", return_value=[]) as sql:

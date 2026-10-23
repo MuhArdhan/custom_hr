@@ -158,11 +158,10 @@ class TestOutletConfiguration(unittest.TestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "outlet aktif"):
 			self.validate()
 
-	def test_enabled_mode_requires_holiday_list(self):
+	def test_enabled_mode_does_not_require_holiday_list(self):
 		self.prepare_activation()
 		self.outlet.holiday_list = None
-		with self.assertRaisesRegex(frappe.ValidationError, "Holiday List"):
-			self.validate()
+		self.validate()
 
 	def test_enabled_mode_requires_effective_datetime(self):
 		self.prepare_activation()

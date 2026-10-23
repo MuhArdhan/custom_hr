@@ -33,6 +33,11 @@ frappe.ui.form.on("Overtime Request", {
 			frm.set_value("overtime_type", "Lembur");
 		}
 	},
+	refresh(frm) {
+		if (!frm.is_new()) {
+			frm.set_intro(__("Approval lembur di Leave Calendar dinonaktifkan sementara. Fokus saat ini cuti/izin."), "blue");
+		}
+	},
 	start_time: update_planned_hours,
 	end_time: update_planned_hours,
 });

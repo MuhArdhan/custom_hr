@@ -61,7 +61,7 @@ def get_data(filters):
 		conditions.append("otr.outlet = %(outlet)s")
 		values.outlet = filters.outlet
 	if filters.get("status"):
-		conditions.append("otr.status = %(status)s")
+		conditions.append("COALESCE(NULLIF(otre.approval_state, ''), otr.status) = %(status)s")
 		values.status = filters.status
 
 	if not _sees_all(frappe.session.user):
@@ -76,7 +76,8 @@ def get_data(filters):
 		"""
 		select
 			otr.date, otr.outlet, otre.employee_name, otre.shift,
-			otr.planned_hours, otr.overtime_type, otr.status,
+			otr.planned_hours, otr.overtime_type,
+			COALESCE(NULLIF(otre.approval_state, ''), otr.status) AS status,
 			att.actual_overtime_duration as actual_hours
 		from `tabOvertime Request` otr
 		join `tabOvertime Request Employee` otre on otre.parent = otr.name

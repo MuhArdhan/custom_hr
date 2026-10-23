@@ -54,7 +54,7 @@ def _session_policy(entry):
 		policy = _policy({**snapshot, "name": entry.shift})
 		standard = (get_datetime(entry.shift_end) - get_datetime(entry.shift_start)).total_seconds() / 3600
 		valid = (
-			snapshot["company"] and snapshot["holiday_list"]
+			snapshot["company"]
 			# Additive v1 marker: old snapshots retain their original company;
 			# never recompute historical logs from either live master.
 			and snapshot.get("company_source", "Employee") == "Employee"
@@ -241,10 +241,10 @@ def _process_session(source_checkin, source_checkout, *, finalize_missing=False)
 			text=_("Sesi outlet IN {0}, OUT {1} ditautkan tanpa mengubah Attendance resmi yang sudah ada.").format(entry.name, checkout.name if checkout else _("Tidak OUT"))
 		)
 		return {"status": "preserved_existing", "attendance": existing.name}
-	full_holiday, half_holiday = _holiday_state(policy, getdate(entry.shift_work_date))
-	if full_holiday and not policy["mark_auto_attendance_on_holidays"]:
-		return {"status": "skipped", "reason": "outlet_holiday"}
-	values = calculate_session_attendance(entry, checkout, half_holiday=half_holiday, finalize_missing=finalize_missing)
+	# Outlet operates on actual presences, on any calendar day. Neither its
+	# legacy Holiday List nor an employee/company calendar gates a real session
+	# or reduces working-hour thresholds. Official leave is still preserved.
+	values = calculate_session_attendance(entry, checkout, finalize_missing=finalize_missing)
 	if leaves:
 		leave = leaves[0]
 		is_half = bool(cint(leave.half_day) and leave.half_day_date and getdate(leave.half_day_date) == values.attendance_date)
