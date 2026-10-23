@@ -32,7 +32,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Lembur",
    "fieldname": "overtime_salary_component",
    "fieldtype": "Link",
    "label": "Komponen Upah Lembur",
