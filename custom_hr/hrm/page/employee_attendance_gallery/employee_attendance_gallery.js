@@ -127,6 +127,21 @@ class EmployeeAttendanceGallery {
 		});
 		this.controls.face_verified.set_value(__("All"));
 
+		// filters on the attendance of the day (gallery cards, summary and detail)
+		this.controls.attendance_status = add_control("attendance_status", {
+			label: __("Attendance"),
+			fieldtype: "Select",
+			options: [__("All"), "Present", "Half Day", "Absent", "On Leave"],
+		});
+		this.controls.attendance_status.set_value(__("All"));
+		for (const [fieldname, label] of [
+			["late_entry", __("Late Entry")],
+			["early_exit", __("Early Exit")],
+			["missing_checkout", __("No Check-out")],
+		]) {
+			add_control(fieldname, { label, fieldtype: "Check" });
+		}
+
 		// refresh, pushed to the right of the same row
 		const $actions = $('<div class="eag-filter eag-actions"></div>').appendTo(this.$filters);
 		const $actions_row = $('<div class="eag-actions-row"></div>').appendTo($actions);
@@ -205,6 +220,7 @@ class EmployeeAttendanceGallery {
 	get_filters() {
 		const value = (fieldname) => this.controls[fieldname].get_value() || null;
 		const log_type = value("log_type");
+		const attendance_status = value("attendance_status");
 		const face_verified = { [__("Verified")]: 1, [__("Unverified")]: 0 }[value("face_verified")];
 		return {
 			company: value("company"),
@@ -216,6 +232,10 @@ class EmployeeAttendanceGallery {
 			search: this.search_value || null,
 			log_type: log_type === __("All") ? null : log_type,
 			face_verified: face_verified === undefined ? null : face_verified,
+			late_entry: value("late_entry") ? 1 : null,
+			early_exit: value("early_exit") ? 1 : null,
+			missing_checkout: value("missing_checkout") ? 1 : null,
+			attendance_status: attendance_status === __("All") ? null : attendance_status,
 		};
 	}
 
@@ -326,7 +346,8 @@ class EmployeeAttendanceGallery {
 			Absent: ["absent", __("Absent")],
 			"On Leave": ["leave", __("On Leave")],
 		};
-		const entry = map[row.attendance_status];
+		// check-in rows carry attendance_status, day cards carry status
+		const entry = map[row.attendance_status || row.status];
 		if (!entry) {
 			return `<span class="eag-badge eag-badge-none">${__("No Attendance")}</span>`;
 		}
@@ -352,6 +373,10 @@ class EmployeeAttendanceGallery {
 				from_date: filters.from_date,
 				to_date: filters.to_date,
 				search: filters.search,
+				late_entry: filters.late_entry,
+				early_exit: filters.early_exit,
+				missing_checkout: filters.missing_checkout,
+				attendance_status: filters.attendance_status,
 				start: this.start,
 				page_length: 20,
 			});
@@ -406,9 +431,11 @@ class EmployeeAttendanceGallery {
 				<div class="eag-chips">
 					${chip("present", __("Present"), row.present)}
 					${chip("late", __("Late"), row.late)}
+					${chip("early", __("Early Exit"), row.early)}
 					${chip("half", __("Half Day"), row.half_day)}
 					${chip("absent", __("Absent"), row.absent)}
 					${chip("leave", __("On Leave"), row.on_leave)}
+					${chip("noout", __("No Check-out"), row.missing_checkout)}
 					${chip("logs", __("Logs"), row.logs)}
 				</div>
 				<button class="btn btn-xs btn-default eag-open">${__("Detail")}</button>
@@ -440,6 +467,10 @@ class EmployeeAttendanceGallery {
 				employee: this.selected_employee.employee,
 				from_date: filters.from_date,
 				to_date: filters.to_date,
+				late_entry: filters.late_entry,
+				early_exit: filters.early_exit,
+				missing_checkout: filters.missing_checkout,
+				attendance_status: filters.attendance_status,
 			});
 			if (id !== this.request_id) return;
 			this.render_employee_header(result.employee);

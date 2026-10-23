@@ -70,5 +70,53 @@
   "value": "Toleransi dalam menit sebelum jam selesai shift. Nilai 0 berarti check-out sebelum shift selesai langsung ditandai pulang awal.",
   "module": "HRM",
   "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Attendance-attendance_date-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "attendance_date",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Attendance-late_entry-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "late_entry",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Attendance-early_exit-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "early_exit",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Attendance-shift-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "shift",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
  }
 ]

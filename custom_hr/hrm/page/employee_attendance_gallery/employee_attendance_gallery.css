@@ -8,7 +8,7 @@
 
 .eag-filters {
 	display: flex;
-	flex-wrap: nowrap;
+	flex-wrap: wrap;
 	align-items: flex-start;
 	gap: 12px;
 	padding: 2px 0 12px;
@@ -49,6 +49,19 @@
 
 .eag-f-face_verified {
 	min-width: 120px;
+}
+
+.eag-f-attendance_status {
+	min-width: 125px;
+}
+
+/* checkboxes sit level with the inputs of the other filters */
+.eag-f-late_entry,
+.eag-f-early_exit,
+.eag-f-missing_checkout {
+	flex: 0 0 auto;
+	align-self: flex-end;
+	padding-bottom: 6px;
 }
 
 .eag-actions {
@@ -293,6 +306,14 @@
 
 .eag-chip-late {
 	background: #ffedd5;
+}
+
+.eag-chip-early {
+	background: #ede9fe;
+}
+
+.eag-chip-noout {
+	background: #e2e8f0;
 }
 
 .eag-chip-half {

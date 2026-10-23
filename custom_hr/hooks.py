@@ -105,6 +105,10 @@ fixtures = [
 					"Shift Type-late_entry_grace_period-description",
 					"Shift Type-early_exit_grace_period-label",
 					"Shift Type-early_exit_grace_period-description",
+					"Attendance-attendance_date-in_standard_filter",
+					"Attendance-late_entry-in_standard_filter",
+					"Attendance-early_exit-in_standard_filter",
+					"Attendance-shift-in_standard_filter",
 				],
 			]
 		],
