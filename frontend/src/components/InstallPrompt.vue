@@ -53,20 +53,15 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { ref, toRef } from "vue"
 
 import { Dialog, Popover, FeatherIcon } from "frappe-ui"
 
-// Initialize deferredPrompt for use later to show browser install prompt.
-const deferredPrompt = ref(null)
-const showDialog = ref(false)
-const iosInstallMessage = ref(false)
+import { installState, isIos, requestInstall } from "@/utils/installPrompt"
 
-const isIos = () => {
-	// Detects if device is on iOS
-	const userAgent = window.navigator.userAgent.toLowerCase()
-	return /iphone|ipad|ipod/.test(userAgent)
-}
+// The prompt event and iOS message live in shared state so Settings can reuse them.
+const showDialog = ref(false)
+const iosInstallMessage = toRef(installState, "iosMessage")
 
 // Detects if device is in standalone mode
 const isInStandaloneMode = () =>
@@ -80,8 +75,7 @@ if (isIos() && !isInStandaloneMode()) {
 window.addEventListener("beforeinstallprompt", (e) => {
 	// Prevent the mini-infobar from appearing on mobile
 	e.preventDefault()
-	// Stash the event so it can be triggered later.
-	deferredPrompt.value = e
+	// The event itself is stashed in installState (utils/installPrompt) for the Settings button.
 	if (isIos() && !isInStandaloneMode()) {
 		iosInstallMessage.value = true
 	} else {
@@ -93,11 +87,10 @@ window.addEventListener("beforeinstallprompt", (e) => {
 
 window.addEventListener("appinstalled", () => {
 	showDialog.value = false
-	deferredPrompt.value = null
 })
 
 async function install() {
-	deferredPrompt.value.prompt()
 	showDialog.value = false
+	await requestInstall()
 }
 </script>

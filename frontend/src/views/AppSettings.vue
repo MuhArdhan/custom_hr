@@ -44,6 +44,22 @@
 							</div>
 						</div>
 
+						<div v-if="showInstall" class="flex flex-col bg-white rounded">
+							<div
+								class="flex flex-row cursor-pointer p-4 items-center justify-between"
+								role="button"
+								@click="install"
+							>
+								<div class="flex flex-row items-center gap-3 grow">
+									<FeatherIcon name="download" class="h-5 w-5 text-gray-500" />
+									<div class="text-base font-normal text-gray-800">
+										{{ __("Install App") }}
+									</div>
+								</div>
+								<FeatherIcon name="chevron-right" class="h-5 w-5 text-gray-500" />
+							</div>
+						</div>
+
 						<div class="flex flex-col bg-white rounded">
 							<Switch
 								size="md"
@@ -80,9 +96,22 @@ import { FeatherIcon, Switch, toast, LoadingIndicator, Button } from "frappe-ui"
 import { computed, inject, ref } from "vue"
 
 import { arePushNotificationsEnabled } from "@/data/notifications"
+import { canInstall, requestInstall } from "@/utils/installPrompt"
 
 const __ = inject("$translate")
 const router = useRouter()
+const showInstall = computed(() => canInstall())
+
+// The browser offers no install dialog when the app is already installed or it dismissed one.
+const install = async () => {
+	if ((await requestInstall()) !== "manual") return
+	toast({
+		title: __("Install App"),
+		text: __("Open your browser menu and choose “Install app” or “Add to Home screen”."),
+		icon: "info",
+		position: "bottom-center",
+	})
+}
 
 const pushNotificationState = ref(
 	window.frappePushNotification?.isNotificationEnabled()
