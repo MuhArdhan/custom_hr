@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"hdr1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>HRM</b></span>\",\"col\":12}},{\"id\":\"sc1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Attendance Gallery\",\"col\":4}},{\"id\":\"sc2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Roster Outlet\",\"col\":4}},{\"id\":\"sc3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pengajuan Lembur\",\"col\":4}},{\"id\":\"sc4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Laporan Lembur\",\"col\":4}},{\"id\":\"sc5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Perhitungan Lembur\",\"col\":4}},{\"id\":\"sc6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rekap Gaji per Departemen\",\"col\":4}},{\"id\":\"contracts\",\"type\":\"card\",\"data\":{\"card_name\":\"Contract Notifications\",\"col\":4}},{\"id\":\"sp1\",\"type\":\"spacer\",\"data\":{\"col\":12}}]",
+ "content": "[{\"id\":\"hdr1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>HRM</b></span>\",\"col\":12}},{\"id\":\"sc1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Attendance Gallery\",\"col\":4}},{\"id\":\"sc2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Roster Outlet\",\"col\":4}},{\"id\":\"sc3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pengajuan Lembur\",\"col\":4}},{\"id\":\"sc4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Laporan Lembur\",\"col\":4}},{\"id\":\"sc5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Perhitungan Lembur\",\"col\":4}},{\"id\":\"sc6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rekap Gaji per Departemen\",\"col\":4}},{\"id\":\"sc7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Outlet\",\"col\":4}},{\"id\":\"sc8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Attendance\",\"col\":4}},{\"id\":\"sc9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"HRM Payroll Settings\",\"col\":4}},{\"id\":\"contracts\",\"type\":\"card\",\"data\":{\"card_name\":\"Contract Notifications\",\"col\":4}},{\"id\":\"sp1\",\"type\":\"spacer\",\"data\":{\"col\":12}}]",
  "creation": "2026-10-09 00:00:00.000000",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -15,7 +15,7 @@
   {"label": "Contract Notification Settings", "type": "Link", "link_type": "DocType", "link_to": "Contract Notification Settings"},
   {"label": "Contract Notification Log", "type": "Link", "link_type": "DocType", "link_to": "Contract Notification Log"}
  ],
- "modified": "2026-10-13 00:00:00.000000",
+ "modified": "2026-10-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "HRM",
@@ -68,6 +68,27 @@
    "label": "Rekap Gaji per Departemen",
    "link_to": "Rekap Gaji per Departemen",
    "type": "Report"
+  },
+  {
+   "color": "Teal",
+   "doc_view": "List",
+   "label": "Outlet",
+   "link_to": "Outlet",
+   "type": "DocType"
+  },
+  {
+   "color": "Teal",
+   "doc_view": "List",
+   "label": "Attendance",
+   "link_to": "Attendance",
+   "type": "DocType"
+  },
+  {
+   "color": "Teal",
+   "doc_view": "",
+   "label": "HRM Payroll Settings",
+   "link_to": "HRM Payroll Settings",
+   "type": "DocType"
   }
  ],
  "title": "HRM",

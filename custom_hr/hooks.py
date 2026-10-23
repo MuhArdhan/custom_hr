@@ -11,6 +11,7 @@ after_install = [
 	"custom_hr.patches.add_leave_calendar_sidebar.execute",
 ]
 after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
+after_sync = "custom_hr.install.set_default_overtime_component"
 
 scheduler_events = {
 	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],
@@ -49,6 +50,7 @@ doctype_js = {
 }
 
 doctype_list_js = {
+	"Attendance": "public/js/attendance_list.js",
 	"Employee Checkin": "public/js/employee_checkin_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",

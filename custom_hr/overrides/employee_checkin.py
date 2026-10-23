@@ -24,7 +24,6 @@ from hrms.hr.doctype.employee_checkin.employee_checkin import (
 from custom_hr.services.outlet_checkin import (
 	_employee_record,
 	prepare_or_protect_checkin,
-	prevent_locked_checkin_deletion,
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime
 from custom_hr.services.checkin_submission import apply_verified_face
@@ -74,9 +73,6 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 	def fetch_shift(self):
 		if not prepare_or_protect_checkin(self):
 			return super().fetch_shift()
-
-	def on_trash(self):
-		prevent_locked_checkin_deletion(self)
 
 	def validate_distance_from_shift_location(self):
 		if not validate_outlet_geofence(self):

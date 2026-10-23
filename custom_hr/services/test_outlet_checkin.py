@@ -18,7 +18,6 @@ from custom_hr.services.outlet_checkin import (
 	_has_out,
 	_relevant_ins,
 	prepare_or_protect_checkin,
-	prevent_locked_checkin_deletion,
 )
 
 MODULE = "custom_hr.services.outlet_checkin"
@@ -319,10 +318,10 @@ class TestOutletCheckin(unittest.TestCase):
 			self.doc.fetch_shift()
 			native.assert_called_once()
 
-	def test_locked_in_cannot_be_deleted_to_bypass_daily_limit(self):
-		self.mark_persisted()
-		with self.assertRaisesRegex(frappe.ValidationError, "tidak boleh dihapus"):
-			prevent_locked_checkin_deletion(self.doc)
+	def test_locked_in_can_be_deleted_so_attendance_can_be_retried(self):
+		# Deliberately open: HR/admins must be able to remove outlet logs to repeat a test
+		# session. Frappe's own link check still orders deletes (Attendance, then OUT, then IN).
+		self.assertNotIn("on_trash", vars(CustomEmployeeCheckin))
 
 	def test_existing_record_is_read_with_row_lock_not_client_original(self):
 		self.mark_persisted()
