@@ -48,18 +48,22 @@
 				<FaceCapture v-else-if="faceStep === 'capture'" mode="verify" @captured="handleFaceCaptured" />
 				<template v-else>
 					<img v-if="capturedPhoto" :src="capturedPhoto" class="w-40 h-40 object-contain bg-black rounded-lg" :alt="__('Captured face')" />
-					<Button :loading="submission.busy" :disabled="submission.busy || !canSubmit" variant="solid" class="w-full py-5" @click="submitAttempt">{{ __("Confirm {0}", [actionLabel]) }}</Button>
+					<p v-if="submission.busy" class="text-sm text-gray-600" role="status">{{ __("Submitting...") }}</p>
+					<Button v-if="showRetry" variant="solid" class="w-full py-5" @click="submitAttempt">{{ __("Try Again") }}</Button>
 					<Button :disabled="submission.busy" variant="ghost" class="w-full" @click="retakeFace">{{ __("Retake Face") }}</Button>
 				</template>
 			</template>
-			<Button v-else :loading="submission.busy" :disabled="!canSubmit || submission.busy" variant="solid" class="w-full py-5" @click="submitAttempt">{{ __("Confirm {0}", [actionLabel]) }}</Button>
+			<template v-else>
+				<p v-if="submission.busy" class="text-sm text-gray-600" role="status">{{ __("Submitting...") }}</p>
+				<Button v-if="showRetry" variant="solid" class="w-full py-5" @click="submitAttempt">{{ __("Try Again") }}</Button>
+			</template>
 			<Button :disabled="submission.busy" variant="ghost" @click="closeModal">{{ __("Close") }}</Button>
 		</div>
 	</ion-modal>
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { createListResource, createResource, FeatherIcon, toast } from "frappe-ui"
 import { IonModal } from "@ionic/vue"
 import FaceCapture from "@/components/FaceCapture.vue"
@@ -95,6 +99,9 @@ let disposed = false
 let locationGeneration = 0
 let refreshTimer
 let confirming = false
+// One automatic submit per verified attempt: a failure must wait for "Try Again", a new GPS
+// check or a new face capture instead of looping.
+let attempted = false
 
 const requestContext = createResource({ url: "custom_hr.api.checkin.get_checkin_context", method: "GET", onError() {} })
 const locationCheck = createResource({ url: "custom_hr.api.checkin.validate_checkin_location", method: "POST", onError() {} })
@@ -118,6 +125,14 @@ const mapUrl = computed(() => `https://maps.google.com/maps?q=${latitude.value},
 const sameEmployee = computed(() => employee.data?.name === employeeName)
 const canOpen = computed(() => sameEmployee.value && online.value && !syncing.value && !opening.value && !submission.busy && (submission.pending?.uncertain || (context.value?.allowed && ["IN", "OUT"].includes(context.value.next_action))))
 const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || (gpsAvailable.value && locationValid.value && !locationChecking.value)) && (!useFace.value || !!capturedDescriptor.value))
+
+const showRetry = computed(() => !submission.busy && !!(verifyError.value || submitError.value) && canSubmit.value)
+
+watch(() => modalOpen.value && canSubmit.value, (ready) => {
+	if (!ready || attempted) return
+	attempted = true
+	submitAttempt()
+})
 
 function message(error) {
 	return error?.messages?.filter(Boolean).join("\n") || error?.message || __("Unable to confirm attendance. Refresh the status and retry.")
@@ -168,6 +183,7 @@ async function openCheckin() {
 		submitError.value = ""
 		verifyError.value = ""
 		retakeFace()
+		attempted = false
 		modalOpen.value = true
 		latitude.value = longitude.value = null
 		// Do not request GPS permission when the server setting is disabled.
@@ -186,6 +202,7 @@ async function openCheckin() {
 
 function fetchLocation() {
 	if (submission.busy || !modalOpen.value || !sameEmployee.value) return
+	attempted = false
 	const generation = ++locationGeneration
 	latitude.value = longitude.value = null
 	locationValid.value = false
@@ -218,6 +235,7 @@ function fetchLocation() {
 
 function retakeFace() {
 	if (submission.busy) return
+	attempted = false
 	faceStep.value = "capture"
 	capturedDescriptor.value = capturedPhoto.value = null
 	verifyError.value = ""
@@ -283,6 +301,7 @@ async function submitAttempt() {
 
 function closeModal() {
 	if (submission.busy) return
+	attempted = false
 	modalOpen.value = false
 	locationGeneration++
 	locationValid.value = false

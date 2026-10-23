@@ -131,26 +131,52 @@ test("Android developer options block opening the existing check-in modal", asyn
 	} finally { ui.unmount() }
 })
 
-test("Android policy is rechecked at confirmation without changing Home UI", async () => {
-	let enabled = false
+test("Android policy is rechecked at submission without changing Home UI", async () => {
+	let checks = 0, blockOnSubmit = true
 	const ui = mount({ capacitor: {
 		isNativePlatform: () => true, getPlatform: () => "android",
-		Plugins: { DevicePolicy: { getStatus: async () => ({ developerOptionsEnabled: enabled }) } },
+		Plugins: { DevicePolicy: { getStatus: async () => ({ developerOptionsEnabled: ++checks > 1 && blockOnSubmit }) } },
 	} })
 	try {
+		// First check opens the modal, the second one runs when the valid attempt submits itself.
 		await flush(); await ui.click("Check In"); await flush()
 		assert.equal(ui.nodes("modal").length, 1)
-		enabled = true
-		await ui.click("Confirm Check In"); await flush()
 		assert.match(ui.text(), /Matikan Opsi Pengembang/)
 		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
-		enabled = false
-		await ui.click("Confirm Check In"); await flush()
+		blockOnSubmit = false
+		await ui.click("Try Again"); await flush()
 		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
 	} finally { ui.unmount() }
 })
 
-test("location is checked before confirmation and outside radius disables submit until retry succeeds", async () => {
+test("a valid attempt submits itself and there is no confirm button", async () => {
+	const ui = mount()
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
+		assert.ok(!ui.text().includes("Confirm"))
+		assert.equal(ui.nodes("modal").length, 0)
+	} finally { ui.unmount() }
+})
+
+test("a failed submission is not retried automatically but can be retried by the user", async () => {
+	let attempts = 0
+	const ui = mount({ post: async () => {
+		if (++attempts === 1) throw new TypeError("lost response")
+		return saved()
+	} })
+	try {
+		await flush(); await ui.click("Check In"); await flush()
+		await flush()
+		assert.equal(attempts, 1)
+		assert.match(ui.text(), /lost response/)
+		await ui.click("Try Again"); await flush()
+		assert.equal(attempts, 2)
+		assert.equal(ui.nodes("modal").length, 0)
+	} finally { ui.unmount() }
+})
+
+test("location is checked before submission and outside radius blocks it until retry succeeds", async () => {
 	let allowed = false
 	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: async () => {
 		if (!allowed) throw new Error("Outside outlet radius")
@@ -159,12 +185,10 @@ test("location is checked before confirmation and outside radius disables submit
 	try {
 		await flush(); await ui.click("Check In"); await flush()
 		assert.match(ui.text(), /Outside outlet radius/)
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
 		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
 		allowed = true
 		await ui.click("Retry location"); await flush()
-		assert.match(ui.text(), /Location verified/)
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
 		const checks = ui.calls.filter(c => c.url.endsWith("validate_checkin_location"))
 		assert.equal(checks.length, 2)
 		assert.equal(checks[0].params.latitude, 0)
@@ -172,7 +196,7 @@ test("location is checked before confirmation and outside radius disables submit
 	} finally { ui.unmount() }
 })
 
-test("native company preflight shows unchanged radius warning inside modal before confirmation", async () => {
+test("native company preflight shows unchanged radius warning inside modal before submission", async () => {
 	const warning = "You must be within 100 meters of your shift location to check in."
 	const ui = mount({ context: { mode: "Native", outlet: null }, settings: { allow_geolocation_tracking: 1 }, locationCheck: async () => {
 		throw Object.assign(new Error("request failed"), { exc_type: "CheckinRadiusExceededError", messages: [warning] })
@@ -180,41 +204,40 @@ test("native company preflight shows unchanged radius warning inside modal befor
 	try {
 		await flush(); await ui.click("Check In"); await flush()
 		assert.ok(ui.text(ui.nodes("modal")[0]).includes(warning))
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
 		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 0)
 	} finally { ui.unmount() }
 })
 
-test("native radius rejection at confirm stays in modal with unchanged text and permits GPS retry", async () => {
+test("native radius rejection at submission stays in modal with unchanged text and a GPS retry submits again", async () => {
 	const warning = "You must be within 100 meters of your shift location to check in."
 	const ui = mount({ context: { mode: "Native", outlet: null }, settings: { allow_geolocation_tracking: 1 }, post: async () => {
 		throw Object.assign(new Error("request failed"), { response: { status: 417 }, exc_type: "CheckinRadiusExceededError", messages: [warning] })
 	} })
 	try {
 		await flush(); await ui.click("Check In"); await flush()
-		await ui.click("Confirm Check In"); await flush()
+		await flush()
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
 		assert.equal(ui.nodes("modal").length, 1)
 		assert.ok(ui.text(ui.nodes("modal")[0]).includes(warning))
 		assert.equal(ui.text().split(warning).length - 1, 1)
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
 		await ui.click("Retry location"); await flush()
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
-		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 1)
+		assert.equal(ui.calls.filter(c => c.url.endsWith("submit_checkin")).length, 2)
 	} finally { ui.unmount() }
 })
 
-test("pending location validation blocks confirmation and late responses cannot validate a reopened modal", async () => {
+test("pending location validation blocks submission and late responses cannot validate a reopened modal", async () => {
 	const resolves = []
 	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: () => new Promise(resolve => resolves.push(resolve)) })
 	try {
 		await flush(); await ui.click("Check In"); await flush()
+		const submits = () => ui.calls.filter(c => c.url.endsWith("submit_checkin")).length
 		assert.match(ui.text(), /Checking location/)
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		assert.equal(submits(), 0)
 		await ui.click("Close"); await ui.click("Check In"); await flush()
 		resolves[0]({ valid: true }); await flush()
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, true)
+		assert.equal(submits(), 0)
 		resolves[1]({ valid: true }); await flush()
-		assert.equal(ui.nodes("button").find(b => ui.text(b).trim() === "Confirm Check In").props.disabled, false)
+		assert.equal(submits(), 1)
 	} finally { ui.unmount() }
 })
 
@@ -233,7 +256,8 @@ test("component uses backend context and shows outlet and shift", async () => {
 })
 
 test("panel retains outlet and shift while compact modal omits both", async () => {
-	const ui = mount(); try {
+	// Location never resolves so the modal stays open instead of submitting itself.
+	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: () => new Promise(() => {}) }); try {
 		await flush()
 		assert.equal(ui.nodes("details").length, 0)
 		assert.ok(!ui.text().includes("Attendance details"))
@@ -268,7 +292,6 @@ test("native mode without a shift does not display a fictitious shift", async ()
 test("camera-open preview is not submitted as shift or browser timestamp", async () => {
 	const ui = mount(); try {
 		await flush(); await ui.click("Check In"); await flush(); assert.equal(ui.gpsCalls, 0)
-		await ui.click("Confirm Check In"); await flush()
 		const post = ui.calls.find((c) => c.url.endsWith("submit_checkin")); assert.ok(post); assert.equal(post.params.request_id, ID); assert.equal(post.params.time, undefined); assert.equal(post.params.shift, undefined)
 		assert.match(ui.text(), /Shift 2 FINAL/); assert.equal(ui.nodes("modal").length, 0)
 	} finally { ui.unmount() }
@@ -281,7 +304,7 @@ test("failed context refresh removes a stale enabled action", async () => {
 })
 test("uncertain POST recovers on reconnect without turning retry into a new OUT", async () => {
 	const ui = mount({ post: async () => { throw new TypeError("lost response") } }); try {
-		await flush(); await ui.click("Check In"); await flush(); await ui.click("Confirm Check In"); await flush()
+		await flush(); await ui.click("Check In"); await flush()
 		assert.match(ui.text(), /previous request is not confirmed/)
 		ui.setLookup({ ...saved(), replayed: true }); ui.setContext(ctx({ next_action: "OUT", candidate_shift: "Shift 2 FINAL" }))
 		await ui.listeners.get("online")(); await flush()
@@ -289,41 +312,42 @@ test("uncertain POST recovers on reconnect without turning retry into a new OUT"
 	} finally { ui.unmount() }
 })
 test("geolocation disabled does not request device permission; a zero latitude works when enabled", async () => {
-	const ui = mount({ settings: { allow_geolocation_tracking: 1 } }); try { await flush(); await ui.click("Check In"); await flush(); assert.equal(ui.gpsCalls, 1); await ui.click("Confirm Check In"); await flush(); assert.equal(ui.calls.find((c) => c.url.endsWith("submit_checkin")).params.latitude, 0) } finally { ui.unmount() }
+	const ui = mount({ settings: { allow_geolocation_tracking: 1 } }); try { await flush(); await ui.click("Check In"); await flush(); assert.equal(ui.gpsCalls, 1); await flush(); assert.equal(ui.calls.find((c) => c.url.endsWith("submit_checkin")).params.latitude, 0) } finally { ui.unmount() }
 })
 test("switching employee while mounted removes the stale modal and cannot submit", async () => {
-	const ui = mount(); try { await flush(); await ui.click("Check In"); await flush(); ui.employee.data.name = "OTHER"; await flush(); assert.equal(ui.nodes("modal").length, 0); assert.equal(ui.calls.filter((c) => c.url.endsWith("submit_checkin")).length, 0) } finally { ui.unmount() }
+	// Location never resolves, so nothing may be submitted for the first employee either.
+	const ui = mount({ settings: { allow_geolocation_tracking: 1 }, locationCheck: () => new Promise(() => {}) }); try { await flush(); await ui.click("Check In"); await flush(); ui.employee.data.name = "OTHER"; await flush(); assert.equal(ui.nodes("modal").length, 0); assert.equal(ui.calls.filter((c) => c.url.endsWith("submit_checkin")).length, 0) } finally { ui.unmount() }
 })
 test("component removes only its own subscriptions on unmount", async () => {
 	const ui = mount(); await flush(); ui.unmount(); assert.equal(ui.listeners.size, 0)
 })
 
-test("face capture uses the shared face endpoint only after explicit confirmation", async () => {
+test("face capture submits to the shared face endpoint as soon as a face is captured", async () => {
 	const ui = mount({ settings: { require_face_checkin: 1 } }); try {
 		await flush(); await ui.click("Check In"); await flush()
 		assert.equal(ui.nodes("face").length, 1)
-		ui.nodes("face")[0].props.onClick(); await flush()
 		assert.equal(ui.calls.filter((c) => c.url.endsWith("face_checkin")).length, 0)
-		await ui.click("Confirm Check In"); await flush()
+		ui.nodes("face")[0].props.onClick(); await flush()
+		assert.equal(ui.calls.filter((c) => c.url.endsWith("face_checkin")).length, 1)
 		const post = ui.calls.find((c) => c.url.endsWith("face_checkin")); assert.ok(post); assert.equal(post.params.request_id, ID); assert.equal(post.params.descriptor, "[0]")
 		assert.equal(ui.gpsCalls, 0)
 	} finally { ui.unmount() }
 })
 
-test("component blocks duplicate confirmation while a POST is in flight", async () => {
+test("component does not submit again while a POST is in flight", async () => {
 	let complete
 	const ui = mount({ post: () => new Promise((resolve) => { complete = resolve }) }); try {
 		await flush(); await ui.click("Check In"); await flush()
-		const first = ui.click("Confirm Check In"); await flush()
-		ui.click("Confirm Check In")
 		assert.equal(ui.calls.filter((c) => c.url.endsWith("submit_checkin")).length, 1)
-		complete(saved()); await first; await flush()
+		ui.listeners.get("online")(); await flush()
+		assert.equal(ui.calls.filter((c) => c.url.endsWith("submit_checkin")).length, 1)
+		complete(saved()); await flush()
 	} finally { ui.unmount() }
 })
 
 test("opening a retry that was already committed does not open a new OUT modal", async () => {
 	const ui = mount({ post: async () => { throw new Error("lost response") } }); try {
-		await flush(); await ui.click("Check In"); await flush(); await ui.click("Confirm Check In"); await flush(); await ui.click("Close"); await flush()
+		await flush(); await ui.click("Check In"); await flush(); await ui.click("Close"); await flush()
 		ui.setLookup(saved()); ui.setContext(ctx({ next_action: "OUT", paired_checkin: "SAVED" }))
 		await ui.click("Retry IN"); await flush()
 		assert.equal(ui.nodes("modal").length, 0)
@@ -331,9 +355,9 @@ test("opening a retry that was already committed does not open a new OUT modal",
 	} finally { ui.unmount() }
 })
 
-test("OUT confirmation sends the original IN identity as a backend precondition", async () => {
+test("OUT submission sends the original IN identity as a backend precondition", async () => {
 	const ui = mount({ context: { next_action: "OUT", paired_checkin: "ORIGINAL-IN" }, post: async (params) => ({ ...saved(), log_type: "OUT", paired_checkin: params.expected_checkin }) }); try {
-		await flush(); await ui.click("Check Out"); await flush(); await ui.click("Confirm Check Out"); await flush()
+		await flush(); await ui.click("Check Out"); await flush()
 		assert.equal(ui.calls.find((c) => c.url.endsWith("submit_checkin")).params.expected_checkin, "ORIGINAL-IN")
 	} finally { ui.unmount() }
 })
@@ -354,7 +378,7 @@ test("offline event disables opening and online event refreshes context", async 
 test("definitive validation error remains visible after the modal closes", async () => {
 	const error = Object.assign(new Error("GPS missing"), { response: { status: 417 }, messages: ["GPS missing"] })
 	const ui = mount({ post: async () => { throw error } }); try {
-		await flush(); await ui.click("Check In"); await flush(); await ui.click("Confirm Check In"); await flush()
+		await flush(); await ui.click("Check In"); await flush()
 		assert.match(ui.text(), /GPS missing/); assert.equal(ui.nodes("modal").length, 0)
 	} finally { ui.unmount() }
 })

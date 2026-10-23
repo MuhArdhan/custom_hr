@@ -32,12 +32,17 @@ def configuration():
 	def transition(state, action, target, role, condition, self_approval=0):
 		transitions.append(dict(state=state, action=action, next_state=target,
 			allowed=role, condition=condition, allow_self_approval=self_approval))
+	employee_user = 'frappe.db.get_value("Employee", doc.employee, "user_id")'
 	transition("Open", "Ajukan ke PL", "Menunggu PL", "All",
-		f'{outlet} and {pl} and doc.owner == frappe.session.user', 1)
+		f'{outlet} and {pl} and doc.owner == frappe.session.user and {employee_user} != {pl}', 1)
+	# No PL to ask (outlet without one, or the PL's own leave): go straight to HRD.
+	transition("Open", "Ajukan ke HRD", "Menunggu HRD", "All",
+		f'{outlet} and doc.owner == frappe.session.user and (not {pl} or {employee_user} == {pl})', 1)
 	pl_condition = f'{outlet} and doc.leave_approver == frappe.session.user and {pl} == frappe.session.user'
 	transition("Menunggu PL", "Approve", "Menunggu HRD", "PL Outlet", f'{pl_condition} and {not_self}')
 	transition("Menunggu PL", "Reject", "Rejected", "PL Outlet", pl_condition, 1)
-	transition("Menunggu HRD", "Approve", "Approved", "HR Manager", f'{outlet} and {not_self}')
+	# HR may approve a request it created for someone else, never its own leave.
+	transition("Menunggu HRD", "Approve", "Approved", "HR Manager", f'{outlet} and {employee_user} != frappe.session.user', 1)
 	transition("Menunggu HRD", "Reject", "Rejected", "HR Manager", outlet, 1)
 	# Company keeps one-level nominated Leave Approver / authorized HR decisions.
 	company_not_self = '(not frappe.db.get_value("HR Settings", None, "prevent_self_leave_approval") or frappe.db.get_value("Employee", doc.employee, "user_id") != frappe.session.user)'
@@ -45,7 +50,7 @@ def configuration():
 		condition = f'not {outlet}'
 		if role == "Leave Approver":
 			condition += ' and doc.leave_approver == frappe.session.user'
-		transition("Open", "Approve", "Approved", role, f'{condition} and {company_not_self}')
+		transition("Open", "Approve", "Approved", role, f'{condition} and {company_not_self}', int(role != "Leave Approver"))
 		transition("Open", "Reject", "Rejected", role, condition, 1)
 	for role in ["HR Manager", "System Manager"]:
 		for state in ["Approved", "Rejected"]:
