@@ -1,0 +1,15 @@
+{
+  "appId": "com.customhr.checkin.prototype",
+  "appName": "ROPI HRMS",
+  "webDir": "dist",
+  "android": {
+    "path": "native",
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "server": {
+    "url": "https://sea-beyond-expansion-respond.trycloudflare.com/hrms",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}

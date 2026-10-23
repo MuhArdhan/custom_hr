@@ -12,11 +12,16 @@
   "holiday_list",
   "geo_section",
   "address",
+  "shift_location",
+  "checkin_radius",
   "column_break_geo",
   "latitude",
   "longitude",
   "geofence_radius_m",
   "shift_section",
+  "enable_outlet_auto_shift",
+  "outlet_auto_shift_effective_from",
+  "shift_transition_minutes",
   "shifts",
   "approval_section",
   "approver_1",
@@ -48,9 +53,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Daftar libur yang berlaku untuk karyawan outlet ini",
+   "description": "Data kalender lama dipertahankan untuk referensi. Tidak membatasi presensi atau pemrosesan Attendance Outlet.",
    "fieldname": "holiday_list",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Holiday List",
    "options": "Holiday List"
   },
@@ -65,6 +71,21 @@
    "label": "Alamat"
   },
   {
+   "fieldname": "shift_location",
+   "fieldtype": "Link",
+   "label": "Shift Location",
+   "options": "Shift Location",
+   "unique": 1,
+   "no_copy": 1,
+   "description": "Dibuat otomatis saat koordinat Outlet diisi. Radius dikelola di Shift Location. Satu lokasi khusus per Outlet."
+  },
+  {
+   "fieldname": "checkin_radius",
+   "fieldtype": "Int",
+   "label": "Checkin Radius (m)",
+   "description": "Tersinkron dua arah dengan Shift Location saat disimpan. Nilai 0 berarti tanpa pembatasan jarak; GPS tetap diperlukan jika geolocation aktif."
+  },
+  {
    "fieldname": "column_break_geo",
    "fieldtype": "Column Break"
   },
@@ -72,24 +93,51 @@
    "fieldname": "latitude",
    "fieldtype": "Float",
    "label": "Latitude",
-   "precision": "6"
+    "precision": "7"
   },
   {
    "fieldname": "longitude",
    "fieldtype": "Float",
    "label": "Longitude",
-   "precision": "6"
+    "precision": "7"
   },
   {
-   "default": "100",
-   "fieldname": "geofence_radius_m",
-   "fieldtype": "Int",
-   "label": "Radius Geofence (m)"
+    "fieldname": "geofence_radius_m",
+    "fieldtype": "Int",
+    "label": "Radius Geofence (m) — Legacy",
+    "hidden": 1,
+    "read_only": 1,
+    "description": "Data lama dipertahankan untuk migrasi saja. Validasi memakai Checkin Radius pada Shift Location."
   },
   {
    "fieldname": "shift_section",
    "fieldtype": "Section Break",
    "label": "Shift"
+  },
+  {
+   "default": "0",
+    "description": "Aktifkan penentuan shift dari jadwal Outlet. Company Attendance tetap mengikuti Employee. Penguncian persiapan sudah dibuka untuk pengujian lokal.",
+   "fieldname": "enable_outlet_auto_shift",
+   "fieldtype": "Check",
+   "label": "Shift Otomatis Outlet",
+    "read_only": 0
+  },
+  {
+    "description": "Tanggal dan waktu mulai mode otomatis. Log sebelum waktu ini tetap mengikuti alur native; hindari backdate saat pengujian.",
+   "fieldname": "outlet_auto_shift_effective_from",
+   "fieldtype": "Datetime",
+   "label": "Shift Otomatis Berlaku Mulai",
+   "no_copy": 1,
+    "read_only": 0
+  },
+  {
+   "default": "30",
+   "description": "IN berpindah ke shift berikutnya sejumlah menit sebelum jam mulainya. Bukan toleransi keterlambatan; Toleransi Terlambat dan Toleransi Pulang Awal tetap diatur pada Shift Type. Shift terakhir menerima IN sampai jam selesai.",
+   "fieldname": "shift_transition_minutes",
+   "fieldtype": "Int",
+   "label": "Jeda Peralihan IN (Menit)",
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "fieldname": "shifts",
@@ -123,7 +171,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-09 00:00:00.000000",
+ "modified": "2026-10-15 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "Outlet",

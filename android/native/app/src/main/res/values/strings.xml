@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ROPI HRMS</string>
+    <string name="title_activity_main">ROPI HRMS</string>
+    <string name="package_name">com.customhr.checkin.prototype</string>
+    <string name="custom_url_scheme">com.customhr.checkin.prototype</string>
+</resources>

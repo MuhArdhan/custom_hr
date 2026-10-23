@@ -1,0 +1,74 @@
+[
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Location-latitude-precision",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Location",
+  "field_name": "latitude",
+  "property": "precision",
+  "property_type": "Int",
+  "value": "7",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Location-longitude-precision",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Location",
+  "field_name": "longitude",
+  "property": "precision",
+  "property_type": "Int",
+  "value": "7",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-late_entry_grace_period-label",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "late_entry_grace_period",
+  "property": "label",
+  "property_type": "Data",
+  "value": "Toleransi Terlambat",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-late_entry_grace_period-description",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "late_entry_grace_period",
+  "property": "description",
+  "property_type": "Small Text",
+  "value": "Toleransi dalam menit setelah jam mulai shift. Check-in setelah jam mulai ditambah toleransi ini ditandai terlambat.",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-early_exit_grace_period-label",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "early_exit_grace_period",
+  "property": "label",
+  "property_type": "Data",
+  "value": "Toleransi Pulang Awal",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-early_exit_grace_period-description",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "early_exit_grace_period",
+  "property": "description",
+  "property_type": "Small Text",
+  "value": "Toleransi dalam menit sebelum jam selesai shift. Nilai 0 berarti check-out sebelum shift selesai langsung ditandai pulang awal.",
+  "module": "HRM",
+  "is_system_generated": 1
+ }
+]

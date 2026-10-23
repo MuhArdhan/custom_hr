@@ -1,0 +1,19 @@
+{
+ "doctype": "Page",
+ "name": "leave-calendar",
+ "page_name": "leave-calendar",
+ "title": "Leave Calendar",
+ "module": "HRM",
+ "standard": "Yes",
+ "system_page": 0,
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "HR User"},
+  {"role": "System Manager"},
+  {"role": "Leave Approver"},
+  {"role": "Outlet Leader"},
+  {"role": "SPV Outlet"},
+  {"role": "Pengelola"},
+  {"role": "PL Outlet"}
+ ]
+}

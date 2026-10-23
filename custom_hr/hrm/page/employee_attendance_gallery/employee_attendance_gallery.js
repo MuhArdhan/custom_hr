@@ -540,6 +540,8 @@ class EmployeeAttendanceGallery {
 							log.log_type || ""
 						)}</span></div>
 						<div class="eag-line"><b>${frappe.datetime.str_to_user(log.time)}</b></div>
+						${log.outlet_at_checkin ? `<div class="eag-line">${frappe.utils.escape_html(log.outlet_at_checkin)}</div>` : ""}
+						${log.shift ? `<div class="eag-line eag-muted">${frappe.utils.escape_html(log.shift)}</div>` : ""}
 						<div class="eag-line eag-muted">${__("Face Verified")}: ${
 							log.face_verified ? __("Yes") : __("No")
 						}</div>

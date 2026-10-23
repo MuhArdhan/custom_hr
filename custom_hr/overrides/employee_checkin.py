@@ -6,7 +6,8 @@
 Adds, without touching the hrms app:
 - self-service restrictions (one IN per day, no backdating, check-out window)
 - face verification requirement
-- realtime attendance marking right after a check-out completes the pair
+- pair-scoped outlet attendance and native realtime marking after check-out
+- immutable outlet IN snapshots and OUT pairing, with activation still gated
 - coordinates are stored even when geolocation tracking is off
 """
 
@@ -14,11 +15,20 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_datetime, now_datetime
+from frappe.utils import cint, flt, get_datetime, now_datetime
 
 from hrms.hr.doctype.employee_checkin.employee_checkin import (
 	EmployeeCheckin as BaseEmployeeCheckin,
 )
+
+from custom_hr.services.outlet_checkin import (
+	_employee_record,
+	prepare_or_protect_checkin,
+	prevent_locked_checkin_deletion,
+)
+from custom_hr.services.outlet_shift import normalize_checkin_datetime
+from custom_hr.services.checkin_submission import apply_verified_face
+from custom_hr.services.outlet_geofence import coordinates, validate_outlet_geofence
 
 # users with any of these roles bypass the self-service checkin restrictions
 SELF_SERVICE_BYPASS_ROLES = {"HR Manager", "HR User", "System Manager"}
@@ -27,14 +37,62 @@ SELF_CHECKIN_TIME_TOLERANCE_SECONDS = 900
 
 
 class CustomEmployeeCheckin(BaseEmployeeCheckin):
+	def before_validate(self):
+		if self.is_new() or not self.get("name"):
+			if not (frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES):
+				# Device time/flags and face_verified in raw REST payloads are not proof.
+				_employee_record(self.employee, for_update=True)
+				self.time = now_datetime()
+				apply_verified_face(self)
+			try:
+				self.time = normalize_checkin_datetime(self.time)
+			except (ValueError, TypeError, OverflowError, KeyError):
+				frappe.throw(_("Waktu absen atau timezone site tidak valid."))
+			super().before_validate()
+			uses_outlet = prepare_or_protect_checkin(self)
+			if uses_outlet:
+				# before_validate still runs with ignore_validate: no raw REST,
+				# face/ordinary endpoint, or HR flag can skip outlet geofencing.
+				self.validate_distance_from_shift_location()
+				self.set_geolocation()
+			if not uses_outlet and not (frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES):
+				self.validate_self_service_time()
+				self.validate_daily_checkin_limit()
+				self.validate_face_verification()
+				self.validate_checkout_window()
+		else:
+			# Check immutable fields against DB before even normalizing a
+			# potentially forged timestamp on an existing locked document.
+			prepare_or_protect_checkin(self)
+			super().before_validate()
+
 	def validate(self):
 		super().validate()
 		self.validate_self_service_checkin()
 
+	@frappe.whitelist()
+	def fetch_shift(self):
+		if not prepare_or_protect_checkin(self):
+			return super().fetch_shift()
+
+	def on_trash(self):
+		prevent_locked_checkin_deletion(self)
+
+	def validate_distance_from_shift_location(self):
+		if not validate_outlet_geofence(self):
+			return super().validate_distance_from_shift_location()
+
 	def set_geolocation(self):
 		# upstream gates this behind HR Settings; store the payload whenever
 		# coordinates are present so the check-in history can show a location
-		if not (self.latitude and self.longitude):
+		if self.get("attendance_source") == "Outlet":
+			try:
+				lat, lon = coordinates(self.latitude, self.longitude)
+			except ValueError:
+				return  # No fictitious (0, 0) map when optional GPS is absent.
+			self.latitude = flt(lat, self.precision("latitude"))
+			self.longitude = flt(lon, self.precision("longitude"))
+		elif not (self.latitude and self.longitude):
 			return
 
 		self.geolocation = frappe.json.dumps(
@@ -59,6 +117,10 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		"""
 		if not self.is_new() or self.flags.get("ignore_checkin_restrictions"):
 			return
+		if self.get("attendance_source") == "Outlet":
+			# Enforced under the employee lock in before_validate/fetch_shift,
+			# including when a caller sets flags.ignore_validate.
+			return
 
 		if frappe.session.user == "Administrator" or set(frappe.get_roles()) & SELF_SERVICE_BYPASS_ROLES:
 			return
@@ -75,22 +137,28 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 
 		day_start = get_datetime(self.time).replace(hour=0, minute=0, second=0, microsecond=0)
 		day_end = day_start + timedelta(days=1)
-		if frappe.db.exists(
-			"Employee Checkin",
-			{
-				"employee": self.employee,
-				"log_type": "IN",
-				"time": ["between", [day_start, day_end]],
-				"name": ("!=", self.name),
-			},
-		):
+		log = frappe.qb.DocType("Employee Checkin")
+		condition = (
+			(log.employee == self.employee) & (log.log_type == "IN")
+			& (log.time >= day_start) & (log.time < day_end)
+		)
+		if self.name:
+			condition &= log.name != self.name
+		if frappe.qb.from_(log).select(log.name).where(condition).limit(1).for_update().run():
 			frappe.throw(
 				title=_("Already Checked In"),
 				msg=_("You have already checked in today. Please check out instead."),
 			)
 
 	def validate_self_service_time(self):
-		drift = abs((get_datetime(self.time) - now_datetime()).total_seconds())
+		server_time = now_datetime()
+		if (
+			self.get("attendance_source") == "Outlet" and self.log_type == "OUT"
+			and self.get("checkout_deadline")
+			and server_time.replace(microsecond=0) > get_datetime(self.checkout_deadline)
+		):
+			frappe.throw(_("Batas check-out sesi sudah lewat menurut waktu server. OUT kemarin tidak dapat dicatat dengan mengubah waktu perangkat; hubungi HR untuk koreksi Attendance."))
+		drift = abs((get_datetime(self.time) - server_time).total_seconds())
 		if drift > SELF_CHECKIN_TIME_TOLERANCE_SECONDS:
 			frappe.throw(
 				title=_("Invalid Check-in Time"),
@@ -114,12 +182,14 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		if self.log_type != "OUT":
 			return
 
-		last_log = frappe.get_all(
-			"Employee Checkin",
-			filters={"employee": self.employee, "name": ("!=", self.name)},
-			fields=["name", "log_type", "time", "shift_actual_end"],
-			order_by="time desc",
-			limit=1,
+		log = frappe.qb.DocType("Employee Checkin")
+		condition = log.employee == self.employee
+		if self.name:
+			condition &= log.name != self.name
+		last_log = (
+			frappe.qb.from_(log).select(log.name, log.log_type, log.time, log.shift_actual_end)
+			.where(condition).orderby(log.time, log.name, order=frappe.qb.desc)
+			.limit(1).for_update().run(as_dict=True)
 		)
 		if not last_log or last_log[0].log_type != "IN":
 			frappe.throw(_("No open check-in found. Please check in before checking out."))
@@ -146,6 +216,13 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		"""
 		if self.log_type != "OUT" or not self.shift or cint(self.skip_auto_attendance):
 			return
+		if self.get("attendance_source") == "Outlet":
+			frappe.enqueue(
+				"custom_hr.services.outlet_attendance.process_outlet_attendance",
+				queue="short", enqueue_after_commit=True,
+				source_checkin=self.paired_checkin, source_checkout=self.name,
+			)
+			return
 		frappe.enqueue(
 			"custom_hr.overrides.employee_checkin.process_shift_attendance_now",
 			queue="short",
@@ -162,9 +239,13 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 	still unmarked, and pulls `last_sync_of_checkin` forward so the standard
 	shift-type processor picks the logs up.
 	"""
-	pending_in = frappe.db.exists(
-		"Employee Checkin",
-		{"employee": employee, "shift": shift, "log_type": "IN", "attendance": ("is", "not set")},
+	log = frappe.qb.DocType("Employee Checkin")
+	native = log.attendance_source.isnull() | (log.attendance_source != "Outlet")
+	pending_in = (
+		frappe.qb.from_(log).select(log.name).where(
+			(log.employee == employee) & (log.shift == shift) & (log.log_type == "IN")
+			& (log.attendance.isnull() | (log.attendance == "")) & native
+		).limit(1).run()
 	)
 	if not pending_in:
 		return
@@ -176,12 +257,11 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 	if not cint(shift_doc.enable_auto_attendance):
 		return
 
-	last_log = frappe.get_all(
-		"Employee Checkin",
-		filters={"employee": employee, "shift": shift, "attendance": ("is", "not set")},
-		fields=["shift_actual_end"],
-		order_by="shift_actual_end desc",
-		limit=1,
+	last_log = (
+		frappe.qb.from_(log).select(log.shift_actual_end).where(
+			(log.employee == employee) & (log.shift == shift)
+			& (log.attendance.isnull() | (log.attendance == "")) & native
+		).orderby(log.shift_actual_end, order=frappe.qb.desc).limit(1).run(as_dict=True)
 	)
 	if last_log and last_log[0].shift_actual_end:
 		last_sync = get_datetime(last_log[0].shift_actual_end) + timedelta(minutes=1)
@@ -193,5 +273,7 @@ def process_shift_attendance_now(shift: str, employee: str) -> None:
 
 def get_checkout_cutoff(open_checkin) -> "datetime":
 	"""Check-out is allowed until the end of the day the shift (or check-in) belongs to."""
+	if open_checkin.get("attendance_source") == "Outlet" and open_checkin.get("checkout_deadline"):
+		return get_datetime(open_checkin.get("checkout_deadline"))
 	reference_time = open_checkin.get("shift_actual_end") or open_checkin.get("time")
 	return get_datetime(reference_time).replace(hour=23, minute=59, second=59, microsecond=0)

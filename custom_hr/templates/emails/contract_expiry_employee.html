@@ -1,0 +1,16 @@
+{% if is_test %}
+<p><strong>[TEST]</strong> Email ini hanya untuk pengujian, bukan pemberitahuan resmi.</p>
+{% endif %}
+<p>Yth. {{ employee_name | e }},</p>
+<p>
+	Kami menginformasikan bahwa kontrak kerja Anda akan berakhir pada
+	<strong>{{ contract_end_date | e }}</strong>, yaitu <strong>{{ reminder_days | e }} hari lagi</strong>.
+</p>
+<p>
+	Silakan menghubungi HRD untuk memperoleh informasi mengenai evaluasi dan tindak lanjut kontrak kerja Anda.
+</p>
+<p>
+	Email ini merupakan pengingat otomatis dan <strong>bukan keputusan mengenai perpanjangan
+	atau berakhirnya hubungan kerja</strong>.
+</p>
+<p>Terima kasih,<br><strong>Tim HRD</strong></p>

@@ -26,7 +26,21 @@ frappe.listview_settings["Outlet"] = {
 };
 
 frappe.ui.form.on("Outlet", {
+	async shift_location(frm) {
+		const location = frm.doc.shift_location;
+		if (!location) return;
+		const result = await frappe.db.get_value("Shift Location", location, "checkin_radius");
+		if (frm.doc.shift_location === location && result.message) {
+			await frm.set_value("checkin_radius", result.message.checkin_radius);
+		}
+	},
 	refresh(frm) {
+		frm.set_intro(
+			__(
+				"Pengaturan shift outlet masih tahap persiapan. Mode otomatis belum dapat diaktifkan sampai integrasi absen selesai. Jeda Peralihan IN bukan toleransi terlambat; toleransi tetap diatur pada Shift Type."
+			),
+			"orange"
+		);
 		if (frm.is_new()) return;
 		frm.add_custom_button(__("Provision Karyawan"), () => {
 			frappe.call({

@@ -8,7 +8,10 @@
   "employee",
   "employee_name",
   "column_break_row",
-  "shift"
+   "shift",
+   "approval_state",
+   "decision_by",
+   "decision_on"
  ],
  "fields": [
   {
@@ -39,11 +42,35 @@
    "label": "Shift",
    "options": "Shift Type",
    "read_only": 1
+  },
+  {
+   "fieldname": "approval_state",
+   "fieldtype": "Select",
+   "label": "Tahap Approval",
+   "options": "\nMenunggu Leader\nMenunggu SPV\nMenunggu HRD\nDisetujui\nDitolak",
+   "read_only": 1,
+   "in_list_view": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "decision_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Diproses Oleh",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "decision_on",
+   "fieldtype": "Datetime",
+   "label": "Diproses Pada",
+   "read_only": 1,
+   "no_copy": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-09 00:00:00.000000",
+  "modified": "2026-10-22 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "Overtime Request Employee",

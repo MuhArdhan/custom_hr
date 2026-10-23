@@ -90,8 +90,8 @@ def collect_month(bulan=None):
 
 	requests = frappe.get_all(
 		"Overtime Request",
-		filters={"status": "Disetujui", "date": ["between", [from_date, to_date]]},
-		fields=["name", "date", "planned_hours"],
+		filters={"status": ["!=", "Ditolak"], "date": ["between", [from_date, to_date]]},
+		fields=["name", "date", "planned_hours", "status"],
 		ignore_permissions=True,
 	)
 	planned = {}
@@ -100,10 +100,12 @@ def collect_month(bulan=None):
 		for row in frappe.get_all(
 			"Overtime Request Employee",
 			filters={"parent": ["in", list(req_map)]},
-			fields=["parent", "employee"],
+			fields=["parent", "employee", "approval_state"],
 			ignore_permissions=True,
 		):
 			req = req_map[row.parent]
+			if (row.get("approval_state") or req.status) != "Disetujui":
+				continue
 			key = (row.employee, getdate(req.date))
 			previous = planned.get(key)
 			cap = flt(req.planned_hours)

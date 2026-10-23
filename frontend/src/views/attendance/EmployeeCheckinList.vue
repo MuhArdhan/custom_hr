@@ -25,6 +25,12 @@ const EMPLOYEE_CHECKIN_FIELDS = [
 	"face_verified",
 	"face_photo",
 	"face_score",
+	"shift",
+	"attendance_source",
+	"outlet_at_checkin",
+	"shift_work_date",
+	"checkout_deadline",
+	"paired_checkin",
 ]
 
 const FILTER_CONFIG = [

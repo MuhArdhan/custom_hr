@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- anydpi overrides the generated density-specific Capacitor PNGs on API 23-25. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item android:drawable="@drawable/frappe_hr_foreground" />
+</layer-list>

@@ -5,6 +5,17 @@ app_description = "HRM: HR app with attendance gallery, face check-in and realti
 app_email = "admin@example.com"
 app_license = "mit"
 required_apps = ["hrms"]
+after_install = [
+	"custom_hr.patches.setup_native_leave_workflow.execute",
+	"custom_hr.patches.remove_legacy_leave_approval_fields.execute",
+	"custom_hr.patches.add_leave_calendar_sidebar.execute",
+]
+after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
+
+scheduler_events = {
+	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],
+	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
+}
 
 # ----------------------------------------------------------------------------
 # App switcher entry (own icon, separate from Frappe HR)
@@ -41,6 +52,7 @@ doctype_list_js = {
 	"Employee Checkin": "public/js/employee_checkin_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Shift Type": "public/js/shift_type_list.js",
 }
 
 # ----------------------------------------------------------------------------
@@ -63,6 +75,14 @@ has_permission = {
 # attendance marking right after check-out
 override_doctype_class = {
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
+	"Shift Type": "custom_hr.overrides.shift_type.CustomShiftType",
+	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
+}
+
+doc_events = {
+	"Shift Location": {
+		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
+	},
 }
 
 # ----------------------------------------------------------------------------
@@ -70,6 +90,23 @@ override_doctype_class = {
 # ----------------------------------------------------------------------------
 
 fixtures = [
+	{
+		"doctype": "Property Setter",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"Shift Location-latitude-precision",
+					"Shift Location-longitude-precision",
+					"Shift Type-late_entry_grace_period-label",
+					"Shift Type-late_entry_grace_period-description",
+					"Shift Type-early_exit_grace_period-label",
+					"Shift Type-early_exit_grace_period-description",
+				],
+			]
+		],
+	},
 	{
 		"doctype": "Custom Field",
 		"filters": [
@@ -83,6 +120,22 @@ fixtures = [
 					"Employee Checkin-face_score",
 					"Employee Checkin-column_break_face",
 					"Employee Checkin-face_photo",
+					"Employee Checkin-outlet_shift_section",
+					"Employee Checkin-attendance_source",
+					"Employee Checkin-outlet_at_checkin",
+					"Employee Checkin-shift_work_date",
+					"Employee Checkin-outlet_shift_column",
+					"Employee Checkin-paired_checkin",
+					"Employee Checkin-checkout_deadline",
+					"Employee Checkin-shift_policy_snapshot",
+					"Attendance-outlet_attendance_section",
+					"Attendance-attendance_source",
+					"Attendance-outlet_at_checkin",
+					"Attendance-source_checkin",
+					"Attendance-source_checkout",
+					"Attendance-outlet_attendance_column",
+					"Attendance-missing_checkout",
+					"Attendance-working_hours_source",
 					"HR Settings-enable_face_checkin",
 					"HR Settings-require_face_checkin",
 					"HR Settings-face_match_threshold",
