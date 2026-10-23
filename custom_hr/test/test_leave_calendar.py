@@ -135,6 +135,39 @@ class TestLeaveCalendar(unittest.TestCase):
 		with self.assertRaises(frappe.ValidationError):
 			api.get_leave_calendar("2026-10-01", "2026-10-31")
 
+	def test_month_counts_match_detail_without_loading_documents_or_workflow(self):
+		row = frappe._dict(from_date=self.doc.from_date, to_date=self.doc.to_date, status="Open", docstatus=0)
+		self.listing.side_effect = None
+		self.listing.return_value = [row]
+		detail = api.get_leave_calendar("2026-11-01", "2026-11-30", kind="leave")["counts"]
+		self.factory.reset_mock()
+		self.workflow.reset_mock()
+		result = api.get_leave_counts("2026-11-01", "2026-11-30", company="Company", employee="EMP-1")
+		self.assertEqual(result["counts"], detail)
+		self.assertEqual(result["total"], 1)
+		self.factory.assert_not_called()
+		self.workflow.assert_not_called()
+		args = self.listing.call_args.kwargs
+		self.assertEqual(args["limit_page_length"], 0)
+		self.assertEqual(args["filters"]["company"], "Company")
+		self.assertEqual(args["filters"]["employee"], "EMP-1")
+		self.assertNotIn("ignore_permissions", args)
+
+	def test_month_counts_do_not_cap_or_fail_on_large_volume(self):
+		row = frappe._dict(from_date="2026-11-03", to_date="2026-11-03", status="Approved", docstatus=1)
+		self.listing.side_effect = None
+		self.listing.return_value = [row] * (api.MAX_REQUESTS + 100)
+		result = api.get_leave_counts("2026-11-01", "2026-11-30")
+		self.assertEqual(result["total"], api.MAX_REQUESTS + 100)
+		self.assertEqual(result["counts"]["2026-11-03"]["approved_leave"], api.MAX_REQUESTS + 100)
+
+	def test_month_counts_respect_read_permission_and_range(self):
+		with patch("frappe.has_permission", return_value=False):
+			self.assertEqual(api.get_leave_counts("2026-11-01", "2026-11-30")["counts"], {})
+		self.listing.assert_not_called()
+		with self.assertRaises(frappe.ValidationError):
+			api.get_leave_counts("2026-01-01", "2026-12-31")
+
 	def test_decision_rechecks_modified_and_does_not_mutate_stale_document(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "sudah berubah"):
 			api.decide_approval("Leave Application", "LEAVE-1", "Approve", "OLD")

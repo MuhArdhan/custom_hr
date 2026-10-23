@@ -157,6 +157,10 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 					item = _request(doc, category, actions, workflow, member)
 					if getdate(item["from_date"]) <= end and getdate(item["to_date"]) >= start:
 						items.append(item)
+	return {"items": items, "counts": _tally(items, start, end), "start_date": str(start), "end_date": str(end)}
+
+
+def _tally(items, start, end):
 	counts = {}
 	for item in items:
 		day, last = max(start, getdate(item["from_date"])), min(end, getdate(item["to_date"]))
@@ -166,7 +170,32 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 			if item["kind"] == "leave":
 				day_counts[item["calendar_status"]] += 1
 			day += timedelta(days=1)
-	return {"items": items, "counts": counts, "start_date": str(start), "end_date": str(end)}
+	return counts
+
+
+@frappe.whitelist(methods=["GET"])
+def get_leave_counts(start_date, end_date, employee=None, company=None):
+	"""Month-grid counts only: one list query, no per-document load or workflow evaluation.
+
+	Rows come from get_list, so permission conditions still scope what each user counts.
+	Day details and actions stay in get_leave_calendar.
+	"""
+	start, end = _range(start_date, end_date)
+	if not frappe.has_permission("Leave Application", "read"):
+		return {"counts": {}, "total": 0, "start_date": str(start), "end_date": str(end)}
+	filters = {"from_date": ["<=", end], "to_date": [">=", start]}
+	if company:
+		filters["company"] = company
+	if employee:
+		filters["employee"] = employee
+	rows = frappe.get_list(
+		"Leave Application", filters=filters, fields=["from_date", "to_date", "status", "docstatus"], limit_page_length=0
+	)
+	items = [
+		{"kind": "leave", "calendar_status": _leave_calendar_status(row), "from_date": row.from_date, "to_date": row.to_date}
+		for row in rows
+	]
+	return {"counts": _tally(items, start, end), "total": len(items), "start_date": str(start), "end_date": str(end)}
 
 
 @frappe.whitelist(methods=["POST"])

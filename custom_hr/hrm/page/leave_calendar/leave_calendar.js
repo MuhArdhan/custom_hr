@@ -57,10 +57,11 @@ class LeaveCalendar {
 		this.page.main.find(".ac-message").text(__("Memuat pengajuan..."));
 		this.page.main.find(".ac-calendar").html(`<div class="ac-loading"><span class="ac-spinner" aria-hidden="true"></span>${__("Menyiapkan kalender cuti...")}</div>`);
 		try {
-			const data = await this.request(first.format("YYYY-MM-DD"), last.format("YYYY-MM-DD"));
+			const response = await frappe.call({ method: "custom_hr.api.leave_calendar.get_leave_counts", type: "GET", args: { ...this.args(), start_date: first.format("YYYY-MM-DD"), end_date: last.format("YYYY-MM-DD") } });
+			const data = response.message;
 			if (token !== this.token) return;
 			this.render(first, data.counts);
-			this.page.main.find(".ac-message").text(data.items.length ? __("{0} pengajuan cuti/izin pada rentang ini.", [data.items.length]) : __("Tidak ada pengajuan cuti/izin yang dapat Anda lihat pada rentang ini."));
+			this.page.main.find(".ac-message").text(data.total ? __("{0} pengajuan cuti/izin pada rentang ini.", [data.total]) : __("Tidak ada pengajuan cuti/izin yang dapat Anda lihat pada rentang ini."));
 		} catch {
 			if (token === this.token) {
 				this.page.main.find(".ac-message").text(__("Kalender belum berhasil dimuat."));
