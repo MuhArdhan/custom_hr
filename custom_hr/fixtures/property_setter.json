@@ -127,7 +127,7 @@
   "field_name": "working_hours_threshold_for_half_day",
   "property": "default",
   "property_type": "Text",
-  "value": "3",
+  "value": "0",
   "module": "HRM",
   "is_system_generated": 1
  },
@@ -173,6 +173,18 @@
   "doctype_or_field": "DocField",
   "doc_type": "Shift Type",
   "field_name": "enable_early_exit_marking",
+  "property": "default",
+  "property_type": "Text",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-enable_auto_attendance-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "enable_auto_attendance",
   "property": "default",
   "property_type": "Text",
   "value": "1",

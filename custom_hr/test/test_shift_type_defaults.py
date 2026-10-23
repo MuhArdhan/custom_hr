@@ -9,7 +9,10 @@ from custom_hr import hooks
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "property_setter.json"
 
 EXPECTED = {
-	"working_hours_threshold_for_half_day": "3",
+	# Also reveals the late/early settings section, which depends on this checkbox.
+	"enable_auto_attendance": "1",
+	# 0 = no half-day rule (any IN+OUT is Present); HR can still set a threshold per shift.
+	"working_hours_threshold_for_half_day": "0",
 	"late_entry_grace_period": "5",
 	"early_exit_grace_period": "0",
 	# The grace periods are ignored unless their marking is switched on.
@@ -27,11 +30,15 @@ def default_setters():
 	}
 
 
-def exported_names():
+def exported_list():
 	for fixture in hooks.fixtures:
 		if fixture["doctype"] == "Property Setter":
-			return set(fixture["filters"][0][2])
-	return set()
+			return fixture["filters"][0][2]
+	return []
+
+
+def exported_names():
+	return set(exported_list())
 
 
 class TestShiftTypeDefaults(unittest.TestCase):
@@ -42,6 +49,10 @@ class TestShiftTypeDefaults(unittest.TestCase):
 		# A name missing from hooks.fixtures is dropped at the next export-fixtures.
 		for field in EXPECTED:
 			self.assertIn(f"Shift Type-{field}-default", exported_names())
+
+	def test_the_export_list_has_no_repeated_names(self):
+		names = exported_list()
+		self.assertEqual(len(names), len(set(names)))
 
 	def test_each_setter_is_a_default_on_the_docfield(self):
 		for row in json.loads(FIXTURES.read_text()):
