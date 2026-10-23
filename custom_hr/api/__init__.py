@@ -15,6 +15,9 @@ from hrms.api import get_current_employee, get_holidays_for_calendar
 
 
 EMPLOYEE_GALLERY_ROLES = ("HR Manager", "HR User", "System Manager")
+ATTENDANCE_STATUSES = ("Present", "Half Day", "Absent", "On Leave", "Work From Home")
+# Filtering logs by the attendance of their day is done in Python, so keep the range small.
+MAX_FILTERED_DAYS = 31
 
 
 @frappe.whitelist()
@@ -139,6 +142,22 @@ def _get_accessible_employees(company: str | None = None) -> list[str]:
 	return frappe.get_list("Employee", filters=filters, pluck="name", limit_page_length=0)
 
 
+def _attendance_conditions(late_entry=None, early_exit=None, missing_checkout=None, attendance_status=None) -> dict:
+	"""Conditions on a day's Attendance, shared by the gallery, the summary and the detail view."""
+	conditions = {
+		fieldname: 1
+		for fieldname, value in (
+			("late_entry", late_entry),
+			("early_exit", early_exit),
+			("missing_checkout", missing_checkout),
+		)
+		if cint(value)
+	}
+	if attendance_status in ATTENDANCE_STATUSES:
+		conditions["status"] = attendance_status
+	return conditions
+
+
 @frappe.whitelist()
 def get_employee_checkin_gallery(
 	company: str | None = None,
@@ -148,10 +167,18 @@ def get_employee_checkin_gallery(
 	search: str | None = None,
 	log_type: str | None = None,
 	face_verified: str | int | None = None,
+	late_entry: str | int | None = None,
+	early_exit: str | int | None = None,
+	missing_checkout: str | int | None = None,
+	attendance_status: str | None = None,
 	start: int = 0,
 	page_length: int = 24,
 ) -> dict:
-	"""Card gallery of employee check-in logs with the attendance status of that day."""
+	"""Card gallery of employee check-in logs with the attendance status of that day.
+
+	late_entry / early_exit / missing_checkout / attendance_status keep only logs whose day's
+	Attendance matches all of the selected conditions.
+	"""
 	_require_employee_gallery_access()
 
 	to_date = getdate(to_date) if to_date else getdate()
@@ -166,6 +193,29 @@ def get_employee_checkin_gallery(
 		accessible = [employee]
 	if not accessible:
 		return {"rows": [], "has_more": False}
+
+	conditions = _attendance_conditions(late_entry, early_exit, missing_checkout, attendance_status)
+	matching_days = None
+	if conditions:
+		if date_diff(to_date, from_date) > MAX_FILTERED_DAYS:
+			frappe.throw(_("Pilih rentang maksimal {0} hari saat memakai filter attendance.").format(MAX_FILTERED_DAYS))
+		matching_days = {
+			(row.employee, str(row.attendance_date))
+			for row in frappe.get_all(
+				"Attendance",
+				filters={
+					"employee": ["in", accessible],
+					"attendance_date": ["between", [from_date, to_date]],
+					"docstatus": 1,
+					**conditions,
+				},
+				fields=["employee", "attendance_date"],
+				limit_page_length=0,
+			)
+		}
+		if not matching_days:
+			return {"rows": [], "has_more": False}
+		accessible = sorted({row_employee for row_employee, _day in matching_days})
 
 	start = cint(start) or 0
 	page_length = min(cint(page_length) or 24, 100)
@@ -199,9 +249,11 @@ def get_employee_checkin_gallery(
 			"longitude",
 		],
 		order_by="time desc",
-		start=start,
-		page_length=page_length + 1,
+		# With attendance conditions the page is cut after filtering, below.
+		**({"limit_page_length": 0} if matching_days is not None else {"start": start, "page_length": page_length + 1}),
 	)
+	if matching_days is not None:
+		checkins = [row for row in checkins if (row.employee, str(getdate(row.time))) in matching_days][start:]
 	has_more = len(checkins) > page_length
 	checkins = checkins[:page_length]
 	if not checkins:
@@ -242,13 +294,25 @@ def get_employee_checkin_gallery(
 
 
 @frappe.whitelist()
-def get_attendance_daily_cards(employee: str, from_date: str, to_date: str) -> dict:
-	"""Per-day attendance cards for one employee (drill-down of the gallery)."""
+def get_attendance_daily_cards(
+	employee: str,
+	from_date: str,
+	to_date: str,
+	late_entry: str | int | None = None,
+	early_exit: str | int | None = None,
+	missing_checkout: str | int | None = None,
+	attendance_status: str | None = None,
+) -> dict:
+	"""Per-day attendance cards for one employee (drill-down of the gallery).
+
+	The same attendance conditions as the gallery keep only the days that match.
+	"""
 	_require_employee_gallery_access()
 	frappe.has_permission("Employee", "read", employee, throw=True)
 
 	from_date = getdate(from_date)
 	to_date = getdate(to_date)
+	conditions = _attendance_conditions(late_entry, early_exit, missing_checkout, attendance_status)
 
 	checkins = frappe.get_all(
 		"Employee Checkin",
@@ -286,6 +350,7 @@ def get_attendance_daily_cards(employee: str, from_date: str, to_date: str) -> d
 				"status",
 				"late_entry",
 				"early_exit",
+				"missing_checkout",
 				"in_time",
 				"out_time",
 				"working_hours",
@@ -303,7 +368,10 @@ def get_attendance_daily_cards(employee: str, from_date: str, to_date: str) -> d
 		date_str = str(date)
 		logs = logs_by_date.get(date_str, [])
 		attendance_row = attendance.get(date_str)
-		if logs or attendance_row:
+		matches = not conditions or (
+			attendance_row and all(attendance_row.get(key) == value for key, value in conditions.items())
+		)
+		if (logs or attendance_row) and matches:
 			first_in = next((log for log in logs if log.log_type == "IN"), logs[0] if logs else None)
 			last_out = next((log for log in reversed(logs) if log.log_type == "OUT"), None)
 			days.append(
@@ -331,10 +399,18 @@ def get_attendance_summary_by_employee(
 	from_date: str | None = None,
 	to_date: str | None = None,
 	search: str | None = None,
+	late_entry: str | int | None = None,
+	early_exit: str | int | None = None,
+	missing_checkout: str | int | None = None,
+	attendance_status: str | None = None,
 	start: int = 0,
 	page_length: int = 20,
 ) -> dict:
-	"""Per-employee attendance summary for a longer date range (weekly/monthly view)."""
+	"""Per-employee attendance summary for a longer date range (weekly/monthly view).
+
+	With late_entry / early_exit / missing_checkout / attendance_status only employees that have
+	at least one day matching all selected conditions are listed.
+	"""
 	_require_employee_gallery_access()
 
 	to_date = getdate(to_date) if to_date else getdate()
@@ -343,6 +419,19 @@ def get_attendance_summary_by_employee(
 	filters = {"company": company} if company else {}
 	if search:
 		filters["employee_name"] = ["like", f"%{search}%"]
+
+	conditions = _attendance_conditions(late_entry, early_exit, missing_checkout, attendance_status)
+	if conditions:
+		matching = frappe.get_all(
+			"Attendance",
+			filters={"attendance_date": ["between", [from_date, to_date]], "docstatus": 1, **conditions},
+			pluck="employee",
+			distinct=True,
+			limit_page_length=0,
+		)
+		if not matching:
+			return {"rows": [], "has_more": False}
+		filters["name"] = ["in", sorted(matching)]
 
 	start = cint(start) or 0
 	page_length = min(cint(page_length) or 20, 100)
@@ -370,7 +459,9 @@ def get_attendance_summary_by_employee(
 			SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) AS half_day,
 			SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) AS absent,
 			SUM(CASE WHEN status = 'On Leave' THEN 1 ELSE 0 END) AS on_leave,
-			SUM(CASE WHEN late_entry = 1 THEN 1 ELSE 0 END) AS late
+			SUM(CASE WHEN late_entry = 1 THEN 1 ELSE 0 END) AS late,
+			SUM(CASE WHEN early_exit = 1 THEN 1 ELSE 0 END) AS early,
+			SUM(CASE WHEN missing_checkout = 1 THEN 1 ELSE 0 END) AS missing_checkout
 		FROM `tabAttendance`
 		WHERE employee IN ({placeholders})
 			AND attendance_date BETWEEN %s AND %s
@@ -410,6 +501,8 @@ def get_attendance_summary_by_employee(
 				"absent": cint(counts.get("absent")),
 				"on_leave": cint(counts.get("on_leave")),
 				"late": cint(counts.get("late")),
+				"early": cint(counts.get("early")),
+				"missing_checkout": cint(counts.get("missing_checkout")),
 				"logs": cint(log_map.get(employee_row.name)),
 			}
 		)

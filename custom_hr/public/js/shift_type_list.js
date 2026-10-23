@@ -9,15 +9,25 @@ frappe.listview_settings["Shift Type"] = {
 	},
 };
 
+// Partition the outlets by what the dialog shows: still connected, to be added, to be removed.
+function outlet_groups(initial, selected) {
+	const names = Object.keys(initial);
+	return {
+		connected: names.filter((name) => initial[name] && selected.has(name)),
+		add: names.filter((name) => !initial[name] && selected.has(name)),
+		remove: names.filter((name) => initial[name] && !selected.has(name)),
+	};
+}
+
 function open_outlet_dialog() {
 	const esc = frappe.utils.escape_html;
 	let initial = {}; // outlet -> already had the shift when the list was loaded
 	let selected = new Set();
 
-	const changes = () => ({
-		add: Object.keys(initial).filter((name) => !initial[name] && selected.has(name)),
-		remove: Object.keys(initial).filter((name) => initial[name] && !selected.has(name)),
-	});
+	const changes = () => {
+		const { add, remove } = outlet_groups(initial, selected);
+		return { add, remove };
+	};
 
 	const dialog = new frappe.ui.Dialog({
 		title: __("Atur Outlet per Shift"),
@@ -40,9 +50,26 @@ function open_outlet_dialog() {
 	const $box = dialog.fields_dict.outlets.$wrapper;
 
 	function summarize() {
-		const { add, remove } = changes();
+		const { connected, add, remove } = outlet_groups(initial, selected);
 		$box.find(".so-summary").text(
 			__("{0} outlet dipilih · tambah {1} · hapus {2}", [selected.size, add.length, remove.length])
+		);
+
+		const chips = (names, background) =>
+			names
+				.map(
+					(name) =>
+						`<span style="display:inline-block;margin:2px 4px 2px 0;padding:1px 8px;border-radius:10px;font-size:12px;background:${background}">${esc(name)}</span>`
+				)
+				.join("");
+		const group = (title, names, background) =>
+			`<div style="margin-bottom:6px"><b>${title} (${names.length}):</b> ${
+				names.length ? chips(names, background) : '<span class="text-muted">—</span>'
+			}</div>`;
+		$box.find(".so-names").html(
+			group(__("Tersambung"), connected, "var(--gray-200)") +
+				(add.length ? group(__("Akan ditambah"), add, "#dcfce7") : "") +
+				(remove.length ? group(__("Akan dihapus"), remove, "#fee2e2") : "")
 		);
 	}
 
@@ -82,6 +109,7 @@ function open_outlet_dialog() {
 				<button type="button" class="btn btn-xs btn-default so-none">${__("Hapus centang yang tampil")}</button>
 				<span class="so-summary text-muted"></span>
 			</div>
+			<div class="so-names" style="max-height:140px;overflow:auto;margin-bottom:8px;padding:0 4px"></div>
 			<div class="so-list" style="max-height:45vh;overflow:auto;padding:0 4px">
 				${message
 					.map(

@@ -11,6 +11,7 @@ after_install = [
 	"custom_hr.patches.add_leave_calendar_sidebar.execute",
 ]
 after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
+after_sync = "custom_hr.install.set_default_overtime_component"
 
 scheduler_events = {
 	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],
@@ -49,6 +50,7 @@ doctype_js = {
 }
 
 doctype_list_js = {
+	"Attendance": "public/js/attendance_list.js",
 	"Employee Checkin": "public/js/employee_checkin_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
@@ -103,6 +105,16 @@ fixtures = [
 					"Shift Type-late_entry_grace_period-description",
 					"Shift Type-early_exit_grace_period-label",
 					"Shift Type-early_exit_grace_period-description",
+					"Shift Type-enable_auto_attendance-default",
+					"Shift Type-working_hours_threshold_for_half_day-default",
+					"Shift Type-late_entry_grace_period-default",
+					"Shift Type-early_exit_grace_period-default",
+					"Shift Type-enable_late_entry_marking-default",
+					"Shift Type-enable_early_exit_marking-default",
+					"Attendance-attendance_date-in_standard_filter",
+					"Attendance-late_entry-in_standard_filter",
+					"Attendance-early_exit-in_standard_filter",
+					"Attendance-shift-in_standard_filter",
 				],
 			]
 		],

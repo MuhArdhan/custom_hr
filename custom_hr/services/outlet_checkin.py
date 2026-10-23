@@ -322,9 +322,3 @@ def prepare_or_protect_checkin(doc) -> bool:
 	validate_new_in_session(doc)
 	_validate_outlet_self_service(doc)
 	return True
-
-
-def prevent_locked_checkin_deletion(doc):
-	stored = _stored_record(doc)
-	if stored and stored.attendance_source == "Outlet":
-		frappe.throw(_("Log shift outlet yang terkunci tidak boleh dihapus. Gunakan koreksi Attendance oleh HR dan pertahankan jejak log asli."))

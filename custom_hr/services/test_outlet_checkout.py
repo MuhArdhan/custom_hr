@@ -342,10 +342,9 @@ class TestOutletCheckout(unittest.TestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "tidak dapat diubah"):
 			self.doc.before_validate()
 
-	def test_existing_out_cannot_be_deleted_to_allow_a_second_out(self):
+	def test_existing_out_can_be_deleted_so_attendance_can_be_retried(self):
 		self.persist_out()
-		with self.assertRaisesRegex(frappe.ValidationError, "tidak boleh dihapus"):
-			self.doc.on_trash()
+		self.assertNotIn("on_trash", vars(type(self.doc)))
 
 	def test_outlet_out_queues_only_its_pair_after_commit(self):
 		prepare_or_protect_checkin(self.doc)
