@@ -118,5 +118,65 @@
   "value": "1",
   "module": "HRM",
   "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-working_hours_threshold_for_half_day-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "working_hours_threshold_for_half_day",
+  "property": "default",
+  "property_type": "Text",
+  "value": "3",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-late_entry_grace_period-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "late_entry_grace_period",
+  "property": "default",
+  "property_type": "Text",
+  "value": "5",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-early_exit_grace_period-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "early_exit_grace_period",
+  "property": "default",
+  "property_type": "Text",
+  "value": "0",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-enable_late_entry_marking-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "enable_late_entry_marking",
+  "property": "default",
+  "property_type": "Text",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-enable_early_exit_marking-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "enable_early_exit_marking",
+  "property": "default",
+  "property_type": "Text",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
  }
 ]
