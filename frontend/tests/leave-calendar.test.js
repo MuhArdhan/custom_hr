@@ -59,6 +59,37 @@ test("untrusted employee names, reasons, status and document identifiers are esc
 	assert.ok(ui.html().includes("&lt;img"))
 })
 
+test("day dialog shows the remaining leave balance and flags a request that exceeds it", async () => {
+	const ui = calendar()
+	ui.instance.request = async () => ({ items: [
+		{ ...item(), name: "OK", leave_balance: 8.5, exceeds_balance: false },
+		{ ...item(), name: "OVER", leave_balance: 2, exceeds_balance: true },
+	] })
+	await ui.instance.load_day(ui.dialog)
+	assert.match(ui.html(), /Sisa jatah: <b>8\.5<\/b> hari/)
+	assert.match(ui.html(), /Sisa jatah: <b>2<\/b> hari · pengajuan melebihi sisa jatah/)
+	assert.equal((ui.html().match(/ac-over/g) || []).length, 1)
+})
+
+test("leave without pay says it uses no entitlement, and an old server response shows no balance line", async () => {
+	const ui = calendar()
+	ui.instance.request = async () => ({ items: [{ ...item(), name: "LWP", leave_balance: null }] })
+	await ui.instance.load_day(ui.dialog)
+	assert.match(ui.html(), /Tanpa jatah \(cuti tanpa gaji\)/)
+	ui.instance.request = async () => ({ items: [item()] })
+	await ui.instance.load_day(ui.dialog)
+	assert.ok(!ui.html().includes("ac-balance"))
+})
+
+test("the whole reason is rendered, not a shortened copy, and stays escaped", async () => {
+	const ui = calendar()
+	const reason = "Menghadiri pernikahan saudara di luar kota, " .repeat(6) + "<b>x</b>"
+	ui.instance.request = async () => ({ items: [{ ...item(), description: reason }] })
+	await ui.instance.load_day(ui.dialog)
+	assert.ok(ui.html().includes(reason.replace("<b>x</b>", "&lt;b&gt;x&lt;/b&gt;")))
+	assert.ok(!ui.html().includes("<b>x</b>"))
+})
+
 test("empty day explicitly says no pending requests", async () => {
 	const ui = calendar()
 	ui.instance.request = async () => ({ items: [] })
@@ -211,12 +242,26 @@ test("late previous-month responses cannot replace the current month", async () 
 	const rendered = []
 	ui.instance.render = first => rendered.push(first.format("YYYY-MM-DD"))
 	let finishOctober
-	ui.instance.request = () => new Promise(resolve => { finishOctober = resolve })
+	// the month grid reads lightweight counts straight from get_leave_counts
+	ui.frappe.call = () => new Promise(resolve => { finishOctober = resolve })
 	const october = ui.instance.load()
 	ui.instance.month = dayjs("2026-11-01")
-	ui.instance.request = async () => ({ items: [{ ...item(), name: "NOVEMBER" }], counts: {} })
+	ui.frappe.call = async () => ({ message: { counts: {}, total: 1 } })
 	await ui.instance.load()
-	finishOctober({ items: [{ ...item(), name: "OCTOBER" }], counts: {} })
+	finishOctober({ message: { counts: {}, total: 5 } })
 	await october
 	assert.deepEqual(rendered, ["2026-11-01"])
+})
+
+test("the month grid asks only for counts, never for the full request list", async () => {
+	const ui = calendar()
+	ui.instance.month = dayjs("2026-10-01")
+	ui.instance.render = () => {}
+	const calls = []
+	ui.frappe.call = async args => { calls.push(args); return { message: { counts: {}, total: 0 } } }
+	await ui.instance.load()
+	assert.equal(calls.length, 1)
+	assert.equal(calls[0].method, "custom_hr.api.leave_calendar.get_leave_counts")
+	assert.equal(calls[0].args.start_date, "2026-09-27")
+	assert.equal(calls[0].args.end_date, "2026-11-07")
 })

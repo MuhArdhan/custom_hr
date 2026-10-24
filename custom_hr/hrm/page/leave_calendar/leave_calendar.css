@@ -48,7 +48,9 @@
 .ac-table .ac-open { font-size: 10px; padding: 0; margin-right: 7px; }
 .ac-subline { display: block; margin-top: 3px; font-size: 10px; }
 .ac-kind { display: inline-block; border-radius: 4px; padding: 2px 5px; font-size: 10px; white-space: nowrap; margin-right: 5px; }
-.ac-reason { display: inline-block; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; color: var(--text-muted, #67758a); }
+.ac-reason { display: block; margin-top: 4px; max-width: 360px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; color: var(--text-muted, #67758a); }
+.ac-balance { font-size: 11px; }
+.ac-over { color: var(--red-600, #c0392b); font-weight: 600; }
 .ac-stage { display: inline-block; padding: 4px 7px; border-radius: 5px; white-space: nowrap; font-size: 11px; }
 .ac-request-actions { display: flex; gap: 5px; white-space: nowrap; font-size: 11px; }
 .ac-request-actions .btn { font-size: 11px; border-radius: 5px; }

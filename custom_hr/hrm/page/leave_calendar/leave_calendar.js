@@ -110,6 +110,14 @@ class LeaveCalendar {
 		this.load_day(dialog);
 	}
 
+	balance_html(item) {
+		// null = leave without pay (no entitlement); undefined = server sent no balance
+		if (item.leave_balance === undefined) return "";
+		if (item.leave_balance === null) return `<div class="ac-subline ac-balance text-muted">${__("Tanpa jatah (cuti tanpa gaji)")}</div>`;
+		const over = item.exceeds_balance ? ` · ${__("pengajuan melebihi sisa jatah")}` : "";
+		return `<div class="ac-subline ac-balance${item.exceeds_balance ? " ac-over" : ""}">${__("Sisa jatah")}: <b>${Number(item.leave_balance)}</b> ${__("hari")}${over}</div>`;
+	}
+
 	async load_day(dialog) {
 		const body = dialog.fields_dict.body.$wrapper;
 		const token = dialog.leave_load_token = (dialog.leave_load_token || 0) + 1;
@@ -128,7 +136,7 @@ class LeaveCalendar {
 				const [status, label] = this.leave_types().find(([key]) => key === item.calendar_status) || this.leave_types()[0];
 				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small></td>
 					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${escape(item.details)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
-					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button><span class="ac-reason" title="${escape(item.description)}">${escape(item.description)}</span></div></td>
+					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button></div>${this.balance_html(item)}${item.description ? `<div class="ac-reason">${escape(item.description)}</div>` : ""}</td>
 					<td><span class="ac-stage ac-${status}">${escape(item.status)}</span></td>
 					<td><div class="ac-request-actions">${item.actions.length ? item.actions.map((action, actionIndex) => `<button class="btn btn-xs ${action.kind === "approve" ? "btn-primary" : "btn-danger"} ac-decision" data-index="${index}" data-action="${actionIndex}" title="${escape(action.next_state)}">${action.kind === "approve" ? __("Approve") : __("Reject")}</button>`).join("") : `<span class="text-muted">${__("Hanya lihat")}</span>`}</div></td></tr>`;
 			});

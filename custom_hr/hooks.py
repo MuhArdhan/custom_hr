@@ -52,6 +52,7 @@ doctype_js = {
 doctype_list_js = {
 	"Attendance": "public/js/attendance_list.js",
 	"Employee Checkin": "public/js/employee_checkin_list.js",
+	"Holiday List": "public/js/holiday_list_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
 	"Shift Type": "public/js/shift_type_list.js",

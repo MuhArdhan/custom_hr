@@ -11,7 +11,8 @@ from frappe.model.workflow import (
 	get_workflow_name,
 	has_approval_access,
 )
-from frappe.utils import cint, getdate
+from frappe.utils import cint, flt, getdate
+from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 
 from custom_hr.services.overtime_approval import decide_employee, employee_state, employee_view
 
@@ -84,6 +85,17 @@ def _leave_calendar_status(doc):
 	return "leave_request"
 
 
+def _leave_balance(doc):
+	"""Remaining entitlement of the requested leave type, so the approver can judge the request."""
+	rules = frappe.db.get_value("Leave Type", doc.leave_type, ["is_lwp", "allow_negative"], as_dict=True) or {}
+	if cint(rules.get("is_lwp")):
+		return {"leave_balance": None, "exceeds_balance": False}
+	# leave_application lets approvers who can read this request (but not the Employee) see the balance
+	balance = flt(get_leave_balance_on(doc.employee, doc.leave_type, getdate(doc.from_date), leave_application=doc.name))
+	exceeds = flt(doc.total_leave_days) > balance and not cint(rules.get("allow_negative"))
+	return {"leave_balance": balance, "exceeds_balance": bool(exceeds)}
+
+
 def _request(doc, kind, actions, workflow, overtime_row=None):
 	if kind == "leave":
 		employees = [{"employee": doc.employee, "employee_name": doc.employee_name or doc.employee}]
@@ -108,6 +120,7 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		"details": details, "description": description, "company": doc.company,
 		"outlet": frappe.db.get_value("Employee", doc.employee, "outlet") if kind == "leave" else doc.get("outlet"),
 		"modified": str(doc.modified), "actions": actions,
+		**(_leave_balance(doc) if kind == "leave" else {}),
 	}
 
 

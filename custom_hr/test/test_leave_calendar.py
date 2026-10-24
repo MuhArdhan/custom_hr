@@ -34,6 +34,8 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.workflow = self.mock(MODULE + "_workflow", return_value=None)
 		self.setting = self.mock("frappe.db.get_single_value", return_value=1)
 		self.db_read = self.mock("frappe.db.get_value", return_value="employee@example.com")
+		# The balance has its own tests below; here it must not add frappe.db.get_value calls.
+		self.balance = self.mock(MODULE + "_leave_balance", return_value={"leave_balance": 10.0, "exceeds_balance": False})
 		self.doc = leave()
 		self.factory = self.mock("frappe.get_doc", return_value=self.doc)
 		self.listing = self.mock("frappe.get_list", side_effect=lambda dt, **kwargs: [frappe._dict(name="LEAVE-1")] if dt == "Leave Application" else [])
@@ -291,3 +293,55 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.assertEqual(result["counts"]["2026-10-30"], {
 			"leave": 4, "overtime": 0, "leave_request": 1, "approved_leave": 1, "rejected": 1, "cancelled": 1,
 		})
+
+	def test_leave_items_carry_the_remaining_balance_for_the_approver(self):
+		item = api.get_leave_calendar("2026-10-30", "2026-10-30")["items"][0]
+		self.assertEqual((item["leave_balance"], item["exceeds_balance"]), (10.0, False))
+		self.balance.assert_called_once_with(self.doc)
+
+	def test_the_full_reason_is_sent_not_a_shortened_copy(self):
+		self.doc.description = "Menghadiri pernikahan saudara di luar kota selama beberapa hari, " * 3
+		item = api.get_leave_calendar("2026-10-30", "2026-10-30")["items"][0]
+		self.assertEqual(item["description"], self.doc.description)
+
+
+class TestLeaveBalance(unittest.TestCase):
+	def setUp(self):
+		self.rules = frappe._dict(is_lwp=0, allow_negative=0)
+		self.remaining = 5.0
+		self.get_value = patch("frappe.db.get_value", side_effect=lambda *a, **k: self.rules)
+		self.balance_on = patch(MODULE + "get_leave_balance_on", side_effect=lambda *a, **k: self.remaining)
+		self.get_value.start()
+		self.balance = self.balance_on.start()
+		self.addCleanup(self.get_value.stop)
+		self.addCleanup(self.balance_on.stop)
+		self.doc = leave(total_leave_days=3)
+
+	def test_balance_is_read_on_the_first_day_with_access_via_the_application(self):
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": 5.0, "exceeds_balance": False})
+		args, kwargs = self.balance.call_args
+		self.assertEqual(args[:2], ("EMP-1", "Annual Leave"))
+		self.assertEqual(str(args[2]), "2026-10-30")
+		self.assertEqual(kwargs["leave_application"], "LEAVE-1")
+
+	def test_a_request_larger_than_the_balance_is_flagged(self):
+		self.remaining = 2.0
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": 2.0, "exceeds_balance": True})
+
+	def test_a_request_equal_to_the_balance_is_not_flagged(self):
+		self.remaining = 3.0
+		self.assertFalse(api._leave_balance(self.doc)["exceeds_balance"])
+
+	def test_a_leave_type_that_allows_negative_balance_is_never_flagged(self):
+		self.rules.allow_negative = 1
+		self.remaining = 0.0
+		self.assertFalse(api._leave_balance(self.doc)["exceeds_balance"])
+
+	def test_leave_without_pay_has_no_balance_to_show(self):
+		self.rules.is_lwp = 1
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": None, "exceeds_balance": False})
+		self.balance.assert_not_called()
+
+	def test_an_unknown_leave_type_is_treated_as_a_normal_one(self):
+		self.rules = None
+		self.assertEqual(api._leave_balance(self.doc)["leave_balance"], 5.0)
