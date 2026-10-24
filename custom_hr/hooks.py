@@ -82,7 +82,16 @@ override_doctype_class = {
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
 }
 
+override_whitelisted_methods = {
+	"hrms.hr.doctype.leave_application.leave_application.get_leave_approver": "custom_hr.services.leave_approver.get_leave_approver",
+	"hrms.api.get_leave_approval_details": "custom_hr.services.leave_approver.get_leave_approval_details",
+}
+
 doc_events = {
+	"Leave Application": {
+		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
+		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
+	},
 	"Shift Location": {
 		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
 	},

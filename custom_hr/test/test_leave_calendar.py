@@ -98,10 +98,10 @@ class TestLeaveCalendar(unittest.TestCase):
 
 	def test_other_workflow_stage_remains_visible_without_actions(self):
 		self.workflow.return_value = frappe._dict(workflow_state_field="leave_workflow_state")
-		self.factory.return_value = leave(leave_workflow_state="Menunggu PL")
+		self.factory.return_value = leave(leave_workflow_state="Menunggu PL", leave_approver_name="Budi")
 		with patch(MODULE + "get_transitions", return_value=[]):
 			result = api.get_leave_calendar("2026-10-01", "2026-10-31")
-		self.assertEqual(result["items"][0]["status"], "Menunggu PL")
+		self.assertEqual(result["items"][0]["status"], "Menunggu Budi")
 		self.assertEqual(result["items"][0]["actions"], [])
 
 	def test_native_self_approval_respects_hr_settings(self):

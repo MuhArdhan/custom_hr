@@ -154,7 +154,7 @@ watch(
   	(newApprover) => {
 			const approverField = formFields.data.find(f => f.fieldname === "leave_approver")
 			const selected = approverField?.documentList?.find(opt => opt.value === newApprover)
-			leaveApplication.value.leave_approver_name = selected?.label?.split(" : ")[1] || ""
+			leaveApplication.value.leave_approver_name = selected?.full_name || ""
   }
 )
 
@@ -272,9 +272,8 @@ function setLeaveApprovers(data) {
 	)
 	leave_approver.reqd = data?.is_mandatory
 	leave_approver.documentList = data?.department_approvers.map((approver) => ({
-		label: approver.full_name
-			? `${approver.name} : ${approver.full_name}`
-			: approver.name,
+		label: approver.name,
+		full_name: approver.full_name,
 		value: approver.name,
 	}))
 	if (!leaveApplication.value.leave_approver){
