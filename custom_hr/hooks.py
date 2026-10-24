@@ -88,6 +88,9 @@ override_whitelisted_methods = {
 }
 
 doc_events = {
+	"Employee": {
+		"validate": "custom_hr.services.employee_outlet.fill_outlet",
+	},
 	"Leave Application": {
 		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
 		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",

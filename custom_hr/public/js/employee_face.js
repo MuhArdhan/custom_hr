@@ -207,4 +207,10 @@ frappe.ui.form.on("Employee", {
 	refresh(frm) {
 		add_face_attendance_buttons(frm);
 	},
+	async company(frm) {
+		// Outlets are named after their Company; the server fills it too on save
+		if (!frm.doc.company || frm.doc.outlet) return;
+		const exists = await frappe.db.exists("Outlet", frm.doc.company);
+		if (exists && !frm.doc.outlet) frm.set_value("outlet", frm.doc.company);
+	},
 });
