@@ -6,7 +6,9 @@
  "engine": "InnoDB",
  "field_order": [
   "shift_type",
-  "enabled"
+  "enabled",
+  "valid_from",
+  "valid_to"
  ],
  "fields": [
   {
@@ -23,6 +25,20 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Aktif"
+  },
+  {
+   "description": "Kosongkan untuk shift tetap. Shift bertanggal diprioritaskan atas shift tetap yang jam mulainya sama.",
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Mulai Berlaku"
+  },
+  {
+   "description": "Kosong = tidak ada tanggal berakhir.",
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Berakhir"
   }
  ],
  "index_web_pages_for_search": 1,

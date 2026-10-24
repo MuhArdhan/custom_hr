@@ -23,6 +23,7 @@
   "outlet_auto_shift_effective_from",
   "shift_transition_minutes",
   "shifts",
+  "shifts_help",
   "approval_section",
   "approver_1",
   "column_break_ap",
@@ -115,16 +116,17 @@
    "label": "Shift"
   },
   {
-   "default": "0",
-    "description": "Aktifkan penentuan shift dari jadwal Outlet. Company Attendance tetap mengikuti Employee. Penguncian persiapan sudah dibuka untuk pengujian lokal.",
+   "default": "1",
+    "description": "Aktifkan penentuan shift dari jadwal Outlet. Company Attendance tetap mengikuti Employee.",
    "fieldname": "enable_outlet_auto_shift",
    "fieldtype": "Check",
    "label": "Shift Otomatis Outlet",
     "read_only": 0
   },
   {
-    "description": "Tanggal dan waktu mulai mode otomatis. Log sebelum waktu ini tetap mengikuti alur native; hindari backdate saat pengujian.",
+    "description": "Tanggal dan waktu mulai mode otomatis. Log sebelum waktu ini tetap mengikuti alur native.",
    "fieldname": "outlet_auto_shift_effective_from",
+   "hidden": 1,
    "fieldtype": "Datetime",
    "label": "Shift Otomatis Berlaku Mulai",
    "no_copy": 1,
@@ -146,12 +148,17 @@
    "options": "Outlet Shift"
   },
   {
+   "fieldname": "shifts_help",
+   "fieldtype": "HTML",
+   "options": "<p class=\"text-muted small\">Mulai Berlaku dan Berakhir bersifat opsional. Kosongkan keduanya untuk shift tetap yang berlaku terus. Jika diisi, shift hanya berlaku pada rentang tanggal itu (Berakhir kosong = tanpa batas akhir). Bila ada shift tetap dengan jam mulai yang sama, shift bertanggal yang dipakai selama rentangnya berlaku; setelah berakhir, shift tetap kembali dipakai. Dua shift tetap tidak boleh berjam mulai sama, dan dua shift bertanggal berjam mulai sama tidak boleh rentangnya beririsan.</p>"
+  },
+  {
    "fieldname": "approval_section",
    "fieldtype": "Section Break",
    "label": "Approval"
   },
   {
-   "description": "Pengelola atau Leader outlet (approval lembur tingkat 1)",
+   "description": "Pengelola atau Leader outlet",
    "fieldname": "approver_1",
    "fieldtype": "Link",
    "label": "Approver 1",
@@ -162,7 +169,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "SPV area (approval lembur tingkat 2). Kosongkan jika tidak ada.",
+   "description": "SPV area. Kosongkan jika tidak ada.",
    "fieldname": "approver_2",
    "fieldtype": "Link",
    "label": "Approver 2",

@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, get_system_timezone, get_time, now_datetime
+from frappe.utils import get_datetime, getdate, get_system_timezone, get_time, now_datetime
 
 SNAPSHOT_VERSION = 1
 SHIFT_FIELDS = (
@@ -143,6 +143,19 @@ def _policy(shift: dict) -> dict:
 	if policy["allow_overtime"] and not policy["overtime_type"]:
 		raise ShiftConfigurationError(_("Jenis lembur Shift Type {0} belum diisi.").format(shift["name"]))
 	return policy
+
+
+def active_shift_names(rows, start_times: dict, day: date) -> list[str]:
+	"""Shift Types in force on `day`. A dated row takes priority over undated rows with the same start time."""
+	in_force = []
+	for row in rows:
+		valid_from, valid_to = row.get("valid_from"), row.get("valid_to")
+		if not row.get("enabled") or (valid_from and getdate(valid_from) > day) or (valid_to and getdate(valid_to) < day):
+			continue
+		in_force.append(row)
+	dated = lambda row: bool(row.get("valid_from") or row.get("valid_to"))
+	replaced = {start_times[row.shift_type] for row in in_force if dated(row)}
+	return [row.shift_type for row in in_force if dated(row) or start_times[row.shift_type] not in replaced]
 
 
 def build_shift_windows(shifts: list[dict], work_date: date, transition_minutes: int) -> list[ShiftWindow]:
@@ -325,8 +338,18 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 			raise ShiftConfigurationError(_("Salah satu Shift Type aktif outlet tidak ditemukan."))
 		local_time = get_datetime(context["evaluated_at"])
 		transition_minutes = int(_number(outlet.shift_transition_minutes, _("Jeda Peralihan IN"), integer=True))
-		windows = build_shift_windows(shifts, local_time.date(), transition_minutes)
-		previous = build_shift_windows(shifts, local_time.date() - timedelta(days=1), transition_minutes)
+		rows = [row for row in (outlet.get("shifts") or []) if row.enabled]
+
+		start_times = {shift.name: _clock(shift.start_time, shift.name) for shift in shifts}
+
+		def shifts_on(day):
+			names = set(active_shift_names(rows, start_times, day))
+			return [shift for shift in shifts if shift.name in names]
+
+		today = local_time.date()
+		windows = build_shift_windows(shifts_on(today), today, transition_minutes)
+		yesterday = shifts_on(today - timedelta(days=1))
+		previous = build_shift_windows(yesterday, today - timedelta(days=1), transition_minutes) if yesterday else []
 		windows = [window for window in previous if window.checkin_end >= datetime.combine(local_time.date(), time.min)] + windows
 	except ShiftConfigurationError as exc:
 		result.update(code="invalid_configuration", message=str(exc))

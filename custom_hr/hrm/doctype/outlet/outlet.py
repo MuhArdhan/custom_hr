@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, get_time
+from frappe.utils import cint, get_time, getdate, now_datetime
 
 # Local testing opened explicitly by the user after T11. Each outlet still
 # requires its own valid schedule, holiday list and activation timestamp.
@@ -46,8 +46,6 @@ class Outlet(Document):
 			seen.add(row.shift_type)
 
 		if not rows:
-			if cint(self.get("enable_outlet_auto_shift")):
-				frappe.throw(_("Mode shift otomatis membutuhkan minimal satu shift aktif."))
 			return
 
 		shifts = {
@@ -58,7 +56,7 @@ class Outlet(Document):
 				fields=["name", "start_time", "end_time", *SHIFT_NUMERIC_FIELDS],
 			)
 		}
-		active_starts = {}
+		active_starts = []
 		for row in rows:
 			shift = shifts.get(row.shift_type)
 			if not shift:
@@ -70,18 +68,18 @@ class Outlet(Document):
 			start, end = get_time(shift.start_time), get_time(shift.end_time)
 			if start == end:
 				frappe.throw(_("Jam mulai dan selesai Shift Type {0} tidak boleh sama.").format(shift.name))
+			if row.get("valid_from") and row.get("valid_to") and getdate(row.valid_to) < getdate(row.valid_from):
+				frappe.throw(_("Baris {0}: tanggal berakhir tidak boleh sebelum tanggal mulai berlaku.").format(row.idx))
 			if not cint(row.enabled):
 				continue
-			if start in active_starts:
-				frappe.throw(
-					_("Shift aktif {0} dan {1} memiliki jam mulai yang sama. Nonaktifkan salah satunya atau ubah jam mulai.").format(
-						active_starts[start], shift.name
+			for other_start, other_name, other in active_starts:
+				if start == other_start and shifts_overlap(row, other):
+					frappe.throw(
+						_("Shift aktif {0} dan {1} memiliki jam mulai yang sama. Beri tanggal berlaku pada salah satunya (shift bertanggal diprioritaskan), ubah jam mulai, atau nonaktifkan salah satunya.").format(
+							other_name, shift.name
+						)
 					)
-				)
-			active_starts[start] = shift.name
-
-		if cint(self.get("enable_outlet_auto_shift")) and not active_starts:
-			frappe.throw(_("Mode shift otomatis membutuhkan minimal satu shift aktif."))
+			active_starts.append((start, shift.name, row))
 
 	def validate_auto_shift_activation(self):
 		if not cint(self.get("enable_outlet_auto_shift")):
@@ -89,12 +87,25 @@ class Outlet(Document):
 		if not cint(self.is_active):
 			frappe.throw(_("Mode shift otomatis hanya dapat digunakan pada outlet aktif."))
 		if not self.get("outlet_auto_shift_effective_from"):
-			frappe.throw(_("Tanggal mulai mode shift otomatis wajib ditentukan saat aktivasi."))
+			self.outlet_auto_shift_effective_from = now_datetime()  # earlier logs keep the native path
 		if not OUTLET_AUTO_SHIFT_READY:
 			frappe.throw(
 				_("Mode shift otomatis belum dapat diaktifkan. Integrasi resolver, pairing, dan attendance belum selesai; pengaturan ini masih tahap persiapan."),
 				title=_("Aktivasi Belum Tersedia"),
 			)
+
+
+def shifts_overlap(a, b) -> bool:
+	"""Same-start shifts clash unless exactly one is dated: the dated one then takes priority."""
+	dated = lambda row: bool(row.get("valid_from") or row.get("valid_to"))
+	if dated(a) != dated(b):
+		return False
+	if not dated(a):
+		return True
+	low, high = getdate("1900-01-01"), getdate("2999-12-31")
+	return max(getdate(a.get("valid_from") or low), getdate(b.get("valid_from") or low)) <= min(
+		getdate(a.get("valid_to") or high), getdate(b.get("valid_to") or high)
+	)
 
 
 def validate_non_negative_number(value, label: str, *, integer: bool = False) -> Decimal:
