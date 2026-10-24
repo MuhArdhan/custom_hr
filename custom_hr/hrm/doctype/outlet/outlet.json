@@ -150,7 +150,7 @@
   {
    "fieldname": "shifts_help",
    "fieldtype": "HTML",
-   "options": "<p class=\"text-muted small\">Mulai Berlaku dan Berakhir bersifat opsional. Kosongkan keduanya untuk shift tetap yang berlaku terus. Jika diisi, shift hanya berlaku pada rentang tanggal itu (Berakhir kosong = tanpa batas akhir). Bila ada shift tetap dengan jam mulai yang sama, shift bertanggal yang dipakai selama rentangnya berlaku; setelah berakhir, shift tetap kembali dipakai. Dua shift tetap tidak boleh berjam mulai sama, dan dua shift bertanggal berjam mulai sama tidak boleh rentangnya beririsan.</p>"
+   "options": "<p class=\"text-muted small\">Tanggal opsional; kosong = berlaku terus. Shift bertanggal didahulukan atas shift lain yang jam mulainya sama selama rentangnya berlaku.</p>"
   },
   {
    "fieldname": "approval_section",
