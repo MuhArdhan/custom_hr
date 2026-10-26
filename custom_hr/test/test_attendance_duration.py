@@ -61,6 +61,19 @@ class TestAttendanceDuration(unittest.TestCase):
 		svc.fill_durations(doc)
 		self.assertEqual(doc.working_duration, "0 min")
 
+	def test_an_in_without_an_out_is_flagged_as_missing_checkout(self):
+		doc = attendance(working_hours=0, in_time="2026-10-26 14:03:43")
+		svc.fill_durations(doc)
+		self.assertEqual(doc.missing_checkout, 1)
+
+	def test_a_complete_pair_or_an_existing_flag_is_left_alone(self):
+		doc = attendance(working_hours=8, in_time="2026-10-26 08:00:00", out_time="2026-10-26 16:00:00")
+		svc.fill_durations(doc)
+		self.assertFalse(doc.get("missing_checkout"))
+		flagged = attendance(working_hours=0, missing_checkout=1)  # outlet sessions set it themselves
+		svc.fill_durations(flagged)
+		self.assertEqual(flagged.missing_checkout, 1)
+
 	def test_missing_out_time_leaves_the_duration_empty(self):
 		doc = attendance(working_hours=0, in_time="2026-10-26 14:03:43")
 		svc.fill_durations(doc)

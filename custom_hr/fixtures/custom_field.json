@@ -637,7 +637,7 @@
   "fieldname": "attendance_source",
   "fieldtype": "Select",
   "label": "Sumber Penentuan Shift",
-  "options": "\nOutlet",
+  "options": "\nOutlet\nDepartment",
   "insert_after": "outlet_shift_section",
   "module": "HRM",
   "read_only": 1,
@@ -741,12 +741,12 @@
   "fieldname": "attendance_source",
   "fieldtype": "Select",
   "label": "Sumber Kehadiran",
-  "options": "\nOutlet",
+  "options": "\nOutlet\nDepartment",
   "insert_after": "outlet_attendance_section",
   "module": "HRM",
   "read_only": 1,
   "no_copy": 1,
-  "in_standard_filter": 1
+  "in_standard_filter": 0
  },
  {
   "doctype": "Custom Field",
@@ -760,7 +760,7 @@
   "module": "HRM",
   "read_only": 1,
   "no_copy": 1,
-  "in_standard_filter": 1,
+  "in_standard_filter": 0,
   "description": "Outlet dari snapshot IN, atau outlet tanggal kerja saat tidak ada log. Tidak mengikuti mutasi Employee secara dinamis."
  },
  {
@@ -826,7 +826,7 @@
   "module": "HRM",
   "read_only": 1,
   "no_copy": 1,
-  "in_standard_filter": 1,
+  "in_standard_filter": 0,
   "description": "Actual Logs: durasi IN-OUT aktual. Locked Shift Allocation: durasi jadwal terkunci untuk Tidak OUT, bukan jam aktual atau dasar lembur otomatis. Kosong pada data lama."
  },
  {
@@ -864,5 +864,90 @@
   "module": "HRM",
   "read_only": 1,
   "no_copy": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shift_section",
+  "fieldname": "auto_shift_section",
+  "fieldtype": "Section Break",
+  "label": "Shift Otomatis",
+  "insert_after": "expense_approvers",
+  "collapsible": 1,
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-enable_auto_shift",
+  "fieldname": "enable_auto_shift",
+  "fieldtype": "Check",
+  "label": "Enable Auto Shift",
+  "default": "0",
+  "insert_after": "auto_shift_section",
+  "description": "Detect the shift from the IN time using the shifts below. Applies to employees without an outlet auto shift.",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shift_transition_minutes",
+  "fieldname": "auto_shift_transition_minutes",
+  "fieldtype": "Int",
+  "label": "IN Transition (Minutes)",
+  "default": "30",
+  "non_negative": 1,
+  "insert_after": "enable_auto_shift",
+  "depends_on": "eval:doc.enable_auto_shift",
+  "description": "IN moves to the next shift this many minutes before its start. This is not a late tolerance.",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shift_allow_unscheduled_days",
+  "fieldname": "auto_shift_allow_unscheduled_days",
+  "fieldtype": "Check",
+  "label": "Allow check-in without a shift on days with no shift",
+  "default": "0",
+  "insert_after": "auto_shift_transition_minutes",
+  "depends_on": "eval:doc.enable_auto_shift",
+  "description": "Saturday work, for example: saved as off-shift, with overtime through an Overtime Request.",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shift_effective_from",
+  "fieldname": "auto_shift_effective_from",
+  "fieldtype": "Datetime",
+  "label": "Auto Shift Effective From",
+  "hidden": 1,
+  "no_copy": 1,
+  "insert_after": "auto_shift_allow_unscheduled_days",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shifts",
+  "fieldname": "auto_shifts",
+  "fieldtype": "Table",
+  "label": "Shifts",
+  "options": "Outlet Shift",
+  "insert_after": "auto_shift_effective_from",
+  "depends_on": "eval:doc.enable_auto_shift",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-auto_shift_help",
+  "fieldname": "auto_shift_help",
+  "fieldtype": "HTML",
+  "insert_after": "auto_shifts",
+  "depends_on": "eval:doc.enable_auto_shift",
+  "options": "<p class=\"text-muted small\">Shifts with the same start time are chosen by the employee at check-in. Pick the days each shift applies on in the Hari column; Setiap hari means every day. Each Shift Type needs auto attendance, working-hours thresholds and grace periods set.</p>",
+  "module": "HRM"
  }
 ]

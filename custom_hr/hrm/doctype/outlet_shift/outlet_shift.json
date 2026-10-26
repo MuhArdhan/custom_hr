@@ -7,13 +7,7 @@
  "field_order": [
   "shift_type",
   "enabled",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday"
+  "days"
  ],
  "fields": [
   {
@@ -32,47 +26,13 @@
    "label": "Aktif"
   },
   {
-   "default": "0",
-   "description": "No day checked = every day",
-   "fieldname": "monday",
-   "fieldtype": "Check",
-   "label": "Mon"
-  },
-  {
-   "default": "0",
-   "fieldname": "tuesday",
-   "fieldtype": "Check",
-   "label": "Tue"
-  },
-  {
-   "default": "0",
-   "fieldname": "wednesday",
-   "fieldtype": "Check",
-   "label": "Wed"
-  },
-  {
-   "default": "0",
-   "fieldname": "thursday",
-   "fieldtype": "Check",
-   "label": "Thu"
-  },
-  {
-   "default": "0",
-   "fieldname": "friday",
-   "fieldtype": "Check",
-   "label": "Fri"
-  },
-  {
-   "default": "0",
-   "fieldname": "saturday",
-   "fieldtype": "Check",
-   "label": "Sat"
-  },
-  {
-   "default": "0",
-   "fieldname": "sunday",
-   "fieldtype": "Check",
-   "label": "Sun"
+   "description": "Hari shift ini berlaku. Pilih Setiap hari kalau tidak dibatasi.",
+   "fieldname": "days",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Hari",
+   "options": "Setiap hari\nSenin-Jumat\nSenin-Kamis\nJumat\nSenin-Sabtu\nSabtu-Minggu\nSabtu\nMinggu\nSenin\nSelasa\nRabu\nKamis",
+   "default": "Setiap hari"
   }
  ],
  "index_web_pages_for_search": 1,

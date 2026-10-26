@@ -14,6 +14,7 @@ from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
 from custom_hr.services.checkin_submission import (
 	RESPONSE_FIELDS, checkin_response, request_log_name, submit_self_checkin,
 )
+from custom_hr.services.department_shift import resolve_department_shift
 from custom_hr.services.outlet_checkin import (
 	_checkout_snapshot,
 	_cutoff,
@@ -84,6 +85,18 @@ def get_checkin_request_result(request_id: str):
 	if row and row.employee != employee:
 		frappe.throw(_("Hasil permintaan bukan milik karyawan ini."), frappe.PermissionError)
 	return checkin_response(row, replayed=True) if row else None
+
+
+def _shift_choices(candidates):
+	"""Same-start shifts for the app's dropdown."""
+	return [
+		{
+			"shift": candidate["shift"],
+			"start_time": get_datetime(candidate["shift_start"]).strftime("%H:%M:%S"),
+			"end_time": get_datetime(candidate["shift_end"]).strftime("%H:%M:%S"),
+		}
+		for candidate in candidates
+	]
 
 
 @frappe.whitelist()
@@ -162,6 +175,16 @@ def get_checkin_context():
 				use_session(latest)
 			return block("session_complete_or_expired", str(exc), "DONE")
 		if not resolution["mode_applies"]:
+			department = resolve_department_shift(employee, now)
+			if department["applies"] and not get_employee_shift(employee, now, False):  # an explicit Shift Assignment wins
+				context["mode"] = "Department"
+				if department["matched"]:
+					context["candidate_shift"] = department["checkin_values"]["shift"]
+				elif department["code"] == "shift_choice_required":
+					context.update(shift_choices=_shift_choices(department["candidates"]), message=department["message"])
+				elif not department["unscheduled_day"]:
+					return block(department["code"], department["message"])
+				return context
 			# Native employees: show the shift in force (or next up) from Shift Assignment / default shift
 			native_shift = get_employee_shift(employee, now, True, "forward")
 			if native_shift and not context["candidate_shift"]:
@@ -171,14 +194,7 @@ def get_checkin_context():
 			return block("integration_not_ready", _("Mode shift otomatis belum dapat digunakan sampai integrasi attendance dan scheduler selesai."))
 		if resolution["code"] == "shift_choice_required":
 			# Not a refusal: the app shows a dropdown and sends the chosen shift with the check-in
-			context.update(shift_choices=[
-				{
-					"shift": candidate["shift"],
-					"start_time": get_datetime(candidate["shift_start"]).strftime("%H:%M:%S"),
-					"end_time": get_datetime(candidate["shift_end"]).strftime("%H:%M:%S"),
-				}
-				for candidate in resolution["candidates"]
-			], message=resolution["message"])
+			context.update(shift_choices=_shift_choices(resolution["candidates"]), message=resolution["message"])
 			return context
 		if not resolution["matched"]:
 			return block(resolution["code"], resolution["message"])

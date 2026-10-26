@@ -5,7 +5,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, get_time
+from frappe.utils import get_datetime, get_time, now_datetime
 
 from hrms.hr.doctype.shift_type.shift_type import ShiftType as BaseShiftType
 from hrms.hr.doctype.shift_assignment.shift_assignment import get_employee_shift
@@ -22,14 +22,50 @@ class CustomShiftType(BaseShiftType):
 		outlet_names = set(frappe.get_all(
 			"Employee Checkin", filters={"name": ["in", [row["name"] for row in logs]], "attendance_source": "Outlet"}, pluck="name",
 		))
-		return [row for row in logs if row["name"] not in outlet_names]
+		native = [row for row in logs if row["name"] not in outlet_names]
+		departments = self._department_names(native)
+		for row in native:
+			row["department_mode"] = row["name"] in departments
+		return native
+
+	def _department_names(self, logs):
+		if not logs:
+			return set()
+		return set(frappe.get_all(
+			"Employee Checkin", filters={"name": ["in", [row["name"] for row in logs]], "attendance_source": "Department"}, pluck="name",
+		))
+
+	def _without_open_department_sessions(self, logs):
+		"""A Department IN with no OUT is judged only after its check-out deadline (end of the shift day).
+
+		Native pulls last_sync_of_checkin forward after any OUT, which would otherwise close colleagues' open days.
+		"""
+		groups = {}
+		for row in logs:
+			groups.setdefault((row.get("employee"), row.get("shift_start")), []).append(row)
+		now = now_datetime()
+		held = set()
+		for group in groups.values():
+			open_session = all(row.get("department_mode") for row in group) and not any(row.get("log_type") == "OUT" for row in group)
+			if open_session and now <= get_datetime(group[0].get("shift_actual_end")):
+				held.update(row["name"] for row in group)
+		return [row for row in logs if row["name"] not in held]
+
+	def get_attendance(self, logs, working_hours_threshold_for_absent, working_hours_threshold_for_half_day):
+		status, hours, late_entry, early_exit, in_time, out_time = super().get_attendance(
+			logs, working_hours_threshold_for_absent, working_hours_threshold_for_half_day
+		)
+		if in_time and not out_time and logs[0].get("department_mode"):
+			# Missing check-out: the day counts as Present with the shift's standard hours
+			return "Present", (logs[0].shift_end - logs[0].shift_start).total_seconds() / 3600, late_entry, False, in_time, None
+		return status, hours, late_entry, early_exit, in_time, out_time
 
 	def mark_absent_for_dates_with_no_attendance(self, employee):
 		frappe.db.get_value("Employee", employee, "name", for_update=True)
 		return super().mark_absent_for_dates_with_no_attendance(employee)
 
 	def get_employee_checkins(self):
-		return self._native_logs(super().get_employee_checkins())
+		return self._without_open_department_sessions(self._native_logs(super().get_employee_checkins()))
 
 	def _process(self, logs):
 		return super()._process(self._native_logs(logs))

@@ -88,6 +88,9 @@ override_whitelisted_methods = {
 }
 
 doc_events = {
+	"Department": {
+		"validate": "custom_hr.services.department_shift.validate_department",
+	},
 	"Attendance": {
 		"validate": "custom_hr.services.attendance_duration.fill_durations",
 	},
@@ -131,6 +134,8 @@ fixtures = [
 					"Attendance-late_entry-in_standard_filter",
 					"Attendance-early_exit-in_standard_filter",
 					"Attendance-shift-in_standard_filter",
+					"Attendance-company-in_standard_filter",
+					"Attendance-department-in_standard_filter",
 				],
 			]
 		],
@@ -167,6 +172,13 @@ fixtures = [
 					"Attendance-working_duration",
 					"Attendance-late_entry_duration",
 					"Attendance-early_exit_duration",
+					"Department-auto_shift_section",
+					"Department-enable_auto_shift",
+					"Department-auto_shift_transition_minutes",
+					"Department-auto_shift_allow_unscheduled_days",
+					"Department-auto_shift_effective_from",
+					"Department-auto_shifts",
+					"Department-auto_shift_help",
 					"HR Settings-enable_face_checkin",
 					"HR Settings-require_face_checkin",
 					"HR Settings-face_match_threshold",

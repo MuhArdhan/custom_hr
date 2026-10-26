@@ -277,7 +277,7 @@ class TestOutletShiftResolver(unittest.TestCase):
 
 	def test_day_without_applicable_shifts_has_no_candidate_instead_of_a_configuration_error(self):
 		for row in self.outlet.shifts:
-			row.monday = 1  # 2026-10-15 is a Thursday
+			row.days = "Senin"  # 2026-10-15 is a Thursday
 		result = self.resolve("2026-10-15 10:00:00")
 		self.assertFalse(result["matched"])
 		self.assertEqual(result["code"], "outside_checkin_window")

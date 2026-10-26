@@ -49,6 +49,11 @@ class TestCheckinContext(CheckinTestCase):
 		self.resolver = self.mock(root + "resolve_outlet_shift", side_effect=lambda *a, **k: deepcopy(self.resolution))
 		self.session = self.mock(root + "validate_new_in_session")
 		self.native_shift = self.mock(root + "get_employee_shift", return_value=None)
+		self.dept_resolution = {
+			"applies": False, "matched": False, "code": "not_applicable", "message": "", "choices": [],
+			"candidates": [], "unscheduled_day": False, "checkin_values": None,
+		}
+		self.dept_resolver = self.mock(root + "resolve_department_shift", side_effect=lambda *a, **k: dict(self.dept_resolution))
 		self.mock("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", new=True)
 
 	def test_native_employee_sees_the_assigned_shift_before_checking_in(self):
@@ -58,6 +63,54 @@ class TestCheckinContext(CheckinTestCase):
 		self.assertEqual(result["mode"], "Native")
 		self.assertEqual(result["candidate_shift"], "Senin - Kamis")
 		self.native_shift.assert_called_once_with("EMP-TEST", NOW, True, "forward")
+
+	def native_mode(self):
+		self.resolution = {"mode": "Native", "mode_applies": False, "matched": False}
+
+	def test_department_employee_sees_the_detected_shift(self):
+		self.native_mode()
+		self.dept_resolution.update(applies=True, matched=True, code="matched", checkin_values={"shift": "Pagi Senin-Kamis"})
+		result = checkin.get_checkin_context()
+		self.assertEqual((result["mode"], result["allowed"], result["candidate_shift"]), ("Department", True, "Pagi Senin-Kamis"))
+		self.native_shift.assert_called_once_with("EMP-TEST", NOW, False)
+
+	def test_department_employee_with_no_matching_shift_is_blocked_with_the_message(self):
+		self.native_mode()
+		self.dept_resolution.update(applies=True, code="outside_checkin_window", message="Tidak ada shift yang menerima IN")
+		result = checkin.get_checkin_context()
+		self.assertFalse(result["allowed"])
+		self.assertEqual(result["reason"], "outside_checkin_window")
+		self.assertEqual(result["message"], "Tidak ada shift yang menerima IN")
+
+	def test_unscheduled_day_stays_allowed_without_a_shift(self):
+		self.native_mode()
+		self.dept_resolution.update(applies=True, code="unscheduled_day", unscheduled_day=True)
+		result = checkin.get_checkin_context()
+		self.assertTrue(result["allowed"])
+		self.assertEqual(result["next_action"], "IN")
+		self.assertIsNone(result["candidate_shift"])
+
+	def test_explicit_assignment_still_wins_in_context(self):
+		self.native_mode()
+		self.dept_resolution.update(applies=True, matched=True, code="matched", checkin_values={"shift": "Pagi Senin-Kamis"})
+		self.native_shift.return_value = frappe._dict(shift_type=frappe._dict(name="Assigned Shift"))
+		result = checkin.get_checkin_context()
+		self.assertEqual((result["mode"], result["candidate_shift"]), ("Native", "Assigned Shift"))
+
+	def test_department_choice_is_listed(self):
+		self.native_mode()
+		self.dept_resolution.update(
+			applies=True, code="shift_choice_required", message="Pilih shift Anda", choices=["A", "B"],
+			candidates=[
+				{"shift": "A", "shift_start": "2026-10-15 06:00:00", "shift_end": "2026-10-15 15:00:00"},
+				{"shift": "B", "shift_start": "2026-10-15 06:00:00", "shift_end": "2026-10-15 10:00:00"},
+			],
+		)
+		result = checkin.get_checkin_context()
+		self.assertTrue(result["allowed"])
+		self.assertIsNone(result["candidate_shift"])
+		self.assertEqual([c["shift"] for c in result["shift_choices"]], ["A", "B"])
+		self.assertEqual(result["message"], "Pilih shift Anda")
 
 	def test_native_employee_without_a_shift_has_no_candidate(self):
 		self.resolution = {"mode": "Native", "mode_applies": False, "matched": False}

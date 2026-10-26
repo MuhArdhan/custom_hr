@@ -328,9 +328,15 @@ class TestOutletCheckin(unittest.TestCase):
 
 	def test_fetch_shift_native_route_is_preserved(self):
 		self.configured = 0
-		with patch("hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin.fetch_shift") as native:
+		with patch("custom_hr.overrides.employee_checkin.apply_department_shift", return_value=False), patch("hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin.fetch_shift") as native:
 			self.doc.fetch_shift()
 			native.assert_called_once()
+
+	def test_fetch_shift_stops_before_native_when_department_mode_prepared_the_checkin(self):
+		self.configured = 0
+		with patch("custom_hr.overrides.employee_checkin.apply_department_shift", return_value=True), patch("hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin.fetch_shift") as native:
+			self.doc.fetch_shift()
+			native.assert_not_called()
 
 	def test_locked_in_can_be_deleted_so_attendance_can_be_retried(self):
 		# Deliberately open: HR/admins must be able to remove outlet logs to repeat a test

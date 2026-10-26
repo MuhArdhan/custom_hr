@@ -27,6 +27,7 @@ from custom_hr.services.outlet_checkin import (
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime
 from custom_hr.services.checkin_submission import apply_verified_face
+from custom_hr.services.department_shift import apply_department_shift
 from custom_hr.services.outlet_geofence import coordinates, validate_outlet_geofence
 
 # users with any of these roles bypass the self-service checkin restrictions
@@ -71,7 +72,7 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 
 	@frappe.whitelist()
 	def fetch_shift(self):
-		if not prepare_or_protect_checkin(self):
+		if not prepare_or_protect_checkin(self) and not apply_department_shift(self):
 			return super().fetch_shift()
 
 	def validate_distance_from_shift_location(self):

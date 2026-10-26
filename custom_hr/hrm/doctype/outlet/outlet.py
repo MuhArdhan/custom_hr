@@ -8,6 +8,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, get_time, now_datetime
 
+from custom_hr.services.outlet_shift import ShiftConfigurationError, parse_days
+
 # Local testing opened explicitly by the user after T11. Each outlet still
 # requires its own valid schedule, holiday list and activation timestamp.
 OUTLET_AUTO_SHIFT_READY = True
@@ -36,37 +38,7 @@ class Outlet(Document):
 		sync_outlet_location(self)
 
 	def validate_shifts(self):
-		rows = self.get("shifts") or []
-		seen = set()
-		for row in rows:
-			if not row.shift_type:
-				frappe.throw(_("Baris {0}: Shift Type wajib diisi.").format(row.idx))
-			if row.shift_type in seen:
-				frappe.throw(_("Shift Type {0} tercantum lebih dari sekali pada outlet ini.").format(row.shift_type))
-			seen.add(row.shift_type)
-
-		if not rows:
-			return
-
-		shifts = {
-			shift.name: shift
-			for shift in frappe.get_all(
-				"Shift Type",
-				filters={"name": ["in", sorted(seen)]},
-				fields=["name", "start_time", "end_time", *SHIFT_NUMERIC_FIELDS],
-			)
-		}
-		for row in rows:
-			shift = shifts.get(row.shift_type)
-			if not shift:
-				frappe.throw(_("Shift Type {0} tidak ditemukan.").format(row.shift_type))
-			for fieldname, label in SHIFT_NUMERIC_FIELDS.items():
-				validate_non_negative_number(shift.get(fieldname), _("{0} pada {1}").format(_(label), shift.name))
-			if shift.start_time in (None, "") or shift.end_time in (None, ""):
-				frappe.throw(_("Jam mulai dan selesai Shift Type {0} wajib diisi.").format(shift.name))
-			start, end = get_time(shift.start_time), get_time(shift.end_time)
-			if start == end:
-				frappe.throw(_("Jam mulai dan selesai Shift Type {0} tidak boleh sama.").format(shift.name))
+		validate_shift_rows(self.get("shifts") or [])
 
 	def validate_auto_shift_activation(self):
 		if not cint(self.get("enable_outlet_auto_shift")):
@@ -80,6 +52,44 @@ class Outlet(Document):
 				_("Mode shift otomatis belum dapat diaktifkan. Integrasi resolver, pairing, dan attendance belum selesai; pengaturan ini masih tahap persiapan."),
 				title=_("Aktivasi Belum Tersedia"),
 			)
+
+
+def validate_shift_rows(rows) -> None:
+	"""Shift table checks shared by Outlet and Department (same child doctype)."""
+	seen = set()
+	for row in rows:
+		if not row.shift_type:
+			frappe.throw(_("Baris {0}: Shift Type wajib diisi.").format(row.idx))
+		if row.shift_type in seen:
+			frappe.throw(_("Shift Type {0} tercantum lebih dari sekali pada outlet ini.").format(row.shift_type))
+		seen.add(row.shift_type)
+
+	if not rows:
+		return
+
+	shifts = {
+		shift.name: shift
+		for shift in frappe.get_all(
+			"Shift Type",
+			filters={"name": ["in", sorted(seen)]},
+			fields=["name", "start_time", "end_time", *SHIFT_NUMERIC_FIELDS],
+		)
+	}
+	for row in rows:
+		shift = shifts.get(row.shift_type)
+		if not shift:
+			frappe.throw(_("Shift Type {0} tidak ditemukan.").format(row.shift_type))
+		for fieldname, label in SHIFT_NUMERIC_FIELDS.items():
+			validate_non_negative_number(shift.get(fieldname), _("{0} pada {1}").format(_(label), shift.name))
+		if shift.start_time in (None, "") or shift.end_time in (None, ""):
+			frappe.throw(_("Jam mulai dan selesai Shift Type {0} wajib diisi.").format(shift.name))
+		start, end = get_time(shift.start_time), get_time(shift.end_time)
+		if start == end:
+			frappe.throw(_("Jam mulai dan selesai Shift Type {0} tidak boleh sama.").format(shift.name))
+		try:
+			parse_days(row.get("days"))
+		except ShiftConfigurationError as exc:
+			frappe.throw(_("Baris {0}: {1}").format(row.idx, exc))
 
 
 def validate_non_negative_number(value, label: str, *, integer: bool = False) -> Decimal:

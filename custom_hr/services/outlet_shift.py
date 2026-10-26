@@ -8,6 +8,7 @@ Preview may inspect a disabled outlet mode but never enables it. Callers must
 re-resolve without preview before accepting an IN (T05/T07).
 """
 
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -45,7 +46,15 @@ FLAG_FIELDS = (
 	"mark_auto_attendance_on_holidays",
 	"allow_overtime",
 )
-WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+DAY_NAMES = {
+	"senin": 0, "mon": 0, "monday": 0,
+	"selasa": 1, "tue": 1, "tuesday": 1,
+	"rabu": 2, "wed": 2, "wednesday": 2,
+	"kamis": 3, "thu": 3, "thursday": 3,
+	"jumat": 4, "jum'at": 4, "fri": 4, "friday": 4,
+	"sabtu": 5, "sat": 5, "saturday": 5,
+	"minggu": 6, "ahad": 6, "sun": 6, "sunday": 6,
+}
 
 
 class ShiftConfigurationError(ValueError):
@@ -146,10 +155,24 @@ def _policy(shift: dict) -> dict:
 	return policy
 
 
+def parse_days(text) -> frozenset[int]:
+	"""Weekdays (0 = Monday) from a Hari value such as "Senin-Kamis" or "Jumat"; empty or "Setiap hari" means every day."""
+	text = (text or "").strip()
+	if not text or text.lower() == "setiap hari":
+		return frozenset(range(7))
+	days = set()
+	for part in text.split(","):
+		ends = [end.strip().lower() for end in re.split(r"\s*[-\u2013]\s*", part.strip())]
+		if len(ends) > 2 or any(end not in DAY_NAMES for end in ends):
+			raise ShiftConfigurationError(_("Hari tidak valid: {0}. Contoh: Senin-Kamis, Jumat, atau Senin, Rabu, Jumat.").format(part.strip() or text))
+		first, last = DAY_NAMES[ends[0]], DAY_NAMES[ends[-1]]
+		days.update((first + step) % 7 for step in range((last - first) % 7 + 1))  # a range may wrap past Sunday
+	return frozenset(days)
+
+
 def row_weekdays(row) -> frozenset[int]:
-	"""Weekdays (0 = Monday) a shift row applies on; no day checked means every day."""
-	checked = frozenset(index for index, field in enumerate(WEEKDAYS) if row.get(field))
-	return checked or frozenset(range(7))
+	"""Weekdays (0 = Monday) a shift row applies on; an empty Hari column means every day."""
+	return parse_days(row.get("days"))
 
 
 def applies_on(row, day: date) -> bool:
@@ -318,6 +341,32 @@ def shift_windows(rows, shifts: list[dict], local_time: datetime, transition_min
 	return [window for window in previous if window.checkin_end >= datetime.combine(today, time.min)] + windows
 
 
+def pick_window(windows, local_time: datetime, chosen_shift: str | None = None, *, no_match_message: str):
+	"""Select the window that accepts an IN at `local_time`: (window or None, outcome with code/message/candidates/choices).
+
+	Shifts sharing a start time are an employee choice; candidates with different starts are refused, never guessed.
+	"""
+	candidates = [window for window in windows if window.contains(local_time)]
+	outcome = {"candidates": [window.as_dict() for window in candidates], "choices": [], "code": "matched", "message": ""}
+	if not candidates:
+		outcome.update(code="outside_checkin_window", message=no_match_message)
+		return None, outcome
+	if len({window.shift_start for window in candidates}) > 1:
+		outcome.update(code="ambiguous_candidate", message=_("Ada lebih dari satu kandidat IN lintas tanggal. Periksa aturan shift malam dengan HR; sistem tidak memilih shift secara sembarang."))
+		return None, outcome
+	selected = candidates[0]
+	if len(candidates) > 1:
+		outcome["choices"] = sorted(window.shift for window in candidates)
+		if not chosen_shift:
+			outcome.update(code="shift_choice_required", message=_("Ada lebih dari satu shift dengan jam mulai yang sama. Pilih shift Anda sebelum check-in."))
+			return None, outcome
+		if chosen_shift not in outcome["choices"]:
+			outcome.update(code="invalid_shift_choice", message=_("Shift yang dipilih tidak tersedia untuk waktu check-in ini."))
+			return None, outcome
+		selected = next(window for window in candidates if window.shift == chosen_shift)
+	return selected, outcome
+
+
 def resolve_outlet_shift(
 	employee: str, timestamp=None, *, preview: bool = False, for_update: bool = False, chosen_shift: str | None = None
 ) -> dict:
@@ -373,24 +422,14 @@ def resolve_outlet_shift(
 		result.update(code="invalid_configuration", message=_("Tanggal kejadian shift berada di luar rentang yang didukung."))
 		return result
 	result["windows"] = [window.as_dict() for window in windows]
-	candidates = [window for window in windows if window.contains(local_time)]
-	result["candidates"] = [window.as_dict() for window in candidates]
-	if not candidates:
-		result.update(code="outside_checkin_window", message=_("Tidak ada shift outlet yang menerima IN pada waktu ini. Periksa jadwal atau hubungi HR."))
+	selected, outcome = pick_window(
+		windows, local_time, chosen_shift,
+		no_match_message=_("Tidak ada shift outlet yang menerima IN pada waktu ini. Periksa jadwal atau hubungi HR."),
+	)
+	result.update(candidates=outcome["candidates"], choices=outcome["choices"])
+	if selected is None:
+		result.update(code=outcome["code"], message=outcome["message"])
 		return result
-	if len({window.shift_start for window in candidates}) > 1:
-		result.update(code="ambiguous_candidate", message=_("Ada lebih dari satu kandidat IN lintas tanggal. Periksa aturan shift malam dengan HR; sistem tidak memilih shift secara sembarang."))
-		return result
-	selected = candidates[0]
-	if len(candidates) > 1:
-		result["choices"] = sorted(window.shift for window in candidates)
-		if not chosen_shift:
-			result.update(code="shift_choice_required", message=_("Ada lebih dari satu shift dengan jam mulai yang sama. Pilih shift Anda sebelum check-in."))
-			return result
-		if chosen_shift not in result["choices"]:
-			result.update(code="invalid_shift_choice", message=_("Shift yang dipilih tidak tersedia untuk waktu check-in ini."))
-			return result
-		selected = next(window for window in candidates if window.shift == chosen_shift)
 	deadline = datetime.combine(selected.shift_end.date(), time(23, 59, 59))
 	snapshot = {
 		"version": SNAPSHOT_VERSION,

@@ -8,10 +8,10 @@ import frappe
 
 from custom_hr.api import roster
 from custom_hr.hrm.doctype.outlet.outlet import Outlet
-from custom_hr.services.outlet_shift import active_shift_names, applies_on, row_weekdays
+from custom_hr.services.outlet_shift import ShiftConfigurationError, active_shift_names, applies_on, parse_days, row_weekdays
 
 STARTS = {"Pagi": time(7), "Pagi Khusus": time(7), "Siang": time(15), "Pagi Senin-Kamis": time(6), "Pagi Jumat": time(6)}
-MON_THU, FRI = {"monday": 1, "tuesday": 1, "wednesday": 1, "thursday": 1}, {"friday": 1}
+MON_THU, FRI = {"days": "Senin-Kamis"}, {"days": "Jumat"}
 MONDAY, FRIDAY = date(2026, 11, 9), date(2026, 11, 13)
 
 
@@ -43,6 +43,32 @@ class TestActiveShiftNames(unittest.TestCase):
 		self.assertEqual(row_weekdays(pagi), frozenset({0, 1, 2, 3}))
 		self.assertEqual(self.names(pagi, day=MONDAY), ["Pagi"])
 		self.assertEqual(self.names(pagi, day=FRIDAY), [])
+
+	def test_days_accept_names_ranges_and_lists(self):
+		for text, expected in (
+			("Senin-Kamis", {0, 1, 2, 3}), ("Jumat", {4}), ("Senin, Rabu, Jumat", {0, 2, 4}), ("mon-thu", {0, 1, 2, 3}),
+			("  SENIN  -  kamis ", {0, 1, 2, 3}), ("Senin–Kamis", {0, 1, 2, 3}), ("Sabtu-Selasa", {5, 6, 0, 1}),
+			("Senin-Kamis, Sabtu", {0, 1, 2, 3, 5}), ("Minggu", {6}), ("sunday", {6}),
+		):
+			with self.subTest(text=text):
+				self.assertEqual(parse_days(text), frozenset(expected))
+
+	def test_empty_days_mean_every_day(self):
+		for text in (None, "", "   ", "Setiap hari", "setiap hari"):
+			self.assertEqual(parse_days(text), frozenset(range(7)))
+
+	def test_every_preset_in_the_dropdown_is_valid(self):
+		from custom_hr.hrm.doctype.outlet_shift.outlet_shift import DAY_PRESETS
+
+		self.assertEqual(DAY_PRESETS[0], "Setiap hari")
+		for text in DAY_PRESETS:
+			with self.subTest(text=text):
+				self.assertTrue(parse_days(text))
+
+	def test_invalid_days_are_rejected(self):
+		for text in ("Funday", "Senin-", "Senin-Kamis-Jumat", "Senin,,Kamis", "1-3"):
+			with self.subTest(text=text), self.assertRaises(ShiftConfigurationError):
+				parse_days(text)
 
 	def test_op_pagi_table_resolves_per_weekday(self):
 		table = (row("Pagi Senin-Kamis", **MON_THU), row("Pagi Jumat", **FRI))
@@ -78,6 +104,9 @@ class TestOutletShiftValidation(unittest.TestCase):
 
 	def test_validate_shifts_still_rejects_duplicate_shift_type(self):
 		self.refused(row("Pagi"), row("Pagi"))
+
+	def test_invalid_days_are_refused_when_saving(self):
+		self.refused(row("Pagi", days="Funday"))
 
 	def test_shift_type_is_required(self):
 		self.refused(row(None))

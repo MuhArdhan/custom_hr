@@ -121,6 +121,30 @@
  },
  {
   "doctype": "Property Setter",
+  "name": "Attendance-department-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "department",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Attendance-company-in_standard_filter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Attendance",
+  "field_name": "company",
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
   "name": "Shift Type-working_hours_threshold_for_half_day-default",
   "doctype_or_field": "DocField",
   "doc_type": "Shift Type",
