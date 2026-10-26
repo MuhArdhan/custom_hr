@@ -828,5 +828,41 @@
   "no_copy": 1,
   "in_standard_filter": 1,
   "description": "Actual Logs: durasi IN-OUT aktual. Locked Shift Allocation: durasi jadwal terkunci untuk Tidak OUT, bukan jam aktual atau dasar lembur otomatis. Kosong pada data lama."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Attendance",
+  "name": "Attendance-working_duration",
+  "fieldname": "working_duration",
+  "fieldtype": "Data",
+  "label": "Working Duration",
+  "insert_after": "working_hours",
+  "module": "HRM",
+  "read_only": 1,
+  "no_copy": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Attendance",
+  "name": "Attendance-late_entry_duration",
+  "fieldname": "late_entry_duration",
+  "fieldtype": "Data",
+  "label": "Late By",
+  "insert_after": "late_entry",
+  "module": "HRM",
+  "read_only": 1,
+  "no_copy": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Attendance",
+  "name": "Attendance-early_exit_duration",
+  "fieldname": "early_exit_duration",
+  "fieldtype": "Data",
+  "label": "Early Exit By",
+  "insert_after": "early_exit",
+  "module": "HRM",
+  "read_only": 1,
+  "no_copy": 1
  }
 ]
