@@ -46,7 +46,7 @@ class TestLeaveApprover(unittest.TestCase):
 
 	def test_stage_label_names_the_approver(self):
 		doc = frappe._dict(leave_approver_name="Budi", leave_approver="pl@example.com")
-		self.assertEqual(svc.stage_label("Menunggu PL", doc), "Menunggu Budi")
+		self.assertEqual(svc.stage_label("Menunggu PL", doc), "Waiting for Budi")
 		self.assertEqual(svc.stage_label("Menunggu PL", frappe._dict(leave_approver=None)), "Menunggu PL")
 		self.assertEqual(svc.stage_label("Menunggu HRD", doc), "Menunggu HRD")
 		self.assertEqual(svc.stage_label("Open", doc), "Open")

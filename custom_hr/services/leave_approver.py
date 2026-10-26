@@ -51,6 +51,6 @@ def submit_to_approver(doc, method=None):
 
 
 def stage_label(state, doc):
-	"""Name the approver instead of the generic 'Menunggu PL'."""
+	"""Name the approver instead of the generic 'Menunggu PL' state."""
 	name = doc.get("leave_approver_name") or doc.get("leave_approver")
-	return f"Menunggu {name}" if state == PENDING_PL and name else state
+	return f"Waiting for {name}" if state == PENDING_PL and name else state

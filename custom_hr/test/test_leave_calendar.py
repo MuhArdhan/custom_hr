@@ -101,7 +101,7 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.factory.return_value = leave(leave_workflow_state="Menunggu PL", leave_approver_name="Budi")
 		with patch(MODULE + "get_transitions", return_value=[]):
 			result = api.get_leave_calendar("2026-10-01", "2026-10-31")
-		self.assertEqual(result["items"][0]["status"], "Menunggu Budi")
+		self.assertEqual(result["items"][0]["status"], "Waiting for Budi")
 		self.assertEqual(result["items"][0]["actions"], [])
 
 	def test_native_self_approval_respects_hr_settings(self):
@@ -171,7 +171,7 @@ class TestLeaveCalendar(unittest.TestCase):
 			api.get_leave_counts("2026-01-01", "2026-12-31")
 
 	def test_decision_rechecks_modified_and_does_not_mutate_stale_document(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "sudah berubah"):
+		with self.assertRaisesRegex(frappe.ValidationError, "has changed"):
 			api.decide_approval("Leave Application", "LEAVE-1", "Approve", "OLD")
 		self.doc.submit.assert_not_called()
 		self.db_read.assert_called_with("Leave Application", "LEAVE-1", "name", for_update=True)
@@ -223,7 +223,7 @@ class TestLeaveCalendar(unittest.TestCase):
 
 	@patch.object(api, "ENABLED_KINDS", frozenset({"leave", "overtime"}))
 	def test_overtime_cannot_be_decided_without_employee_identity(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "Pilih karyawan"):
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose the employee"):
 			api.decide_approval("Overtime Request", "OT-1", "Setujui", str(self.doc.modified))
 		self.doc.submit.assert_not_called()
 
@@ -249,13 +249,13 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.assertEqual([call.args[0] for call in self.listing.call_args_list], ["Leave Application"])
 
 	def test_explicit_overtime_filter_is_disabled_before_query(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "dinonaktifkan sementara"):
+		with self.assertRaisesRegex(frappe.ValidationError, "temporarily disabled"):
 			api.get_leave_calendar("2026-10-01", "2026-10-31", kind="overtime")
 		self.listing.assert_not_called()
 
 	def test_overtime_approve_and_reject_are_disabled_before_document_access(self):
 		for action in ["Setujui", "Tolak", "Approve", "Reject"]:
-			with self.assertRaisesRegex(frappe.ValidationError, "dinonaktifkan sementara"):
+			with self.assertRaisesRegex(frappe.ValidationError, "temporarily disabled"):
 				api.decide_approval("Overtime Request", "OT-1", action, "STAMP", employee="EMP-1")
 		self.factory.assert_not_called()
 		self.db_read.assert_not_called()
