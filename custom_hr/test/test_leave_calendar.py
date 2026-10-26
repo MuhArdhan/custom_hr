@@ -34,6 +34,8 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.workflow = self.mock(MODULE + "_workflow", return_value=None)
 		self.setting = self.mock("frappe.db.get_single_value", return_value=1)
 		self.db_read = self.mock("frappe.db.get_value", return_value="employee@example.com")
+		# The balance has its own tests below; here it must not add frappe.db.get_value calls.
+		self.balance = self.mock(MODULE + "_leave_balance", return_value={"leave_balance": 10.0, "exceeds_balance": False})
 		self.doc = leave()
 		self.factory = self.mock("frappe.get_doc", return_value=self.doc)
 		self.listing = self.mock("frappe.get_list", side_effect=lambda dt, **kwargs: [frappe._dict(name="LEAVE-1")] if dt == "Leave Application" else [])
@@ -96,10 +98,10 @@ class TestLeaveCalendar(unittest.TestCase):
 
 	def test_other_workflow_stage_remains_visible_without_actions(self):
 		self.workflow.return_value = frappe._dict(workflow_state_field="leave_workflow_state")
-		self.factory.return_value = leave(leave_workflow_state="Menunggu PL")
+		self.factory.return_value = leave(leave_workflow_state="Menunggu PL", leave_approver_name="Budi")
 		with patch(MODULE + "get_transitions", return_value=[]):
 			result = api.get_leave_calendar("2026-10-01", "2026-10-31")
-		self.assertEqual(result["items"][0]["status"], "Menunggu PL")
+		self.assertEqual(result["items"][0]["status"], "Waiting for Budi")
 		self.assertEqual(result["items"][0]["actions"], [])
 
 	def test_native_self_approval_respects_hr_settings(self):
@@ -169,7 +171,7 @@ class TestLeaveCalendar(unittest.TestCase):
 			api.get_leave_counts("2026-01-01", "2026-12-31")
 
 	def test_decision_rechecks_modified_and_does_not_mutate_stale_document(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "sudah berubah"):
+		with self.assertRaisesRegex(frappe.ValidationError, "has changed"):
 			api.decide_approval("Leave Application", "LEAVE-1", "Approve", "OLD")
 		self.doc.submit.assert_not_called()
 		self.db_read.assert_called_with("Leave Application", "LEAVE-1", "name", for_update=True)
@@ -221,7 +223,7 @@ class TestLeaveCalendar(unittest.TestCase):
 
 	@patch.object(api, "ENABLED_KINDS", frozenset({"leave", "overtime"}))
 	def test_overtime_cannot_be_decided_without_employee_identity(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "Pilih karyawan"):
+		with self.assertRaisesRegex(frappe.ValidationError, "Choose the employee"):
 			api.decide_approval("Overtime Request", "OT-1", "Setujui", str(self.doc.modified))
 		self.doc.submit.assert_not_called()
 
@@ -247,13 +249,13 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.assertEqual([call.args[0] for call in self.listing.call_args_list], ["Leave Application"])
 
 	def test_explicit_overtime_filter_is_disabled_before_query(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "dinonaktifkan sementara"):
+		with self.assertRaisesRegex(frappe.ValidationError, "temporarily disabled"):
 			api.get_leave_calendar("2026-10-01", "2026-10-31", kind="overtime")
 		self.listing.assert_not_called()
 
 	def test_overtime_approve_and_reject_are_disabled_before_document_access(self):
 		for action in ["Setujui", "Tolak", "Approve", "Reject"]:
-			with self.assertRaisesRegex(frappe.ValidationError, "dinonaktifkan sementara"):
+			with self.assertRaisesRegex(frappe.ValidationError, "temporarily disabled"):
 				api.decide_approval("Overtime Request", "OT-1", action, "STAMP", employee="EMP-1")
 		self.factory.assert_not_called()
 		self.db_read.assert_not_called()
@@ -291,3 +293,55 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.assertEqual(result["counts"]["2026-10-30"], {
 			"leave": 4, "overtime": 0, "leave_request": 1, "approved_leave": 1, "rejected": 1, "cancelled": 1,
 		})
+
+	def test_leave_items_carry_the_remaining_balance_for_the_approver(self):
+		item = api.get_leave_calendar("2026-10-30", "2026-10-30")["items"][0]
+		self.assertEqual((item["leave_balance"], item["exceeds_balance"]), (10.0, False))
+		self.balance.assert_called_once_with(self.doc)
+
+	def test_the_full_reason_is_sent_not_a_shortened_copy(self):
+		self.doc.description = "Menghadiri pernikahan saudara di luar kota selama beberapa hari, " * 3
+		item = api.get_leave_calendar("2026-10-30", "2026-10-30")["items"][0]
+		self.assertEqual(item["description"], self.doc.description)
+
+
+class TestLeaveBalance(unittest.TestCase):
+	def setUp(self):
+		self.rules = frappe._dict(is_lwp=0, allow_negative=0)
+		self.remaining = 5.0
+		self.get_value = patch("frappe.db.get_value", side_effect=lambda *a, **k: self.rules)
+		self.balance_on = patch(MODULE + "get_leave_balance_on", side_effect=lambda *a, **k: self.remaining)
+		self.get_value.start()
+		self.balance = self.balance_on.start()
+		self.addCleanup(self.get_value.stop)
+		self.addCleanup(self.balance_on.stop)
+		self.doc = leave(total_leave_days=3)
+
+	def test_balance_is_read_on_the_first_day_with_access_via_the_application(self):
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": 5.0, "exceeds_balance": False})
+		args, kwargs = self.balance.call_args
+		self.assertEqual(args[:2], ("EMP-1", "Annual Leave"))
+		self.assertEqual(str(args[2]), "2026-10-30")
+		self.assertEqual(kwargs["leave_application"], "LEAVE-1")
+
+	def test_a_request_larger_than_the_balance_is_flagged(self):
+		self.remaining = 2.0
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": 2.0, "exceeds_balance": True})
+
+	def test_a_request_equal_to_the_balance_is_not_flagged(self):
+		self.remaining = 3.0
+		self.assertFalse(api._leave_balance(self.doc)["exceeds_balance"])
+
+	def test_a_leave_type_that_allows_negative_balance_is_never_flagged(self):
+		self.rules.allow_negative = 1
+		self.remaining = 0.0
+		self.assertFalse(api._leave_balance(self.doc)["exceeds_balance"])
+
+	def test_leave_without_pay_has_no_balance_to_show(self):
+		self.rules.is_lwp = 1
+		self.assertEqual(api._leave_balance(self.doc), {"leave_balance": None, "exceeds_balance": False})
+		self.balance.assert_not_called()
+
+	def test_an_unknown_leave_type_is_treated_as_a_normal_one(self):
+		self.rules = None
+		self.assertEqual(api._leave_balance(self.doc)["leave_balance"], 5.0)

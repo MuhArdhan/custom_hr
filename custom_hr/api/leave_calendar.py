@@ -11,8 +11,10 @@ from frappe.model.workflow import (
 	get_workflow_name,
 	has_approval_access,
 )
-from frappe.utils import cint, getdate
+from frappe.utils import cint, flt, getdate
+from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 
+from custom_hr.services.leave_approver import stage_label
 from custom_hr.services.overtime_approval import decide_employee, employee_state, employee_view
 
 TYPES = {"leave": "Leave Application", "overtime": "Overtime Request"}
@@ -31,7 +33,7 @@ def _range(start_date, end_date):
 		if not 0 <= (end - start).days < 62:
 			raise ValueError
 	except (ValueError, TypeError, OverflowError):
-		frappe.throw(_("Pilih rentang tanggal yang valid, maksimal 62 hari."))
+		frappe.throw(_("Choose a valid date range of at most 62 days."))
 	return start, end
 
 
@@ -84,6 +86,17 @@ def _leave_calendar_status(doc):
 	return "leave_request"
 
 
+def _leave_balance(doc):
+	"""Remaining entitlement of the requested leave type, so the approver can judge the request."""
+	rules = frappe.db.get_value("Leave Type", doc.leave_type, ["is_lwp", "allow_negative"], as_dict=True) or {}
+	if cint(rules.get("is_lwp")):
+		return {"leave_balance": None, "exceeds_balance": False}
+	# leave_application lets approvers who can read this request (but not the Employee) see the balance
+	balance = flt(get_leave_balance_on(doc.employee, doc.leave_type, getdate(doc.from_date), leave_application=doc.name))
+	exceeds = flt(doc.total_leave_days) > balance and not cint(rules.get("allow_negative"))
+	return {"leave_balance": balance, "exceeds_balance": bool(exceeds)}
+
+
 def _request(doc, kind, actions, workflow, overtime_row=None):
 	if kind == "leave":
 		employees = [{"employee": doc.employee, "employee_name": doc.employee_name or doc.employee}]
@@ -94,20 +107,21 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		description = doc.description or ""
 	else:
 		if overtime_row is None:
-			frappe.throw(_("Pilih karyawan yang akan diproses."))
+			frappe.throw(_("Choose the employee to process."))
 		employees = [{"employee": overtime_row.employee, "employee_name": overtime_row.employee_name or overtime_row.employee}]
 		start = end = getdate(doc.date)
-		details = f"{doc.start_time} – {doc.end_time} ({doc.planned_hours} " + _("jam") + ")"
+		details = f"{doc.start_time} – {doc.end_time} ({doc.planned_hours} " + _("hours") + ")"
 		description = doc.get("reason") or ""
 	return {
 		"doctype": doc.doctype, "name": doc.name, "kind": kind,
 		"employee": employees[0]["employee"],
 		"calendar_status": _leave_calendar_status(doc) if kind == "leave" else None,
 		"from_date": str(start), "to_date": str(end), "employees": employees,
-		"status": employee_state(doc, overtime_row) if overtime_row else (doc.get(workflow.workflow_state_field) if workflow else doc.status),
+		"status": employee_state(doc, overtime_row) if overtime_row else (stage_label(doc.get(workflow.workflow_state_field), doc) if workflow else doc.status),
 		"details": details, "description": description, "company": doc.company,
 		"outlet": frappe.db.get_value("Employee", doc.employee, "outlet") if kind == "leave" else doc.get("outlet"),
 		"modified": str(doc.modified), "actions": actions,
+		**(_leave_balance(doc) if kind == "leave" else {}),
 	}
 
 
@@ -116,9 +130,9 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 	"""Readable requests at every stage; actions remain native permission-gated."""
 	start, end = _range(start_date, end_date)
 	if kind and kind not in TYPES:
-		frappe.throw(_("Jenis pengajuan tidak valid."))
+		frappe.throw(_("Invalid request type."))
 	if kind and kind not in ENABLED_KINDS:
-		frappe.throw(_("Approval lembur di Leave Calendar dinonaktifkan sementara. Fokus saat ini cuti/izin."))
+		frappe.throw(_("Overtime approval in the Leave Calendar is temporarily disabled. The current focus is leave."))
 	items = []
 	for category, doctype in TYPES.items():
 		if category not in ENABLED_KINDS:
@@ -142,7 +156,7 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 		# Never use get_all/ignore_permissions: list counts must not leak other teams.
 		rows = frappe.get_list(doctype, filters=filters, fields=["name"], order_by="creation asc", limit_page_length=MAX_REQUESTS + 1)
 		if len(rows) > MAX_REQUESTS:
-			frappe.throw(_("Terlalu banyak pengajuan. Persempit rentang tanggal atau filter."))
+			frappe.throw(_("Too many requests. Narrow the date range or filters."))
 		for row in rows:
 			doc = frappe.get_doc(doctype, row.name)
 			if not doc.has_permission("read"):
@@ -202,30 +216,30 @@ def get_leave_counts(start_date, end_date, employee=None, company=None):
 def decide_approval(doctype, name, action, modified, employee=None):
 	"""Recheck authority/state under a row lock; run the real document lifecycle."""
 	if doctype not in TYPES.values() or not name or not modified:
-		frappe.throw(_("Pengajuan tidak valid."))
+		frappe.throw(_("Invalid request."))
 	if doctype == "Overtime Request" and "overtime" not in ENABLED_KINDS:
-		frappe.throw(_("Approval lembur di Leave Calendar dinonaktifkan sementara. Fokus saat ini cuti/izin."))
+		frappe.throw(_("Overtime approval in the Leave Calendar is temporarily disabled. The current focus is leave."))
 	# Verify read access before acquiring locks, and never trust a client document.
 	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("read")
 	frappe.db.get_value(doctype, name, "name", for_update=True)
 	doc.reload()
 	if str(doc.modified) != modified:
-		frappe.throw(_("Pengajuan sudah berubah. Muat ulang daftar sebelum memproses."))
+		frappe.throw(_("The request has changed. Reload the list before processing."))
 	workflow = _workflow(doctype)
 	if doctype == "Overtime Request":
 		if not employee:
-			frappe.throw(_("Pilih karyawan yang akan diproses."))
+			frappe.throw(_("Choose the employee to process."))
 		row = next((r for r in doc.employees if r.employee == employee), None)
 		allowed = _actions(employee_view(doc, row), workflow) if row else []
 		if action not in {item["action"] for item in allowed}:
-			frappe.throw(_("Anda tidak berhak memproses karyawan ini."), frappe.PermissionError)
+			frappe.throw(_("You are not allowed to process this employee."), frappe.PermissionError)
 		return decide_employee(doc, employee, action, workflow)
 	if employee and employee != doc.employee:
-		frappe.throw(_("Karyawan tidak sesuai dengan pengajuan."), frappe.PermissionError)
+		frappe.throw(_("The employee does not match the request."), frappe.PermissionError)
 	allowed = _actions(doc, workflow)
 	if action not in {item["action"] for item in allowed}:
-		frappe.throw(_("Anda tidak berhak memproses pengajuan ini pada tahap saat ini."), frappe.PermissionError)
+		frappe.throw(_("You are not allowed to process this request at its current stage."), frappe.PermissionError)
 	if workflow:
 		result = apply_workflow(doc, action)
 	else:

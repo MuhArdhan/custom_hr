@@ -197,11 +197,13 @@ def _shift_options(outlet):
 	rows = frappe.get_all(
 		"Outlet Shift",
 		filters={"parent": outlet, "enabled": 1},
-		fields=["shift_type"],
+		fields=["shift_type", "valid_to"],
 		ignore_permissions=True,
 	)
 	options = []
 	for row in rows:
+		if row.valid_to and getdate(row.valid_to) < getdate():
+			continue  # temporary shift that has already ended
 		color = frappe.db.get_value("Shift Type", row.shift_type, "color") or "Blue"
 		options.append({"value": row.shift_type, "label": row.shift_type, "color": color})
 	return options

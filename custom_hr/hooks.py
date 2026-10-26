@@ -52,6 +52,7 @@ doctype_js = {
 doctype_list_js = {
 	"Attendance": "public/js/attendance_list.js",
 	"Employee Checkin": "public/js/employee_checkin_list.js",
+	"Holiday List": "public/js/holiday_list_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
 	"Shift Type": "public/js/shift_type_list.js",
@@ -81,7 +82,19 @@ override_doctype_class = {
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
 }
 
+override_whitelisted_methods = {
+	"hrms.hr.doctype.leave_application.leave_application.get_leave_approver": "custom_hr.services.leave_approver.get_leave_approver",
+	"hrms.api.get_leave_approval_details": "custom_hr.services.leave_approver.get_leave_approval_details",
+}
+
 doc_events = {
+	"Employee": {
+		"validate": "custom_hr.services.employee_outlet.fill_outlet",
+	},
+	"Leave Application": {
+		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
+		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
+	},
 	"Shift Location": {
 		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
 	},

@@ -12,16 +12,16 @@ class LeaveCalendar {
 				<div class="ac-filters"></div>
 				<div class="ac-toolbar">
 					<div><h3 class="ac-title"></h3></div>
-					<div class="ac-navigation"><button class="btn btn-default btn-sm ac-today">${__("Hari ini")}</button><button class="btn btn-default btn-sm ac-prev" aria-label="${__("Bulan sebelumnya")}">&lsaquo;</button><button class="btn btn-default btn-sm ac-next" aria-label="${__("Bulan berikutnya")}">&rsaquo;</button></div>
+					<div class="ac-navigation"><button class="btn btn-default btn-sm ac-today">${__("Today")}</button><button class="btn btn-default btn-sm ac-prev" aria-label="${__("Previous month")}">&lsaquo;</button><button class="btn btn-default btn-sm ac-next" aria-label="${__("Next month")}">&rsaquo;</button></div>
 				</div>
 				<div class="ac-message" role="status" aria-live="polite"></div>
 				<div class="ac-legend">${this.leave_types().map(([key, label]) => `<span class="ac-${key}">${label}</span>`).join("")}</div>
-				<div class="ac-scroll"><div class="ac-calendar" aria-label="${__("Kalender cuti bulanan")}"></div></div>
+				<div class="ac-scroll"><div class="ac-calendar" aria-label="${__("Monthly leave calendar")}"></div></div>
 			</div>
 		`);
 		this.filters = {};
 		for (const df of [
-			{ fieldname: "employee", fieldtype: "Link", options: "Employee", label: __("Karyawan") },
+			{ fieldname: "employee", fieldtype: "Link", options: "Employee", label: __("Employee") },
 			{ fieldname: "company", fieldtype: "Link", options: "Company", label: __("Company") },
 		]) {
 			this.filters[df.fieldname] = frappe.ui.form.make_control({ parent: this.page.main.find(".ac-filters"), df: { ...df, change: () => this.load() }, render_input: true });
@@ -41,7 +41,7 @@ class LeaveCalendar {
 	}
 
 	leave_types() {
-		return [["leave_request", __("Leave Request")], ["approved_leave", __("Leave")], ["rejected", __("Ditolak")], ["cancelled", __("Dibatalkan")]];
+		return [["leave_request", __("Leave Request")], ["approved_leave", __("Leave")], ["rejected", __("Rejected")], ["cancelled", __("Cancelled")]];
 	}
 
 	async request(start, end, extra = {}) {
@@ -54,32 +54,32 @@ class LeaveCalendar {
 		const first = this.month.clone().startOf("month").day(0);
 		const last = first.clone().add(41, "days");
 		this.page.main.find(".ac-title").text(this.month.format("MMMM YYYY"));
-		this.page.main.find(".ac-message").text(__("Memuat pengajuan..."));
-		this.page.main.find(".ac-calendar").html(`<div class="ac-loading"><span class="ac-spinner" aria-hidden="true"></span>${__("Menyiapkan kalender cuti...")}</div>`);
+		this.page.main.find(".ac-message").text(__("Loading requests..."));
+		this.page.main.find(".ac-calendar").html(`<div class="ac-loading"><span class="ac-spinner" aria-hidden="true"></span>${__("Preparing leave calendar...")}</div>`);
 		try {
 			const response = await frappe.call({ method: "custom_hr.api.leave_calendar.get_leave_counts", type: "GET", args: { ...this.args(), start_date: first.format("YYYY-MM-DD"), end_date: last.format("YYYY-MM-DD") } });
 			const data = response.message;
 			if (token !== this.token) return;
 			this.render(first, data.counts);
-			this.page.main.find(".ac-message").text(data.total ? __("{0} pengajuan cuti/izin pada rentang ini.", [data.total]) : __("Tidak ada pengajuan cuti/izin yang dapat Anda lihat pada rentang ini."));
+			this.page.main.find(".ac-message").text(data.total ? __("{0} leave requests in this range.", [data.total]) : __("There are no leave requests you can view in this range."));
 		} catch {
 			if (token === this.token) {
-				this.page.main.find(".ac-message").text(__("Kalender belum berhasil dimuat."));
-				this.page.main.find(".ac-calendar").html(`<div class="ac-loading ac-load-error"><strong>${__("Kalender tidak dapat dimuat")}</strong><span>${__("Periksa koneksi, lalu coba kembali.")}</span><button class="btn btn-default btn-sm ac-retry">${__("Coba lagi")}</button></div>`);
+				this.page.main.find(".ac-message").text(__("The calendar could not be loaded."));
+				this.page.main.find(".ac-calendar").html(`<div class="ac-loading ac-load-error"><strong>${__("Calendar unavailable")}</strong><span>${__("Check your connection and try again.")}</span><button class="btn btn-default btn-sm ac-retry">${__("Try again")}</button></div>`);
 			}
 		}
 	}
 
 	render(first, counts) {
 		const escape = frappe.utils.escape_html;
-		let html = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(day => `<div class="ac-weekday">${__(day)}</div>`).join("");
+		let html = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => `<div class="ac-weekday">${__(day)}</div>`).join("");
 		const today = frappe.datetime.get_today();
 		for (let index = 0; index < 42; index++) {
 			const day = first.clone().add(index, "days");
 			const date = day.format("YYYY-MM-DD");
 			const values = counts[date] || {};
 			html += `<div class="ac-day ${day.month() !== this.month.month() ? "ac-outside" : ""} ${date === today ? "ac-current" : ""} ${[0, 6].includes(index % 7) ? "ac-weekend" : ""}">
-				<button class="ac-day-button" data-date="${date}" aria-label="${escape(day.format("dddd, DD MMMM YYYY"))}" ${date === today ? 'aria-current="date"' : ""}><span class="ac-date-number">${day.date()}</span>${date === today ? `<small>${__("Hari ini")}</small>` : ""}</button>`;
+				<button class="ac-day-button" data-date="${date}" aria-label="${escape(day.format("dddd, DD MMMM YYYY"))}" ${date === today ? 'aria-current="date"' : ""}><span class="ac-date-number">${day.date()}</span>${date === today ? `<small>${__("Today")}</small>` : ""}</button>`;
 			for (const [status, label] of this.leave_types()) {
 				if (values[status]) html += `<button class="ac-badge ac-${status}" data-date="${date}" data-kind="leave" aria-label="${escape(label)} (${Number(values[status])})"><span class="ac-badge-label">${escape(label)}</span><span class="ac-badge-count">${Number(values[status])}</span></button>`;
 			}
@@ -89,7 +89,7 @@ class LeaveCalendar {
 	}
 
 	open_day(date, kind = null) {
-		const dialog = new frappe.ui.Dialog({ title: __("Cuti & Izin — {0}", [frappe.datetime.str_to_user(date)]), size: "extra-large", fields: [{ fieldname: "body", fieldtype: "HTML" }] });
+		const dialog = new frappe.ui.Dialog({ title: __("Leave & Permission — {0}", [frappe.datetime.str_to_user(date)]), size: "extra-large", fields: [{ fieldname: "body", fieldtype: "HTML" }] });
 		dialog.approval_date = date;
 		dialog.approval_kind = kind;
 		dialog.approval_filters = this.args();
@@ -103,17 +103,25 @@ class LeaveCalendar {
 			const item = dialog.approval_items[Number(button.dataset.index)];
 			const action = item.actions[Number(button.dataset.action)];
 			const person = item.employees[0];
-			const note = item.kind === "leave" && item.from_date !== item.to_date ? __("Keputusan berlaku untuk seluruh rentang tanggal cuti pengajuan ini.") : "";
-			frappe.confirm(__("{0} pengajuan {1} ({2})?", [action.kind === "approve" ? __("Approve") : __("Reject"), frappe.utils.escape_html(person.employee_name), frappe.utils.escape_html(item.name)]) + " " + note, () => this.decide(dialog, item, action));
+			const note = item.kind === "leave" && item.from_date !== item.to_date ? __("The decision applies to the whole date range of this request.") : "";
+			frappe.confirm(__("{0} request from {1} ({2})?", [action.kind === "approve" ? __("Approve") : __("Reject"), frappe.utils.escape_html(person.employee_name), frappe.utils.escape_html(item.name)]) + " " + note, () => this.decide(dialog, item, action));
 		});
 		dialog.show();
 		this.load_day(dialog);
 	}
 
+	balance_html(item) {
+		// null = leave without pay (no entitlement); undefined = server sent no balance
+		if (item.leave_balance === undefined) return "";
+		if (item.leave_balance === null) return `<div class="ac-subline ac-balance text-muted">${__("No entitlement (leave without pay)")}</div>`;
+		const over = item.exceeds_balance ? ` · ${__("request exceeds remaining balance")}` : "";
+		return `<div class="ac-subline ac-balance${item.exceeds_balance ? " ac-over" : ""}">${__("Remaining balance")}: <b>${Number(item.leave_balance)}</b> ${__("days")}${over}</div>`;
+	}
+
 	async load_day(dialog) {
 		const body = dialog.fields_dict.body.$wrapper;
 		const token = dialog.leave_load_token = (dialog.leave_load_token || 0) + 1;
-		body.text(__("Memuat pengajuan..."));
+		body.text(__("Loading requests..."));
 		try {
 			const data = await this.request(dialog.approval_date, dialog.approval_date, { ...dialog.approval_filters, kind: "leave" });
 			if (token !== dialog.leave_load_token) return;
@@ -121,26 +129,26 @@ class LeaveCalendar {
 			data.items = data.items.filter(item => item.kind === "leave" && item.doctype === "Leave Application");
 			dialog.approval_items = data.items;
 			const escape = value => frappe.utils.escape_html(String(value || ""));
-			if (!data.items.length) { body.text(__("Tidak ada pengajuan cuti/izin yang dapat Anda lihat pada tanggal ini.")); return; }
-			let html = `<div class="ac-table-scroll"><table class="table ac-table"><thead><tr><th>${__("Karyawan")}</th><th>${__("Cuti / Izin")}</th><th>${__("Status")}</th><th>${__("Aksi")}</th></tr></thead><tbody>`;
+			if (!data.items.length) { body.text(__("There are no leave requests you can view on this date.")); return; }
+			let html = `<div class="ac-table-scroll"><table class="table ac-table"><thead><tr><th>${__("Employee")}</th><th>${__("Leave / Permission")}</th><th>${__("Status")}</th><th>${__("Action")}</th></tr></thead><tbody>`;
 			data.items.forEach((item, index) => {
 				const person = item.employees[0];
 				const [status, label] = this.leave_types().find(([key]) => key === item.calendar_status) || this.leave_types()[0];
 				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small></td>
 					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${escape(item.details)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
-					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button><span class="ac-reason" title="${escape(item.description)}">${escape(item.description)}</span></div></td>
+					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button></div>${this.balance_html(item)}${item.description ? `<div class="ac-reason">${escape(item.description)}</div>` : ""}</td>
 					<td><span class="ac-stage ac-${status}">${escape(item.status)}</span></td>
-					<td><div class="ac-request-actions">${item.actions.length ? item.actions.map((action, actionIndex) => `<button class="btn btn-xs ${action.kind === "approve" ? "btn-primary" : "btn-danger"} ac-decision" data-index="${index}" data-action="${actionIndex}" title="${escape(action.next_state)}">${action.kind === "approve" ? __("Approve") : __("Reject")}</button>`).join("") : `<span class="text-muted">${__("Hanya lihat")}</span>`}</div></td></tr>`;
+					<td><div class="ac-request-actions">${item.actions.length ? item.actions.map((action, actionIndex) => `<button class="btn btn-xs ${action.kind === "approve" ? "btn-primary" : "btn-danger"} ac-decision" data-index="${index}" data-action="${actionIndex}" title="${escape(action.next_state)}">${action.kind === "approve" ? __("Approve") : __("Reject")}</button>`).join("") : `<span class="text-muted">${__("View only")}</span>`}</div></td></tr>`;
 			});
 			body.html(html + "</tbody></table></div>");
 		} catch {
-			if (token === dialog.leave_load_token) body.text(__("Gagal memuat pengajuan. Tutup lalu buka kembali tanggal ini."));
+			if (token === dialog.leave_load_token) body.text(__("Failed to load requests. Close and reopen this date."));
 		}
 	}
 
 	async decide(dialog, item, action) {
 		if (item.kind !== "leave" || item.doctype !== "Leave Application") {
-			frappe.show_alert({ message: __("Approval lembur dinonaktifkan sementara."), indicator: "orange" });
+			frappe.show_alert({ message: __("Overtime approval is temporarily disabled."), indicator: "orange" });
 			return;
 		}
 		if (dialog.approval_busy) return;
@@ -149,9 +157,9 @@ class LeaveCalendar {
 		dialog.fields_dict.body.$wrapper.find(".ac-decision").prop("disabled", true);
 		try {
 			await frappe.call({ method: "custom_hr.api.leave_calendar.decide_approval", type: "POST", args: { doctype: item.doctype, name: item.name, action: action.action, modified: item.modified, employee: item.employee || item.employees[0].employee } });
-			frappe.show_alert({ message: __("Pengajuan berhasil diproses."), indicator: "green" });
+			frappe.show_alert({ message: __("Request processed successfully."), indicator: "green" });
 		} catch {
-			frappe.show_alert({ message: __("Pengajuan tidak diproses. Periksa pesan kesalahan dan daftar terbaru."), indicator: "red" });
+			frappe.show_alert({ message: __("Request not processed. Check the error message and the latest list."), indicator: "red" });
 		} finally {
 			dialog.approval_busy = false;
 			await Promise.allSettled([this.load_day(dialog), this.load()]);
