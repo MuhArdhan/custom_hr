@@ -11,7 +11,7 @@
 			</div>
 			<div v-if="context" class="mt-3 text-sm text-gray-700 space-y-1" aria-live="polite">
 				<div v-if="context.outlet">{{ context.outlet }}</div>
-				<div v-if="displayShift">{{ displayShift }}</div>
+				<div v-if="displayShift">{{ shiftLabel(displayShift) }}</div>
 			</div>
 			<div v-if="context?.incomplete_session" class="mt-3 text-sm text-orange-700" role="status">
 				{{ __("Missing Check-out") }} · {{ context.incomplete_session.shift_work_date }}
@@ -68,6 +68,7 @@ import { createListResource, createResource, FeatherIcon, toast } from "frappe-u
 import { IonModal } from "@ionic/vue"
 import FaceCapture from "@/components/FaceCapture.vue"
 import { settings } from "@/data/settings"
+import { shiftLabel } from "@/data/shiftTimes"
 import { CheckinSubmission, formatSiteDateTime, hasCoordinates, validContext } from "@/utils/checkin"
 import { requireAndroidAttendanceDevice } from "@/utils/androidDevice"
 
@@ -140,7 +141,7 @@ function message(error) {
 
 function saved(result) {
 	submitError.value = ""
-	toast({ title: __("Success"), text: __("{0} saved. Shift: {1}", [result.log_type, result.shift || "—"]), icon: "check-circle", position: "bottom-center", iconClasses: "text-green-500" })
+	toast({ title: __("Success"), text: __("{0} saved. Shift: {1}", [result.log_type, shiftLabel(result.shift) || "—"]), icon: "check-circle", position: "bottom-center", iconClasses: "text-green-500" })
 	closeModal()
 }
 

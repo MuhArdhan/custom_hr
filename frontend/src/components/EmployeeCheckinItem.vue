@@ -12,7 +12,7 @@
 						&middot; {{ __("Face Verified") }}
 					</span>
 				</div>
-				<div v-if="props.doc.shift" class="text-xs text-gray-700">{{ __("Shift") }}: {{ props.doc.shift }}</div>
+				<div v-if="props.doc.shift" class="text-xs text-gray-700">{{ __("Shift") }}: {{ shiftLabel(props.doc.shift) }}</div>
 				<div v-if="props.doc.outlet_at_checkin" class="text-xs text-gray-500">{{ __("Outlet") }}: {{ props.doc.outlet_at_checkin }}</div>
 				<div v-if="props.doc.shift_work_date" class="text-xs text-gray-500">{{ __("Work Date") }}: {{ props.doc.shift_work_date }}</div>
 				<div v-if="props.doc.checkout_deadline && props.doc.log_type === 'IN'" class="text-xs text-gray-500">{{ __("Check-out Deadline") }}: {{ formatSiteDateTime(props.doc.checkout_deadline) }}</div>
@@ -40,6 +40,7 @@ import { FeatherIcon } from "frappe-ui"
 import { inject } from "vue"
 
 import ListItem from "@/components/ListItem.vue"
+import { shiftLabel } from "@/data/shiftTimes"
 import { formatSiteDateTime, hasCoordinates } from "@/utils/checkin"
 
 const __ = inject("$translate")
