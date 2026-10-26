@@ -1,10 +1,10 @@
-const hrms_list_settings = frappe.listview_settings["Holiday List"] || {};
+const hrms_list_settings = frappe.listview_settings["Holiday List Assignment"] || {};
 
-frappe.listview_settings["Holiday List"] = {
+frappe.listview_settings["Holiday List Assignment"] = {
 	...hrms_list_settings,
 	onload(list_view) {
 		hrms_list_settings.onload?.(list_view);
-		list_view.page.add_inner_button(__("Tetapkan Massal"), open_assign_dialog);
+		list_view.page.add_inner_button(__("Bulk Assign"), open_assign_dialog);
 	},
 };
 
@@ -15,7 +15,7 @@ function open_assign_dialog() {
 	let selected = new Set();
 
 	const dialog = new frappe.ui.Dialog({
-		title: __("Tetapkan Holiday List secara massal"),
+		title: __("Bulk Assign Holiday List"),
 		size: "large",
 		fields: [
 			{ fieldname: "holiday_list", fieldtype: "Link", options: "Holiday List", label: __("Holiday List"), reqd: 1, change: () => load() },
@@ -24,14 +24,14 @@ function open_assign_dialog() {
 				fieldtype: "Select",
 				options: ["Company", "Employee"],
 				default: "Company",
-				label: __("Berlaku untuk"),
+				label: __("Applicable For"),
 				change: () => load(),
 			},
-			{ fieldname: "from_date", fieldtype: "Date", label: __("Mulai Tanggal"), reqd: 1, default: frappe.datetime.year_start() },
-			{ fieldname: "search", fieldtype: "Data", label: __("Cari") },
+			{ fieldname: "from_date", fieldtype: "Date", label: __("From Date"), reqd: 1, default: frappe.datetime.year_start() },
+			{ fieldname: "search", fieldtype: "Data", label: __("Search") },
 			{ fieldname: "targets", fieldtype: "HTML" },
 		],
-		primary_action_label: __("Tetapkan"),
+		primary_action_label: __("Assign"),
 		primary_action: save,
 	});
 	const $box = dialog.fields_dict.targets.$wrapper;
@@ -43,7 +43,7 @@ function open_assign_dialog() {
 	}
 
 	function summarize() {
-		$box.find(".ha-summary").text(__("{0} dipilih", [selected.size]));
+		$box.find(".ha-summary").text(__("{0} selected", [selected.size]));
 	}
 
 	function set_visible(checked) {
@@ -67,8 +67,8 @@ function open_assign_dialog() {
 		if ((dialog.get_value("kind") || "Company") !== kind || dialog.get_value("holiday_list") !== holiday_list) return; // a newer choice superseded this one
 		$box.html(`
 			<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-				<button type="button" class="btn btn-xs btn-default ha-all">${__("Pilih yang tampil")}</button>
-				<button type="button" class="btn btn-xs btn-default ha-none">${__("Hapus centang yang tampil")}</button>
+				<button type="button" class="btn btn-xs btn-default ha-all">${__("Select visible")}</button>
+				<button type="button" class="btn btn-xs btn-default ha-none">${__("Uncheck visible")}</button>
 				<span class="ha-summary text-muted"></span>
 			</div>
 			<div class="ha-list" style="max-height:50vh;overflow:auto;padding:0 4px">
@@ -77,7 +77,7 @@ function open_assign_dialog() {
 						(row) => `<label class="ha-row" data-label="${esc(row.label.toLowerCase())}" style="display:flex;gap:8px;align-items:center;padding:3px 0;margin:0">
 							<input type="checkbox" data-name="${esc(row.name)}" ${row.on_list ? "checked disabled" : ""}>
 							<span>${esc(row.label)}</span>
-							<span class="text-muted" style="margin-left:auto">${row.on_list ? "" : esc(row.holiday_list || __("belum ada"))}</span>
+							<span class="text-muted" style="margin-left:auto">${row.on_list ? "" : esc(row.holiday_list || __("none"))}</span>
 						</label>`
 					)
 					.join("")}
@@ -93,7 +93,7 @@ function open_assign_dialog() {
 	}
 
 	async function save() {
-		if (!selected.size) return frappe.msgprint(__("Pilih minimal satu."));
+		if (!selected.size) return frappe.msgprint(__("Select at least one."));
 		const values = dialog.get_values();
 		const holiday_list = values.holiday_list;
 		values.kind = values.kind || "Company";
@@ -105,10 +105,10 @@ function open_assign_dialog() {
 		});
 		const failed = result.failed.map((row) => `<li>${esc(row.target)}: ${esc(row.error)}</li>`);
 		frappe.msgprint({
-			title: __("Hasil"),
+			title: __("Result"),
 			indicator: failed.length ? "orange" : "green",
 			message:
-				__("Ditetapkan: {0} · tidak berubah: {1} · gagal: {2}", [result.assigned, result.unchanged, failed.length]) +
+				__("Assigned: {0} · unchanged: {1} · failed: {2}", [result.assigned, result.unchanged, failed.length]) +
 				(failed.length ? `<ul>${failed.join("")}</ul>` : ""),
 		});
 	}
