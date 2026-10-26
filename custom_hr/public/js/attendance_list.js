@@ -1,6 +1,19 @@
 // Frappe's Export dialog pre-checks only the mandatory fields and has no setting for it.
 // Pre-check the columns HR normally exports from Attendance instead.
-const ATTENDANCE_EXPORT_DEFAULTS = ["employee", "employee_name", "attendance_date", "status", "shift"];
+const ATTENDANCE_EXPORT_DEFAULTS = [
+	"employee",
+	"employee_name",
+	"working_duration",
+	"status",
+	"leave_type",
+	"attendance_date",
+	"company",
+	"shift",
+	"in_time",
+	"out_time",
+	"late_entry_duration",
+	"early_exit_duration",
+];
 
 const original_export = frappe.ui.BulkOperations.prototype.export;
 frappe.ui.BulkOperations.prototype.export = function (doctype, docnames) {
