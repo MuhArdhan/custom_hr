@@ -48,7 +48,20 @@ class TestCheckinContext(CheckinTestCase):
 		self.has_out = self.mock(root + "_has_out", side_effect=lambda *a, **k: self.closed)
 		self.resolver = self.mock(root + "resolve_outlet_shift", side_effect=lambda *a, **k: deepcopy(self.resolution))
 		self.session = self.mock(root + "validate_new_in_session")
+		self.native_shift = self.mock(root + "get_employee_shift", return_value=None)
 		self.mock("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", new=True)
+
+	def test_native_employee_sees_the_assigned_shift_before_checking_in(self):
+		self.resolution = {"mode": "Native", "mode_applies": False, "matched": False}
+		self.native_shift.return_value = frappe._dict(shift_type=frappe._dict(name="Senin - Kamis"))
+		result = checkin.get_checkin_context()
+		self.assertEqual(result["mode"], "Native")
+		self.assertEqual(result["candidate_shift"], "Senin - Kamis")
+		self.native_shift.assert_called_once_with("EMP-TEST", NOW, True, "forward")
+
+	def test_native_employee_without_a_shift_has_no_candidate(self):
+		self.resolution = {"mode": "Native", "mode_applies": False, "matched": False}
+		self.assertIsNone(checkin.get_checkin_context()["candidate_shift"])
 
 	def test_new_session_returns_server_evaluated_candidate(self):
 		result = checkin.get_checkin_context()

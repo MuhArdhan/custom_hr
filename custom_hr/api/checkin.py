@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import cint, get_datetime, getdate, now_datetime
 
 from hrms.api import get_current_employee
+from hrms.hr.doctype.shift_assignment.shift_assignment import get_employee_shift
 
 from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
 from custom_hr.services.checkin_submission import (
@@ -161,6 +162,10 @@ def get_checkin_context():
 				use_session(latest)
 			return block("session_complete_or_expired", str(exc), "DONE")
 		if not resolution["mode_applies"]:
+			# Native employees: show the shift in force (or next up) from Shift Assignment / default shift
+			native_shift = get_employee_shift(employee, now, True, "forward")
+			if native_shift and not context["candidate_shift"]:
+				context["candidate_shift"] = native_shift.shift_type.name
 			return context
 		if not outlet_configuration.OUTLET_AUTO_SHIFT_READY:
 			return block("integration_not_ready", _("Mode shift otomatis belum dapat digunakan sampai integrasi attendance dan scheduler selesai."))
