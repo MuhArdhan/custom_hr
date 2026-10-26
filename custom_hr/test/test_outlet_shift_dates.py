@@ -1,54 +1,53 @@
-"""Outlet Shift validity dates: a dated shift takes priority over an undated one with the same start."""
+"""Outlet Shift rows: weekdays decide which shifts apply on a day; same-start shifts are allowed."""
 
 import unittest
-from datetime import date, time
+from datetime import date, time, timedelta
 from unittest.mock import patch
 
 import frappe
 
+from custom_hr.api import roster
 from custom_hr.hrm.doctype.outlet.outlet import Outlet
-from custom_hr.services.outlet_shift import active_shift_names
+from custom_hr.services.outlet_shift import active_shift_names, applies_on, row_weekdays
 
-STARTS = {"Pagi": time(7), "Pagi Khusus": time(7), "Siang": time(15)}
+STARTS = {"Pagi": time(7), "Pagi Khusus": time(7), "Siang": time(15), "Pagi Senin-Kamis": time(6), "Pagi Jumat": time(6)}
+MON_THU, FRI = {"monday": 1, "tuesday": 1, "wednesday": 1, "thursday": 1}, {"friday": 1}
+MONDAY, FRIDAY = date(2026, 11, 9), date(2026, 11, 13)
 
 
-def row(shift_type, enabled=1, valid_from=None, valid_to=None):
-	return frappe._dict(shift_type=shift_type, enabled=enabled, valid_from=valid_from, valid_to=valid_to)
+def row(shift_type, enabled=1, **days):
+	return frappe._dict(shift_type=shift_type, enabled=enabled, **days)
 
 
 class TestActiveShiftNames(unittest.TestCase):
 	day = date(2026, 11, 10)
 
 	def names(self, *rows, day=None):
-		return sorted(active_shift_names(rows, STARTS, day or self.day))
+		return sorted(active_shift_names(rows, day or self.day))
 
-	def test_rows_without_dates_are_always_active(self):
+	def test_enabled_rows_are_always_active(self):
 		self.assertEqual(self.names(row("Pagi"), row("Siang")), ["Pagi", "Siang"])
 
 	def test_disabled_rows_are_ignored(self):
 		self.assertEqual(self.names(row("Pagi", enabled=0), row("Siang")), ["Siang"])
 
-	def test_row_is_active_only_inside_its_dates_inclusive(self):
-		temp = row("Siang", valid_from="2026-11-10", valid_to="2026-11-12")
-		self.assertEqual(self.names(temp, day=date(2026, 11, 9)), [])
-		self.assertEqual(self.names(temp, day=date(2026, 11, 10)), ["Siang"])
-		self.assertEqual(self.names(temp, day=date(2026, 11, 12)), ["Siang"])
-		self.assertEqual(self.names(temp, day=date(2026, 11, 13)), [])
+	def test_same_start_shifts_are_both_active_on_the_day(self):
+		self.assertEqual(self.names(row("Pagi"), row("Pagi Khusus")), ["Pagi", "Pagi Khusus"])
 
-	def test_empty_end_date_never_expires(self):
-		self.assertEqual(self.names(row("Siang", valid_from="2026-11-01"), day=date(2030, 1, 1)), ["Siang"])
+	def test_row_without_weekdays_applies_every_day(self):
+		self.assertEqual(row_weekdays(row("Pagi")), frozenset(range(7)))
+		self.assertTrue(all(applies_on(row("Pagi"), MONDAY + timedelta(days=offset)) for offset in range(7)))
 
-	def test_dated_shift_takes_priority_over_the_undated_one_with_the_same_start(self):
-		temp = row("Pagi Khusus", valid_from="2026-11-10", valid_to="2026-11-12")
-		self.assertEqual(self.names(row("Pagi"), row("Siang"), temp), ["Pagi Khusus", "Siang"])
+	def test_weekday_row_only_applies_on_its_days(self):
+		pagi = row("Pagi", **MON_THU)
+		self.assertEqual(row_weekdays(pagi), frozenset({0, 1, 2, 3}))
+		self.assertEqual(self.names(pagi, day=MONDAY), ["Pagi"])
+		self.assertEqual(self.names(pagi, day=FRIDAY), [])
 
-	def test_undated_shift_returns_outside_the_dated_period(self):
-		temp = row("Pagi Khusus", valid_from="2026-11-01", valid_to="2026-11-05")
-		self.assertEqual(self.names(row("Pagi"), temp), ["Pagi"])
-
-	def test_open_ended_dated_shift_keeps_priority_forever(self):
-		temp = row("Pagi Khusus", valid_from="2026-11-01")
-		self.assertEqual(self.names(row("Pagi"), temp, day=date(2030, 1, 1)), ["Pagi Khusus"])
+	def test_op_pagi_table_resolves_per_weekday(self):
+		table = (row("Pagi Senin-Kamis", **MON_THU), row("Pagi Jumat", **FRI))
+		self.assertEqual(self.names(*table, day=MONDAY), ["Pagi Senin-Kamis"])
+		self.assertEqual(self.names(*table, day=FRIDAY), ["Pagi Jumat"])
 
 
 class TestOutletShiftValidation(unittest.TestCase):
@@ -68,35 +67,28 @@ class TestOutletShiftValidation(unittest.TestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.validate(*rows)
 
-	def test_dated_shift_may_share_a_start_with_an_undated_one(self):
-		self.validate(row("Pagi"), row("Pagi Khusus", valid_from="2026-11-01", valid_to="2026-11-05"))
+	def test_same_start_rows_are_accepted(self):
+		self.validate(row("Pagi"), row("Pagi Khusus"))
 
-	def test_two_undated_shifts_with_the_same_start_are_refused(self):
-		self.refused(row("Pagi"), row("Pagi Khusus"))
+	def test_same_start_shifts_on_different_weekdays_are_allowed(self):
+		self.validate(row("Pagi Senin-Kamis", **MON_THU), row("Pagi Jumat", **FRI))
 
-	def test_dated_shifts_with_the_same_start_and_overlapping_dates_are_refused(self):
-		self.refused(
-			row("Pagi", valid_from="2026-11-01", valid_to="2026-11-10"),
-			row("Pagi Khusus", valid_from="2026-11-10", valid_to="2026-11-20"),
-		)
-
-	def test_same_start_date_is_refused_even_without_end_dates(self):
-		self.refused(row("Pagi", valid_from="2026-11-01"), row("Pagi Khusus", valid_from="2026-11-01"))
-
-	def test_back_to_back_dated_shifts_with_the_same_start_are_allowed(self):
-		self.validate(
-			row("Pagi", valid_from="2026-11-01", valid_to="2026-11-09"),
-			row("Pagi Khusus", valid_from="2026-11-10", valid_to="2026-11-20"),
-		)
-
-	def test_different_starts_may_overlap_in_dates(self):
-		self.validate(row("Pagi", valid_from="2026-11-01"), row("Siang", valid_from="2026-11-01"))
-
-	def test_disabled_rows_do_not_clash(self):
+	def test_disabled_rows_are_accepted(self):
 		self.validate(row("Pagi"), row("Pagi Khusus", enabled=0))
 
-	def test_end_before_start_is_refused(self):
-		self.refused(row("Siang", valid_from="2026-11-10", valid_to="2026-11-01"))
+	def test_validate_shifts_still_rejects_duplicate_shift_type(self):
+		self.refused(row("Pagi"), row("Pagi"))
+
+	def test_shift_type_is_required(self):
+		self.refused(row(None))
+
+
+class TestRosterShiftOptions(unittest.TestCase):
+	def test_roster_options_do_not_skip_any_enabled_shift(self):
+		rows = [frappe._dict(shift_type="Pagi"), frappe._dict(shift_type="Pagi Khusus")]
+		with patch("frappe.get_all", return_value=rows), patch("frappe.db.get_value", return_value="Green"):
+			options = roster._shift_options("Outlet A")
+		self.assertEqual([option["value"] for option in options], ["Pagi", "Pagi Khusus"])
 
 
 class TestAutoShiftDefaults(unittest.TestCase):

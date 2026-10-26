@@ -22,6 +22,7 @@ MODULE = "custom_hr.services.outlet_shift"
 DAY = date(2026, 10, 15)
 FIRST = "Shift 1 05.00 - 13.00"
 LAST = "Shift 2 10.00 - 18.00"
+SHORT = "Shift Pendek 05.00 - 09.00"
 
 
 def make_shift(name=FIRST, start="05:00:00", end="13:00:00", **overrides):
@@ -132,10 +133,18 @@ class TestShiftWindows(unittest.TestCase):
 		with self.assertRaisesRegex(ShiftConfigurationError, "duplikat"):
 			build_shift_windows([self.shifts[0], self.shifts[0]], DAY, 30)
 
-	def test_duplicate_start_times_are_rejected(self):
-		self.shifts[1].start_time = "05:00:00"
-		with self.assertRaisesRegex(ShiftConfigurationError, "bertabrakan"):
-			build_shift_windows(self.shifts, DAY, 30)
+	def test_same_start_shifts_share_the_window_opening(self):
+		self.shifts.append(make_shift(SHORT, "05:00:00", "09:00:00"))
+		windows = {w.shift: w for w in build_shift_windows(self.shifts, DAY, 30)}
+		self.assertEqual(windows[FIRST].checkin_start, windows[SHORT].checkin_start)
+		self.assertEqual(windows[FIRST].checkin_start, datetime(2026, 10, 15))
+		self.assertEqual(windows[LAST].checkin_start, datetime(2026, 10, 15, 9, 30))
+
+	def test_same_start_shifts_close_at_their_own_end_or_the_next_start_transition(self):
+		self.shifts.append(make_shift(SHORT, "05:00:00", "09:00:00"))
+		windows = {w.shift: w for w in build_shift_windows(self.shifts, DAY, 30)}
+		self.assertEqual(windows[SHORT].checkin_end, datetime(2026, 10, 15, 9))
+		self.assertEqual(windows[FIRST].checkin_end, datetime(2026, 10, 15, 9, 30))
 
 	def test_same_start_and_end_is_rejected(self):
 		self.shifts[0].end_time = "05:00:00"
@@ -222,6 +231,56 @@ class TestOutletShiftResolver(unittest.TestCase):
 				self.assertTrue(result["matched"])
 				self.assertEqual(result["selection"]["shift"], expected)
 				self.assertEqual(len(result["candidates"]), 1)
+
+	def add_short_shift(self):
+		self.shifts.append(make_shift(SHORT, "05:00:00", "09:00:00"))
+		self.outlet.shifts.append(frappe._dict(shift_type=SHORT, enabled=1))
+
+	def test_same_start_shifts_require_a_choice(self):
+		self.add_short_shift()
+		result = self.resolve("2026-10-15 06:00:00")
+		self.assertFalse(result["matched"])
+		self.assertEqual(result["code"], "shift_choice_required")
+		self.assertEqual(result["choices"], sorted([FIRST, SHORT]))
+		self.assertIsNone(result["checkin_values"])
+		self.assertTrue(result["message"])
+
+	def test_chosen_same_start_shift_is_matched(self):
+		self.add_short_shift()
+		result = self.resolve("2026-10-15 06:00:00", chosen_shift=SHORT)
+		self.assertTrue(result["matched"])
+		self.assertEqual(result["selection"]["shift"], SHORT)
+		self.assertEqual(result["checkin_values"]["shift"], SHORT)
+		self.assertEqual(result["checkin_values"]["shift_policy_snapshot"]["standard_working_hours"], 4)
+
+	def test_choice_outside_the_candidates_is_refused(self):
+		self.add_short_shift()
+		result = self.resolve("2026-10-15 06:00:00", chosen_shift=LAST)
+		self.assertFalse(result["matched"])
+		self.assertEqual(result["code"], "invalid_shift_choice")
+		self.assertEqual(result["choices"], sorted([FIRST, SHORT]))
+		self.assertIsNone(result["checkin_values"])
+
+	def test_short_shift_stops_being_offered_after_its_end(self):
+		self.add_short_shift()
+		self.assertEqual(self.resolve("2026-10-15 08:00:00")["code"], "shift_choice_required")
+		result = self.resolve("2026-10-15 09:15:00")
+		self.assertTrue(result["matched"])
+		self.assertEqual(result["selection"]["shift"], FIRST)
+		self.assertEqual(result["choices"], [])
+
+	def test_choice_is_ignored_when_there_is_a_single_candidate(self):
+		self.add_short_shift()
+		result = self.resolve("2026-10-15 11:00:00", chosen_shift=SHORT)
+		self.assertTrue(result["matched"])
+		self.assertEqual(result["selection"]["shift"], LAST)
+
+	def test_day_without_applicable_shifts_has_no_candidate_instead_of_a_configuration_error(self):
+		for row in self.outlet.shifts:
+			row.monday = 1  # 2026-10-15 is a Thursday
+		result = self.resolve("2026-10-15 10:00:00")
+		self.assertFalse(result["matched"])
+		self.assertEqual(result["code"], "outside_checkin_window")
 
 	def test_after_last_shift_has_reason_not_native_fallback(self):
 		result = self.resolve("2026-10-15 18:00:01")

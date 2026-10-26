@@ -292,7 +292,9 @@ def prepare_or_protect_checkin(doc) -> bool:
 	configured = bool(employee.outlet) and bool(
 		frappe.db.get_value("Outlet", employee.outlet, "enable_outlet_auto_shift", for_update=True)
 	)
-	resolution = resolve_outlet_shift(doc.employee, doc.time, for_update=True) if configured else None
+	# The employee's dropdown choice (same-start shifts) arrives as the checkin's shift; the resolver
+	# validates it against the candidates and ignores it when there is only one.
+	resolution = resolve_outlet_shift(doc.employee, doc.time, for_update=True, chosen_shift=doc.get("shift") or None) if configured else None
 	if resolution and resolution["mode"] == "Unavailable":
 		frappe.throw(resolution["message"])
 	uses_outlet = bool(resolution and resolution["mode_applies"])

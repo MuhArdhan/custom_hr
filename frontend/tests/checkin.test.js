@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { CheckinSubmission, formatSiteDateTime, hasCoordinates, requestUUID, validContext } from "../src/utils/checkin.js"
+import { CheckinSubmission, formatSiteDateTime, hasCoordinates, requestUUID, shiftChoiceLabel, shiftChoices, validContext } from "../src/utils/checkin.js"
 
 const ID = "d288162e-b86c-443d-801d-5ccf98d92d84"
 const NEXT_ID = "3399e2eb-47b3-4de1-9557-8a56f242ee35"
@@ -35,6 +35,26 @@ test("coordinates allow a zero axis but reject missing/default/nonfinite values"
 test("only a valid context for the current employee can drive an action", () => {
 	assert.ok(validContext({ employee: "EMP", next_action: "OUT", allowed: true }, "EMP"))
 	for (const value of [null, { employee: "OTHER", next_action: "IN", allowed: true }, { employee: "EMP", next_action: "GUESS", allowed: true }, { employee: "EMP", next_action: "IN" }]) assert.equal(validContext(value, "EMP"), false)
+})
+test("shift choices are offered only for an IN with same-start candidates", () => {
+	const context = { shift_choices: [{ shift: "A", start_time: "05:00:00", end_time: "13:00:00" }] }
+	assert.deepEqual(shiftChoices(context, "IN"), context.shift_choices)
+	assert.deepEqual(shiftChoices(context, "OUT"), [])
+	assert.deepEqual(shiftChoices({}, "IN"), [])
+	assert.deepEqual(shiftChoices(null, "IN"), [])
+})
+test("a shift choice shows the shift name and its hours", () => {
+	assert.equal(shiftChoiceLabel({ shift: "Shift Penuh", start_time: "05:00:00", end_time: "13:00:00" }), "Shift Penuh (05:00 - 13:00)")
+	assert.equal(shiftChoiceLabel({ shift: "Shift Pendek", start_time: "05:00:00", end_time: "09:00:00" }), "Shift Pendek (05:00 - 09:00)")
+})
+test("the chosen shift is sent with the request but cannot replace the action or request id", async () => {
+	const f = flow()
+	f.begin("IN", "standard")
+	let sent
+	await f.submit(async (params) => { sent = params; return result() }, { shift: "A", log_type: "OUT", request_id: "other" })
+	assert.equal(sent.shift, "A")
+	assert.equal(sent.log_type, "IN")
+	assert.equal(sent.request_id, ID)
 })
 test("secure UUID fallback works without randomUUID on an insecure dev origin", () => {
 	assert.equal(requestUUID({ getRandomValues: (bytes) => bytes.fill(0) }), "00000000-0000-4000-8000-000000000000")

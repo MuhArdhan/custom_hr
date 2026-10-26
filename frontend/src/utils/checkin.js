@@ -15,6 +15,17 @@ export function validContext(context, employee) {
 	return context?.employee === employee && ["IN", "OUT", "DONE"].includes(context.next_action) && typeof context.allowed === "boolean"
 }
 
+// Same-start shifts: the server lists them and the employee must pick one before an IN.
+export function shiftChoices(context, action) {
+	return action === "IN" && Array.isArray(context?.shift_choices) ? context.shift_choices : []
+}
+
+const clock = (value) => String(value || "").slice(0, 5)
+
+export function shiftChoiceLabel(choice) {
+	return `${choice.shift} (${clock(choice.start_time)} - ${clock(choice.end_time)})`
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function requestUUID(crypto) {

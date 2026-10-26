@@ -98,11 +98,11 @@ class TestOutletConfiguration(unittest.TestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "tidak ditemukan"):
 			self.validate()
 
-	def test_same_start_on_two_active_shifts_is_rejected(self):
+	def test_same_start_on_two_active_shifts_is_accepted(self):
+		# The employee picks between them at check-in
 		self.add_shift()
 		self.add_shift("Shift B", "05:00:00", "15:00:00")
-		with self.assertRaisesRegex(frappe.ValidationError, "jam mulai yang sama"):
-			self.validate()
+		self.validate()
 
 	def test_disabled_shift_does_not_conflict_with_active_start(self):
 		self.add_shift()

@@ -7,8 +7,13 @@
  "field_order": [
   "shift_type",
   "enabled",
-  "valid_from",
-  "valid_to"
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday"
  ],
  "fields": [
   {
@@ -27,18 +32,47 @@
    "label": "Aktif"
   },
   {
-   "description": "Kosongkan untuk shift tetap. Shift bertanggal diprioritaskan atas shift tetap yang jam mulainya sama.",
-   "fieldname": "valid_from",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "Mulai Berlaku"
+   "default": "0",
+   "description": "No day checked = every day",
+   "fieldname": "monday",
+   "fieldtype": "Check",
+   "label": "Mon"
   },
   {
-   "description": "Kosong = tidak ada tanggal berakhir.",
-   "fieldname": "valid_to",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "Berakhir"
+   "default": "0",
+   "fieldname": "tuesday",
+   "fieldtype": "Check",
+   "label": "Tue"
+  },
+  {
+   "default": "0",
+   "fieldname": "wednesday",
+   "fieldtype": "Check",
+   "label": "Wed"
+  },
+  {
+   "default": "0",
+   "fieldname": "thursday",
+   "fieldtype": "Check",
+   "label": "Thu"
+  },
+  {
+   "default": "0",
+   "fieldname": "friday",
+   "fieldtype": "Check",
+   "label": "Fri"
+  },
+  {
+   "default": "0",
+   "fieldname": "saturday",
+   "fieldtype": "Check",
+   "label": "Sat"
+  },
+  {
+   "default": "0",
+   "fieldname": "sunday",
+   "fieldtype": "Check",
+   "label": "Sun"
   }
  ],
  "index_web_pages_for_search": 1,

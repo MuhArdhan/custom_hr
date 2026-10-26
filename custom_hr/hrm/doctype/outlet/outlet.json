@@ -150,7 +150,7 @@
   {
    "fieldname": "shifts_help",
    "fieldtype": "HTML",
-   "options": "<p class=\"text-muted small\">Tanggal opsional; kosong = berlaku terus. Shift bertanggal didahulukan atas shift lain yang jam mulainya sama selama rentangnya berlaku.</p>"
+   "options": "<p class=\"text-muted small\">Shift dengan jam mulai yang sama dipilih karyawan saat check-in. Hari opsional; kosong = berlaku setiap hari.</p>"
   },
   {
    "fieldname": "approval_section",

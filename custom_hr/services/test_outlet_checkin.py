@@ -62,6 +62,20 @@ class TestOutletCheckin(unittest.TestCase):
 	def tearDown(self):
 		frappe.clear_messages()
 
+	def test_chosen_shift_field_is_passed_to_the_resolver(self):
+		self.doc.shift = "Shift A"
+		prepare_or_protect_checkin(self.doc)
+		self.assertEqual(self.resolver.call_args.kwargs["chosen_shift"], "Shift A")
+
+	def test_no_chosen_shift_passes_none(self):
+		prepare_or_protect_checkin(self.doc)
+		self.assertIsNone(self.resolver.call_args.kwargs["chosen_shift"])
+
+	def test_choice_required_is_refused_with_the_resolver_message(self):
+		self.resolution.update(matched=False, code="shift_choice_required", message="Pilih shift Anda", checkin_values=None)
+		with self.assertRaisesRegex(frappe.ValidationError, "Pilih shift Anda"):
+			prepare_or_protect_checkin(self.doc)
+
 	def mock(self, name, **kwargs):
 		patcher = patch(f"{MODULE}.{name}", **kwargs)
 		self.addCleanup(patcher.stop)
@@ -101,7 +115,7 @@ class TestOutletCheckin(unittest.TestCase):
 		self.assertTrue(prepare_or_protect_checkin(self.doc))
 		self.resolver.assert_called_once()
 		self.assertEqual(self.resolver.call_args.args[0], "EMP-TEST")
-		self.assertEqual(self.resolver.call_args.kwargs, {"for_update": True})
+		self.assertEqual(self.resolver.call_args.kwargs, {"for_update": True, "chosen_shift": None})
 		self.assertEqual(self.doc.shift, "Shift 2")
 		self.assertEqual(self.doc.attendance_source, "Outlet")
 		self.assertEqual(self.doc.outlet_at_checkin, "Outlet Test")

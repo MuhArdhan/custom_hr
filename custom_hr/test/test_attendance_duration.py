@@ -50,11 +50,21 @@ class TestAttendanceDuration(unittest.TestCase):
 			svc.fill_durations(doc)
 		self.assertEqual(doc.early_exit_duration, "30 min")
 
-	def test_unflagged_or_unshifted_rows_stay_empty(self):
+	def test_unflagged_or_unshifted_rows_have_no_late_or_early_text(self):
 		doc = attendance(in_time="2026-10-26 09:05:00", out_time="2026-10-26 15:20:00")
 		with shift("08:00", "16:00"):
 			svc.fill_durations(doc)
-		self.assertEqual((doc.late_entry_duration, doc.early_exit_duration, doc.working_duration), ("", "", ""))
+		self.assertEqual((doc.late_entry_duration, doc.early_exit_duration), ("", ""))
+
+	def test_a_very_short_visit_shows_zero_minutes_instead_of_nothing(self):
+		doc = attendance(working_hours=0, in_time="2026-10-26 14:03:43", out_time="2026-10-26 14:03:48")
+		svc.fill_durations(doc)
+		self.assertEqual(doc.working_duration, "0 min")
+
+	def test_missing_out_time_leaves_the_duration_empty(self):
+		doc = attendance(working_hours=0, in_time="2026-10-26 14:03:43")
+		svc.fill_durations(doc)
+		self.assertEqual(doc.working_duration, "")
 		doc = attendance(late_entry=1, in_time="2026-10-26 09:05:00", shift=None)
 		svc.fill_durations(doc)
 		self.assertEqual(doc.late_entry_duration, "")

@@ -72,6 +72,27 @@ class TestCheckinContext(CheckinTestCase):
 		self.assertEqual(result["checkout_deadline"], "2026-10-15 23:59:59")
 		self.resolver.assert_called_once_with("EMP-TEST", NOW)
 
+	def test_context_lists_choices_when_the_shift_is_ambiguous(self):
+		self.resolution.update(
+			matched=False, code="shift_choice_required", message="Pilih shift Anda", checkin_values=None, choices=["A", "B"],
+			candidates=[
+				{"shift": "A", "shift_start": "2026-10-15 05:00:00", "shift_end": "2026-10-15 13:00:00"},
+				{"shift": "B", "shift_start": "2026-10-15 05:00:00", "shift_end": "2026-10-15 09:00:00"},
+			],
+		)
+		result = checkin.get_checkin_context()
+		self.assertTrue(result["allowed"])
+		self.assertEqual(result["next_action"], "IN")
+		self.assertIsNone(result["candidate_shift"])
+		self.assertEqual(result["shift_choices"], [
+			{"shift": "A", "start_time": "05:00:00", "end_time": "13:00:00"},
+			{"shift": "B", "start_time": "05:00:00", "end_time": "09:00:00"},
+		])
+		self.assertEqual(result["message"], "Pilih shift Anda")
+
+	def test_context_without_choices_has_an_empty_list(self):
+		self.assertEqual(checkin.get_checkin_context()["shift_choices"], [])
+
 	def test_context_reads_sessions_without_locks_or_writes(self):
 		with patch("frappe.db.sql") as sql, patch("frappe.get_doc") as writer:
 			checkin.get_checkin_context()
@@ -203,6 +224,26 @@ class TestSharedSubmission(CheckinTestCase):
 		self.assertEqual(self.events, ["lock"])
 		self.assertTrue(self.query.call_args.kwargs["for_update"])
 
+	def test_chosen_shift_is_put_on_the_new_checkin(self):
+		submission.submit_self_checkin("EMP-TEST", "IN", shift="Shift B")
+		self.assertEqual(self.writer.call_args.args[0]["shift"], "Shift B")
+
+	def test_no_choice_adds_no_shift_to_the_new_checkin(self):
+		submission.submit_self_checkin("EMP-TEST", "IN")
+		self.assertNotIn("shift", self.writer.call_args.args[0])
+
+	def test_replay_with_a_different_choice_is_not_treated_as_the_same_request(self):
+		self.stored = frappe._dict(employee="EMP-TEST", log_type="IN", shift="Shift A", name="SAVED")
+		with self.assertRaisesRegex(frappe.ValidationError, "tindakan lain"):
+			submission.submit_self_checkin("EMP-TEST", "IN", request_id=REQUEST_ID, shift="Shift B")
+		_result, replayed = submission.submit_self_checkin("EMP-TEST", "IN", request_id=REQUEST_ID, shift="Shift A")
+		self.assertTrue(replayed)
+
+	def test_normal_endpoint_passes_the_choice(self):
+		with patch.object(checkin, "get_current_employee", return_value="EMP-TEST"), patch.object(checkin, "submit_self_checkin", return_value=(frappe._dict(shift="Shift B"), False)) as writer:
+			checkin.submit_checkin("IN", shift="Shift B")
+		self.assertEqual(writer.call_args.kwargs["shift"], "Shift B")
+
 	def test_request_id_reuse_for_different_action_rejected(self):
 		self.stored = frappe._dict(employee="EMP-TEST", log_type="IN")
 		with self.assertRaisesRegex(frappe.ValidationError, "tindakan lain"):
@@ -318,6 +359,12 @@ class TestFaceProofAndLifecycle(CheckinTestCase):
 		self.assertTrue(result["replayed"])
 		photo.assert_not_called()
 		commit.assert_not_called()
+
+	def test_face_endpoint_passes_the_choice_to_the_shared_writer(self):
+		stored = frappe._dict(name="SAVED", employee="EMP-TEST", shift="Shift B", log_type="IN", face_score=0)
+		with patch.object(face, "get_current_employee", return_value="EMP-TEST"), patch.object(face, "validate_active_employee"), patch.object(face, "_validate_descriptor", return_value=[0.0]), patch("frappe.db.get_value", return_value=frappe._dict(name="PROFILE", descriptor="[0.0]")), patch("frappe.db.get_single_value", return_value=0.5), patch.object(face, "submit_self_checkin", return_value=(stored, True)) as writer, patch.object(face, "_save_photo_data_url"), patch("frappe.db.commit"):
+			face.face_checkin("IN", [0.0], photo="photo", request_id=REQUEST_ID, shift="Shift B")
+		self.assertEqual(writer.call_args.kwargs["shift"], "Shift B")
 
 	def test_context_query_helpers_can_run_without_for_update(self):
 		with patch("frappe.db.sql", return_value=[]) as sql:

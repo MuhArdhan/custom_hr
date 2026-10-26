@@ -13,6 +13,13 @@
 				<div v-if="context.outlet">{{ context.outlet }}</div>
 				<div v-if="displayShift">{{ shiftLabel(displayShift) }}</div>
 			</div>
+			<div v-if="choices.length" class="mt-3">
+				<label for="shift-choice" class="block text-xs text-gray-600 mb-1">{{ __("Choose your shift") }}</label>
+				<select id="shift-choice" v-model="chosenShift" class="w-full rounded border border-gray-300 px-2 py-2 text-sm" :disabled="submission.busy">
+					<option value="" disabled>{{ __("Select shift") }}</option>
+					<option v-for="choice in choices" :key="choice.shift" :value="choice.shift">{{ shiftChoiceLabel(choice) }}</option>
+				</select>
+			</div>
 			<div v-if="context?.incomplete_session" class="mt-3 text-sm text-orange-700" role="status">
 				{{ __("Missing Check-out") }} · {{ context.incomplete_session.shift_work_date }}
 				<div>{{ context.incomplete_session.message }}</div>
@@ -69,7 +76,7 @@ import { IonModal } from "@ionic/vue"
 import FaceCapture from "@/components/FaceCapture.vue"
 import { settings } from "@/data/settings"
 import { shiftLabel } from "@/data/shiftTimes"
-import { CheckinSubmission, formatSiteDateTime, hasCoordinates, validContext } from "@/utils/checkin"
+import { CheckinSubmission, formatSiteDateTime, hasCoordinates, shiftChoiceLabel, shiftChoices, validContext } from "@/utils/checkin"
 import { requireAndroidAttendanceDevice } from "@/utils/androidDevice"
 
 const employee = inject("$employee")
@@ -119,13 +126,17 @@ const checkins = createListResource({
 const lastLog = computed(() => checkins.data?.[0] || null)
 const displayShift = computed(() => context.value?.candidate_shift || (context.value?.next_action === "DONE" ? submission.lastResult?.shift || lastLog.value?.shift : null))
 const action = computed(() => submission.pending?.log_type || context.value?.next_action)
+const chosenShift = ref("")
+const choices = computed(() => shiftChoices(context.value, action.value))
+const choiceMade = computed(() => !choices.value.length || !!chosenShift.value)
+watch(choices, (list) => { if (!list.some((choice) => choice.shift === chosenShift.value)) chosenShift.value = "" })
 const actionLabel = computed(() => submission.pending?.uncertain && !submission.busy ? __("Retry {0}", [submission.pending.log_type]) : action.value === "OUT" ? __("Check Out") : action.value === "DONE" ? __("Attendance Completed") : __("Check In"))
 const useFace = computed(() => submission.pending?.channel === "face" || settings.data?.enable_face_checkin || settings.data?.require_face_checkin)
 const gpsAvailable = computed(() => hasCoordinates(latitude.value, longitude.value))
 const mapUrl = computed(() => `https://maps.google.com/maps?q=${latitude.value},${longitude.value}&hl=en&z=15&output=embed`)
 const sameEmployee = computed(() => employee.data?.name === employeeName)
-const canOpen = computed(() => sameEmployee.value && online.value && !syncing.value && !opening.value && !submission.busy && (submission.pending?.uncertain || (context.value?.allowed && ["IN", "OUT"].includes(context.value.next_action))))
-const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || (gpsAvailable.value && locationValid.value && !locationChecking.value)) && (!useFace.value || !!capturedDescriptor.value))
+const canOpen = computed(() => sameEmployee.value && online.value && !syncing.value && !opening.value && !submission.busy && choiceMade.value && (submission.pending?.uncertain || (context.value?.allowed && ["IN", "OUT"].includes(context.value.next_action))))
+const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && choiceMade.value && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || (gpsAvailable.value && locationValid.value && !locationChecking.value)) && (!useFace.value || !!capturedDescriptor.value))
 
 const showRetry = computed(() => !submission.busy && !!(verifyError.value || submitError.value) && canSubmit.value)
 
@@ -269,6 +280,7 @@ async function submitAttempt() {
 		// Native checks are asynchronous: the modal/account may have changed.
 		if (disposed || !sameEmployee.value || !modalOpen.value || !canSubmit.value) return
 		const payload = { latitude: latitude.value, longitude: longitude.value }
+		if (choices.value.length) payload.shift = chosenShift.value
 		if (useFace.value) {
 			payload.descriptor = JSON.stringify(capturedDescriptor.value)
 			payload.photo = capturedPhoto.value

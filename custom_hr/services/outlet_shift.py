@@ -45,6 +45,7 @@ FLAG_FIELDS = (
 	"mark_auto_attendance_on_holidays",
 	"allow_overtime",
 )
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 
 class ShiftConfigurationError(ValueError):
@@ -145,17 +146,19 @@ def _policy(shift: dict) -> dict:
 	return policy
 
 
-def active_shift_names(rows, start_times: dict, day: date) -> list[str]:
-	"""Shift Types in force on `day`. A dated row takes priority over undated rows with the same start time."""
-	in_force = []
-	for row in rows:
-		valid_from, valid_to = row.get("valid_from"), row.get("valid_to")
-		if not row.get("enabled") or (valid_from and getdate(valid_from) > day) or (valid_to and getdate(valid_to) < day):
-			continue
-		in_force.append(row)
-	dated = lambda row: bool(row.get("valid_from") or row.get("valid_to"))
-	replaced = {start_times[row.shift_type] for row in in_force if dated(row)}
-	return [row.shift_type for row in in_force if dated(row) or start_times[row.shift_type] not in replaced]
+def row_weekdays(row) -> frozenset[int]:
+	"""Weekdays (0 = Monday) a shift row applies on; no day checked means every day."""
+	checked = frozenset(index for index, field in enumerate(WEEKDAYS) if row.get(field))
+	return checked or frozenset(range(7))
+
+
+def applies_on(row, day: date) -> bool:
+	return day.weekday() in row_weekdays(row)
+
+
+def active_shift_names(rows, day: date) -> list[str]:
+	"""Shift Types in force on `day`: enabled rows whose weekdays include it."""
+	return [row.shift_type for row in rows if row.get("enabled") and applies_on(row, day)]
 
 
 def build_shift_windows(shifts: list[dict], work_date: date, transition_minutes: int) -> list[ShiftWindow]:
@@ -173,29 +176,29 @@ def build_shift_windows(shifts: list[dict], work_date: date, transition_minutes:
 	if not shifts:
 		raise ShiftConfigurationError(_("Outlet belum memiliki shift aktif."))
 	definitions = []
-	names, starts = set(), set()
+	names = set()
 	for shift in shifts:
 		name = shift.get("name")
 		if not name or name in names:
 			raise ShiftConfigurationError(_("Daftar shift aktif kosong atau memiliki Shift Type duplikat."))
 		start, end = _clock(shift.get("start_time"), name), _clock(shift.get("end_time"), name)
-		if start == end or start in starts:
+		if start == end:
 			raise ShiftConfigurationError(_("Jam mulai shift aktif bertabrakan atau sama dengan jam selesai."))
 		names.add(name)
-		starts.add(start)
 		definitions.append((start, end, name, _policy(shift)))
 	definitions.sort(key=lambda row: (row[0], row[2]))
 	midnight = datetime.combine(work_date, time.min)
 	delta = timedelta(minutes=int(transition))
 	windows = []
-	for index, (start, end, name, policy) in enumerate(definitions):
+	for start, end, name, policy in definitions:
 		shift_start = datetime.combine(work_date, start)
 		shift_end = datetime.combine(work_date, end)
 		if end < start:
 			shift_end += timedelta(days=1)
-		checkin_start = midnight if index == 0 else shift_start - delta
-		last = index == len(definitions) - 1
-		transition_at = None if last else datetime.combine(work_date, definitions[index + 1][0]) - delta
+		# Shifts sharing a start time share the same opening and the same next-start transition
+		checkin_start = midnight if start == definitions[0][0] else shift_start - delta
+		later_starts = [other[0] for other in definitions if other[0] > start]
+		transition_at = datetime.combine(work_date, min(later_starts)) - delta if later_starts else None
 		# A cutoff after shift end never reopens an already-finished shift.
 		checkin_end = min(shift_end, transition_at) if transition_at is not None else shift_end
 		inclusive = transition_at is None or shift_end < transition_at
@@ -300,8 +303,27 @@ def get_employee_attendance_mode(employee: str, timestamp=None, *, for_update: b
 	return context
 
 
-def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False, for_update: bool = False) -> dict:
+def shift_windows(rows, shifts: list[dict], local_time: datetime, transition_minutes: int) -> list[ShiftWindow]:
+	"""Windows that may accept an IN at `local_time`: today's shifts plus yesterday's overnight ones."""
+
+	def shifts_on(day):
+		names = set(active_shift_names(rows, day))
+		return [shift for shift in shifts if shift.name in names]
+
+	today = local_time.date()
+	todays = shifts_on(today)
+	windows = build_shift_windows(todays, today, transition_minutes) if todays else []
+	yesterday = shifts_on(today - timedelta(days=1))
+	previous = build_shift_windows(yesterday, today - timedelta(days=1), transition_minutes) if yesterday else []
+	return [window for window in previous if window.checkin_end >= datetime.combine(today, time.min)] + windows
+
+
+def resolve_outlet_shift(
+	employee: str, timestamp=None, *, preview: bool = False, for_update: bool = False, chosen_shift: str | None = None
+) -> dict:
 	"""Return selection + JSON-ready snapshot, or a stable code and reason.
+
+	Shifts sharing a start time are an employee choice: `choices` lists them and `chosen_shift` picks one.
 
 	No writes, activation, historical backfill, Shift Assignment fallback, user
 	permission bypass or HTTP exposure. Expected failures are returned, not thrown.
@@ -314,6 +336,7 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 		"code": context["mode_reason"],
 		"windows": [],
 		"candidates": [],
+		"choices": [],
 		"selection": None,
 		"checkin_values": None,
 	}
@@ -340,17 +363,9 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 		transition_minutes = int(_number(outlet.shift_transition_minutes, _("Jeda Peralihan IN"), integer=True))
 		rows = [row for row in (outlet.get("shifts") or []) if row.enabled]
 
-		start_times = {shift.name: _clock(shift.start_time, shift.name) for shift in shifts}
-
-		def shifts_on(day):
-			names = set(active_shift_names(rows, start_times, day))
-			return [shift for shift in shifts if shift.name in names]
-
-		today = local_time.date()
-		windows = build_shift_windows(shifts_on(today), today, transition_minutes)
-		yesterday = shifts_on(today - timedelta(days=1))
-		previous = build_shift_windows(yesterday, today - timedelta(days=1), transition_minutes) if yesterday else []
-		windows = [window for window in previous if window.checkin_end >= datetime.combine(local_time.date(), time.min)] + windows
+		for shift in shifts:
+			_clock(shift.start_time, shift.name)  # reject invalid clocks even when the shift is off today
+		windows = shift_windows(rows, shifts, local_time, transition_minutes)
 	except ShiftConfigurationError as exc:
 		result.update(code="invalid_configuration", message=str(exc))
 		return result
@@ -363,10 +378,19 @@ def resolve_outlet_shift(employee: str, timestamp=None, *, preview: bool = False
 	if not candidates:
 		result.update(code="outside_checkin_window", message=_("Tidak ada shift outlet yang menerima IN pada waktu ini. Periksa jadwal atau hubungi HR."))
 		return result
-	if len(candidates) != 1:
+	if len({window.shift_start for window in candidates}) > 1:
 		result.update(code="ambiguous_candidate", message=_("Ada lebih dari satu kandidat IN lintas tanggal. Periksa aturan shift malam dengan HR; sistem tidak memilih shift secara sembarang."))
 		return result
 	selected = candidates[0]
+	if len(candidates) > 1:
+		result["choices"] = sorted(window.shift for window in candidates)
+		if not chosen_shift:
+			result.update(code="shift_choice_required", message=_("Ada lebih dari satu shift dengan jam mulai yang sama. Pilih shift Anda sebelum check-in."))
+			return result
+		if chosen_shift not in result["choices"]:
+			result.update(code="invalid_shift_choice", message=_("Shift yang dipilih tidak tersedia untuk waktu check-in ini."))
+			return result
+		selected = next(window for window in candidates if window.shift == chosen_shift)
 	deadline = datetime.combine(selected.shift_end.date(), time(23, 59, 59))
 	snapshot = {
 		"version": SNAPSHOT_VERSION,

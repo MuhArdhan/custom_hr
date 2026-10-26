@@ -31,6 +31,7 @@ def fill_durations(doc, method=None):
 	start, end = shift_bounds(doc)
 	late = doc.late_entry and start and doc.in_time and _minutes(get_datetime(doc.in_time), start)
 	early = doc.early_exit and end and doc.out_time and _minutes(end, get_datetime(doc.out_time))
-	doc.working_duration = format_duration(round(flt(doc.working_hours) * 60)) if doc.working_hours else ""
+	# Working Hours is rounded to 2 decimals, so a very short visit is 0 even though both punches exist
+	doc.working_duration = format_duration(round(flt(doc.working_hours) * 60)) if doc.working_hours else ("0 min" if doc.in_time and doc.out_time else "")
 	doc.late_entry_duration = format_duration(late) if late and late > 0 else ""
 	doc.early_exit_duration = format_duration(early) if early and early > 0 else ""

@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, get_time, getdate, now_datetime
+from frappe.utils import cint, get_time, now_datetime
 
 # Local testing opened explicitly by the user after T11. Each outlet still
 # requires its own valid schedule, holiday list and activation timestamp.
@@ -56,7 +56,6 @@ class Outlet(Document):
 				fields=["name", "start_time", "end_time", *SHIFT_NUMERIC_FIELDS],
 			)
 		}
-		active_starts = []
 		for row in rows:
 			shift = shifts.get(row.shift_type)
 			if not shift:
@@ -68,18 +67,6 @@ class Outlet(Document):
 			start, end = get_time(shift.start_time), get_time(shift.end_time)
 			if start == end:
 				frappe.throw(_("Jam mulai dan selesai Shift Type {0} tidak boleh sama.").format(shift.name))
-			if row.get("valid_from") and row.get("valid_to") and getdate(row.valid_to) < getdate(row.valid_from):
-				frappe.throw(_("Baris {0}: tanggal berakhir tidak boleh sebelum tanggal mulai berlaku.").format(row.idx))
-			if not cint(row.enabled):
-				continue
-			for other_start, other_name, other in active_starts:
-				if start == other_start and shifts_overlap(row, other):
-					frappe.throw(
-						_("Shift aktif {0} dan {1} memiliki jam mulai yang sama. Beri tanggal berlaku pada salah satunya (shift bertanggal diprioritaskan), ubah jam mulai, atau nonaktifkan salah satunya.").format(
-							other_name, shift.name
-						)
-					)
-			active_starts.append((start, shift.name, row))
 
 	def validate_auto_shift_activation(self):
 		if not cint(self.get("enable_outlet_auto_shift")):
@@ -93,19 +80,6 @@ class Outlet(Document):
 				_("Mode shift otomatis belum dapat diaktifkan. Integrasi resolver, pairing, dan attendance belum selesai; pengaturan ini masih tahap persiapan."),
 				title=_("Aktivasi Belum Tersedia"),
 			)
-
-
-def shifts_overlap(a, b) -> bool:
-	"""Same-start shifts clash unless exactly one is dated: the dated one then takes priority."""
-	dated = lambda row: bool(row.get("valid_from") or row.get("valid_to"))
-	if dated(a) != dated(b):
-		return False
-	if not dated(a):
-		return True
-	low, high = getdate("1900-01-01"), getdate("2999-12-31")
-	return max(getdate(a.get("valid_from") or low), getdate(b.get("valid_from") or low)) <= min(
-		getdate(a.get("valid_to") or high), getdate(b.get("valid_to") or high)
-	)
 
 
 def validate_non_negative_number(value, label: str, *, integer: bool = False) -> Decimal:

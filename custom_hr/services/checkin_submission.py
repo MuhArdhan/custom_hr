@@ -52,7 +52,7 @@ def checkin_response(doc, *, replayed=False):
 	return {**{field: doc.get(field) for field in RESPONSE_FIELDS}, "replayed": replayed}
 
 
-def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, request_id=None, expected_checkin=None):
+def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, request_id=None, expected_checkin=None, shift=None):
 	log_type = (log_type or "").upper()
 	if log_type not in ("IN", "OUT"):
 		frappe.throw(_("Log Type must be either IN or OUT."))
@@ -66,7 +66,7 @@ def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, re
 			"Employee Checkin", name, list(RESPONSE_FIELDS), as_dict=True, for_update=True,
 		)
 		if stored:
-			if stored.employee != employee or stored.log_type != log_type:
+			if stored.employee != employee or stored.log_type != log_type or (shift and stored.get("shift") and stored.shift != shift):
 				frappe.throw(_("request_id sudah digunakan untuk tindakan lain. Gunakan identitas permintaan baru."))
 			return stored, True
 	if expected_checkin is not None:
@@ -78,6 +78,7 @@ def submit_self_checkin(employee, log_type, *, latitude=None, longitude=None, re
 	doc = frappe.get_doc({
 		"doctype": "Employee Checkin", "employee": employee, "log_type": log_type,
 		"time": now_datetime(), "latitude": latitude, "longitude": longitude,
+		**({"shift": shift} if shift else {}),  # the employee's choice among same-start shifts
 	})
 	apply_verified_face(doc)
 	doc.validate_face_verification()
