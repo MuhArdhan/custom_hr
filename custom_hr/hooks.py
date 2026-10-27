@@ -148,6 +148,7 @@ fixtures = [
 				"in",
 				[
 					"Employee-outlet",
+					"Employee-user_username",
 					"Employee Checkin-face_verification_section",
 					"Employee Checkin-face_verified",
 					"Employee Checkin-face_score",

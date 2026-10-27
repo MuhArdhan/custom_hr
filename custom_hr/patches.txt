@@ -17,3 +17,4 @@ custom_hr.patches.allow_hr_self_created_leave_approval
 custom_hr.patches.add_hrm_sidebar_links
 custom_hr.patches.add_grooming_sidebar_link
 # Patches added in this section will be executed after doctypes are migrated
+custom_hr.patches.fill_employee_user_username
