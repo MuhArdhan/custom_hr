@@ -35,6 +35,9 @@ class TestCheckImage(unittest.TestCase):
 class TestGroomingApi(unittest.TestCase):
 	def setUp(self):
 		self.record = None
+		self.checkin = frappe._dict(name="IN-1", shift="Shift Pagi")
+		self.history = []
+		self.photos = []
 		self.doc = MagicMock()
 		self.doc.name = "GRM-EMP-1-2026-10-26"
 		self.doc.photos = [MagicMock(name=f"row-{key}", step=key) for key in KEYS]
@@ -47,7 +50,8 @@ class TestGroomingApi(unittest.TestCase):
 		self.save = self.patch("_save_photo_data_url", side_effect=lambda data, doctype, name, filename: f"/private/files/{filename}.jpg")
 		self.exists = self.patch("frappe.db.exists", return_value=None)
 		self.set_value = self.patch("frappe.db.set_value")
-		self.patch("frappe.db.get_value", side_effect=lambda *a, **k: self.record)
+		self.get_value = self.patch("frappe.db.get_value", side_effect=lambda doctype, *a, **k: self.checkin if doctype == "Employee Checkin" else self.record)
+		self.patch("frappe.get_all", side_effect=lambda doctype, *a, **k: self.photos if doctype == "Grooming Photo" else self.history)
 
 	def patch(self, name, **kwargs):
 		target = name if name.startswith("frappe.") else f"custom_hr.api.grooming.{name}"
@@ -59,6 +63,59 @@ class TestGroomingApi(unittest.TestCase):
 		status = grooming.get_grooming_status()
 		self.assertEqual([step["key"] for step in status["steps"]], KEYS)
 		self.assertEqual((status["date"], status["submitted"], status["review_status"]), ("2026-10-26", False, None))
+
+	def test_status_reports_whether_the_employee_checked_in_and_the_shift(self):
+		status = grooming.get_grooming_status()
+		self.assertEqual((status["checked_in"], status["shift"]), (True, "Shift Pagi"))
+		self.checkin = None
+		status = grooming.get_grooming_status()
+		self.assertEqual((status["checked_in"], status["shift"]), (False, None))
+
+	def test_the_checkin_lookup_uses_the_server_date_and_the_latest_in(self):
+		grooming.get_grooming_status()
+		call = next(c for c in self.get_value.call_args_list if c.args[0] == "Employee Checkin")
+		filters = call.args[1]
+		self.assertEqual((filters["employee"], filters["log_type"], filters["time"]), ("EMP-1", "IN", ["between", ["2026-10-26 00:00:00", "2026-10-26 23:59:59"]]))
+		self.assertEqual(call.kwargs["order_by"], "time desc")
+
+	def test_status_includes_the_history_newest_first(self):
+		self.history = [frappe._dict(name="G2", grooming_date="2026-10-26", shift="Shift Pagi", review_status="Sesuai", review_note=None)]
+		history = grooming.get_grooming_status()["history"]
+		self.assertEqual([(h["name"], h["date"], h["shift"], h["review_status"]) for h in history], [("G2", "2026-10-26", "Shift Pagi", "Sesuai")])
+
+	def test_detail_returns_my_record_with_its_photos_in_step_order_and_titles(self):
+		self.record = frappe._dict(name="G1", employee="EMP-1", grooming_date="2026-10-26", shift="Shift Pagi", submitted_at="2026-10-26 08:00:00", review_status="Tidak Sesuai", review_note="kuku panjang", reviewed_on="2026-10-26 09:00:00")
+		self.photos = [frappe._dict(step=key, photo=f"/private/files/{key}.jpg") for key in KEYS]
+		detail = grooming.get_grooming_detail("G1")
+		self.assertEqual((detail["name"], detail["shift"], detail["review_status"], detail["review_note"]), ("G1", "Shift Pagi", "Tidak Sesuai", "kuku panjang"))
+		self.assertEqual([(p["step"], p["title"]) for p in detail["photos"]][:2], [("right_hand", "Tangan kanan"), ("left_hand", "Tangan kiri")])
+		self.assertEqual(len(detail["photos"]), 5)
+
+	def test_detail_refuses_another_employees_or_a_missing_record_with_the_same_message(self):
+		self.record = frappe._dict(name="G1", employee="EMP-2", grooming_date="2026-10-26")
+		with self.assertRaises(frappe.PermissionError) as other:
+			grooming.get_grooming_detail("G1")
+		self.record = None
+		with self.assertRaises(frappe.PermissionError) as missing:
+			grooming.get_grooming_detail("NOPE")
+		self.assertEqual(str(other.exception), str(missing.exception))
+
+	def test_submit_requires_a_checkin_today_and_writes_nothing_without_one(self):
+		self.checkin = None
+		with self.assertRaisesRegex(frappe.ValidationError, "check in"):
+			grooming.submit_grooming([JPEG] * 5)
+		self.writer.assert_not_called()
+		self.save.assert_not_called()
+
+	def test_submit_stores_the_shift_and_checkin_of_the_day(self):
+		grooming.submit_grooming([JPEG] * 5)
+		values = self.writer.call_args.args[0]
+		self.assertEqual((values["shift"], values["checkin"]), ("Shift Pagi", "IN-1"))
+
+	def test_an_off_shift_checkin_still_allows_grooming_without_a_shift(self):
+		self.checkin = frappe._dict(name="IN-2", shift=None)
+		grooming.submit_grooming([JPEG] * 5)
+		self.assertIsNone(self.writer.call_args.args[0]["shift"])
 
 	def test_status_shows_todays_review_result(self):
 		self.record = frappe._dict(name="GRM-1", review_status="Tidak Sesuai", review_note="kuku panjang")

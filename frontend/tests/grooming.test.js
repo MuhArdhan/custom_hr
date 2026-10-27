@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { canSubmit, fitWithin, nextStep, toPayload } from "../src/utils/grooming.js"
+import { canSubmit, fitWithin, groupByMonth, historySummary, nextStep, toPayload, viewState } from "../src/utils/grooming.js"
 
 const STEPS = ["right_hand", "left_hand", "cap", "trousers", "footwear"].map((key) => ({ key }))
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
@@ -42,4 +42,32 @@ test("hiding the advance shortcut leaves its routes registered and adds the groo
 	assert.doesNotMatch(home, /EmployeeAdvanceFormView/)
 	assert.match(home, /GroomingView/)
 	assert.match(read("../src/router/grooming.js"), /name: "GroomingView"/)
+	assert.match(read("../src/router/grooming.js"), /name: "GroomingDetailView"/)
+})
+
+test("the screen is history once sent, a check-in prompt before check-in, and the camera flow otherwise", () => {
+	assert.equal(viewState(null), "loading")
+	assert.equal(viewState({ submitted: true, checked_in: true }), "history")
+	assert.equal(viewState({ submitted: true, checked_in: false }), "history")
+	assert.equal(viewState({ submitted: false, checked_in: false }), "needs_checkin")
+	assert.equal(viewState({ submitted: false, checked_in: true }), "capture")
+})
+
+const HISTORY = [
+	{ date: "2026-10-27", review_status: "Menunggu" },
+	{ date: "2026-10-26", review_status: "Sesuai" },
+	{ date: "2026-09-30", review_status: "Tidak Sesuai" },
+	{ date: "2026-09-29", review_status: "Sesuai" },
+]
+
+test("history is grouped by month in the order it arrives", () => {
+	const groups = groupByMonth(HISTORY)
+	assert.deepEqual(groups.map((group) => [group.month, group.items.length]), [["2026-10", 2], ["2026-09", 2]])
+	assert.deepEqual(groupByMonth([]), [])
+})
+
+test("the summary counts each review result", () => {
+	assert.deepEqual(historySummary(HISTORY), { Sesuai: 2, "Tidak Sesuai": 1, Menunggu: 1 })
+	assert.deepEqual(historySummary([]), { Sesuai: 0, "Tidak Sesuai": 0, Menunggu: 0 })
+	assert.deepEqual(historySummary([{ review_status: null }]), { Sesuai: 0, "Tidak Sesuai": 0, Menunggu: 1 })
 })

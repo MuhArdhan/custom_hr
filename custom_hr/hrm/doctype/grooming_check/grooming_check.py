@@ -32,6 +32,8 @@ class GroomingCheck(Document):
 			self.employee == before.employee
 			and getdate(self.grooming_date) == getdate(before.grooming_date)
 			and get_datetime(self.submitted_at) == get_datetime(before.submitted_at)
+			and (self.shift or None) == (before.shift or None)
+			and (self.checkin or None) == (before.checkin or None)
 			and [(row.step, row.photo) for row in self.photos] == [(row.step, row.photo) for row in before.photos]
 		)
 		if not same:

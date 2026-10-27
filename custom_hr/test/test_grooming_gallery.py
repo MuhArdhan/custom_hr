@@ -51,6 +51,9 @@ class TestGroomingGallery(unittest.TestCase):
 		self.assertEqual([(p["step"], p["title"]) for p in rows[0]["photos"]], [("right_hand", "Tangan kanan"), ("left_hand", "Tangan kiri")])
 		self.assertEqual(rows[1]["photos"][0]["photo"], "/private/files/G2-right_hand.jpg")
 
+	def test_cards_ask_for_the_shift(self):
+		self.assertIn("shift", grooming.CARD_FIELDS)
+
 	def test_the_period_defaults_to_today_and_filters_are_passed_on(self):
 		grooming.get_grooming_gallery(company="Co", outlet="Out", employee="EMP-1", review_status="Sesuai", search="bud")
 		filters = self.calls[0][1]

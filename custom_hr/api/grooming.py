@@ -13,23 +13,64 @@ from custom_hr.services.grooming import GROOMING_STEPS, check_image
 
 GALLERY_ROLES = ("HR Manager", "HR User", "System Manager")
 REVIEW_STATUSES = ("Menunggu", "Sesuai", "Tidak Sesuai")
-CARD_FIELDS = ["name", "employee", "employee_name", "company", "outlet", "grooming_date", "submitted_at", "review_status", "review_note", "reviewed_by", "reviewed_on"]
+HISTORY_LIMIT = 30
+CARD_FIELDS = ["name", "employee", "employee_name", "company", "outlet", "shift", "grooming_date", "submitted_at", "review_status", "review_note", "reviewed_by", "reviewed_on"]
+
+
+def _checkin_today(employee, today):
+	"""The employee's latest IN today: grooming is only open after checking in, and takes that shift."""
+	return frappe.db.get_value(
+		"Employee Checkin",
+		{"employee": employee, "log_type": "IN", "time": ["between", [f"{today} 00:00:00", f"{today} 23:59:59"]]},
+		["name", "shift"], order_by="time desc", as_dict=True,
+	)
 
 
 @frappe.whitelist(methods=["GET"])
 def get_grooming_status() -> dict:
-	"""Today's grooming for the logged-in employee, with the steps the app walks through."""
+	"""Today's grooming for the logged-in employee: the steps, check-in state, and the recent history."""
 	employee = get_current_employee()
 	today = nowdate()
+	checkin = _checkin_today(employee, today)
+	history = frappe.get_all(
+		"Grooming Check", filters={"employee": employee}, fields=["name", "grooming_date", "shift", "review_status", "review_note"],
+		order_by="grooming_date desc", page_length=HISTORY_LIMIT,
+	)
 	record = frappe.db.get_value(
 		"Grooming Check", {"employee": employee, "grooming_date": today}, ["name", "review_status", "review_note"], as_dict=True,
 	)
 	return {
 		"date": today,
 		"steps": [dict(step) for step in GROOMING_STEPS],
+		"checked_in": bool(checkin),
+		"shift": checkin.shift if checkin else None,
+		"history": [
+			{"name": row.name, "date": str(row.grooming_date), "shift": row.shift, "review_status": row.review_status, "review_note": row.review_note}
+			for row in history
+		],
 		"submitted": bool(record),
 		"review_status": record.review_status if record else None,
 		"review_note": record.review_note if record else None,
+	}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_grooming_detail(name) -> dict:
+	"""One of the logged-in employee's own groomings, with its five photos."""
+	employee = get_current_employee()
+	record = frappe.db.get_value(
+		"Grooming Check", name,
+		["name", "employee", "grooming_date", "shift", "submitted_at", "review_status", "review_note", "reviewed_on"], as_dict=True,
+	)
+	if not record or record.employee != employee:  # a missing and a foreign record look the same
+		frappe.throw(_("Grooming tidak ditemukan."), frappe.PermissionError)
+	titles = {step["key"]: step["title"] for step in GROOMING_STEPS}
+	photos = frappe.get_all("Grooming Photo", filters={"parent": name, "parenttype": "Grooming Check"}, fields=["step", "photo"], order_by="idx asc")
+	return {
+		"name": record.name, "date": str(record.grooming_date), "shift": record.shift, "submitted_at": str(record.submitted_at or ""),
+		"review_status": record.review_status, "review_note": record.review_note,
+		"reviewed_on": str(record.reviewed_on) if record.reviewed_on else None,
+		"photos": [{"step": item.step, "title": titles.get(item.step, item.step), "photo": item.photo} for item in photos],
 	}
 
 
@@ -44,11 +85,15 @@ def submit_grooming(photos) -> dict:
 	for data_url in photos:
 		check_image(data_url)  # every photo is validated before the first write
 	today = nowdate()
+	checkin = _checkin_today(employee, today)
+	if not checkin:
+		frappe.throw(_("Lakukan check in terlebih dahulu sebelum grooming."))
 	if frappe.db.exists("Grooming Check", {"employee": employee, "grooming_date": today}):
 		frappe.throw(_("Grooming hari ini sudah dikirim."))
 	now = now_datetime()
 	doc = frappe.get_doc({
 		"doctype": "Grooming Check", "employee": employee, "grooming_date": today, "submitted_at": now,
+		"shift": checkin.shift, "checkin": checkin.name,
 		# the real file URLs need the record's name, so the rows start with a placeholder
 		"photos": [{"step": step["key"], "photo": "pending", "taken_at": now} for step in GROOMING_STEPS],
 	})

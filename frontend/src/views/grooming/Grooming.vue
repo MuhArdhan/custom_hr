@@ -13,18 +13,18 @@
 					<p v-if="loading" class="text-sm text-gray-500 text-center py-10">{{ __("Loading...") }}</p>
 					<p v-else-if="loadError" class="text-sm text-red-600" role="alert">{{ loadError }}</p>
 
-					<!-- Already sent today -->
-					<div v-else-if="status?.submitted" class="bg-white rounded-lg p-6 shadow-sm flex flex-col items-center text-center gap-3">
-						<div class="h-14 w-14 rounded-full bg-green-50 flex items-center justify-center">
-							<FeatherIcon name="check" class="h-7 w-7 text-green-600" />
+					<!-- Before checking in -->
+					<div v-else-if="view === 'needs_checkin'" class="bg-white rounded-lg p-6 shadow-sm flex flex-col items-center text-center gap-3">
+						<div class="h-14 w-14 rounded-full bg-orange-50 flex items-center justify-center">
+							<FeatherIcon name="clock" class="h-7 w-7 text-orange-600" />
 						</div>
-						<h3 class="text-lg font-semibold text-gray-900">{{ __("Today's grooming has been sent") }}</h3>
-						<span class="px-3 py-1 rounded-full text-sm font-medium" :class="review.pill">{{ review.label }}</span>
-						<p v-if="status.review_note" class="w-full text-left text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{{ status.review_note }}</p>
+						<h3 class="text-lg font-semibold text-gray-900">{{ __("Check in first") }}</h3>
+						<p class="text-sm text-gray-600">{{ __("Grooming opens after you check in today.") }}</p>
+						<Button variant="solid" class="w-full py-5" @click="goBack">{{ __("Go to Home") }}</Button>
 					</div>
 
 					<!-- Review all five photos, then send -->
-					<div v-else-if="reviewing" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
+					<div v-else-if="view === 'capture' && reviewing" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
 						<div>
 							<h3 class="text-lg font-semibold text-gray-900">{{ __("Check your photos") }}</h3>
 							<p class="text-sm text-gray-500 mt-1">{{ __("Tap a photo to retake it.") }}</p>
@@ -41,10 +41,11 @@
 					</div>
 
 					<!-- One step at a time -->
-					<div v-else-if="step" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
+					<div v-else-if="view === 'capture' && step" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
 						<div class="flex flex-row gap-1" role="progressbar" :aria-valuenow="index + 1" :aria-valuemax="steps.length">
 							<div v-for="(item, position) in steps" :key="item.key" class="h-1.5 flex-1 rounded-full" :class="position === index ? 'bg-gray-800' : photos[item.key] ? 'bg-green-500' : 'bg-gray-200'" />
 						</div>
+						<p v-if="status.shift" class="text-xs text-gray-500">{{ __("Shift") }}: {{ shiftLabel(status.shift) }}</p>
 						<div>
 							<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ __("Step {0} of {1}", [index + 1, steps.length]) }}</p>
 							<h3 class="text-xl font-semibold text-gray-900 mt-1">{{ step.title }}</h3>
@@ -63,6 +64,30 @@
 						</template>
 						<Button v-if="index > 0" variant="ghost" class="w-full" @click="index--">{{ __("Back") }}</Button>
 					</div>
+
+					<!-- History, laid out like the attendance (Employee Checkin) history -->
+					<div v-if="view === 'history' || (view === 'needs_checkin' && history.length)" class="flex flex-col w-full">
+						<p v-if="view === 'history'" class="text-sm text-gray-600 text-center">{{ __("Today's grooming has been sent") }}</p>
+						<div class="flex flex-col bg-white rounded mt-5">
+							<router-link
+								v-for="item in history"
+								:key="item.name"
+								:to="{ name: 'GroomingDetailView', params: { id: item.name } }"
+								class="flex flex-row p-3.5 items-center justify-between border-b cursor-pointer"
+							>
+								<div class="flex flex-row items-center gap-3 grow min-w-0">
+									<FeatherIcon :name="reviewStyle(item.review_status).icon" class="h-5 w-5 shrink-0" :class="reviewStyle(item.review_status).tone" />
+									<div class="flex flex-col gap-1 min-w-0">
+										<div class="text-base font-normal text-gray-800">{{ __(reviewStyle(item.review_status).label) }}</div>
+										<div class="text-xs font-normal text-gray-500">{{ dayjs(item.date).format("ddd, D MMM YYYY") }}</div>
+										<div v-if="item.shift" class="text-xs font-normal text-gray-700">{{ __("Shift") }}: {{ shiftLabel(item.shift) }}</div>
+										<div v-if="item.review_note" class="text-xs font-normal text-gray-700 line-clamp-2">{{ item.review_note }}</div>
+									</div>
+								</div>
+								<FeatherIcon name="chevron-right" class="h-5 w-5 text-gray-500 shrink-0" />
+							</router-link>
+						</div>
+					</div>
 				</div>
 			</div>
 		</ion-content>
@@ -76,9 +101,11 @@ import { IonContent, IonPage } from "@ionic/vue"
 import { Button, FeatherIcon, createResource, toast } from "frappe-ui"
 
 import GroomingCapture from "@/components/GroomingCapture.vue"
-import { canSubmit, toPayload } from "@/utils/grooming"
+import { shiftLabel } from "@/data/shiftTimes"
+import { canSubmit, reviewStyle, toPayload, viewState } from "@/utils/grooming"
 
 const __ = inject("$translate")
+const dayjs = inject("$dayjs")
 const router = useRouter()
 
 const status = ref(null)
@@ -93,15 +120,11 @@ const photos = reactive({})
 const statusResource = createResource({ url: "custom_hr.api.grooming.get_grooming_status", method: "GET", onError() {} })
 const submitResource = createResource({ url: "custom_hr.api.grooming.submit_grooming", method: "POST", onError() {} })
 
+const view = computed(() => viewState(status.value))
+const history = computed(() => status.value?.history || [])
 const steps = computed(() => status.value?.steps || [])
 const step = computed(() => steps.value[index.value])
 const ready = computed(() => canSubmit(photos, steps.value))
-const review = computed(() => {
-	const result = status.value?.review_status
-	if (result === "Sesuai") return { label: __("Compliant"), pill: "bg-green-50 text-green-700" }
-	if (result === "Tidak Sesuai") return { label: __("Not compliant"), pill: "bg-red-50 text-red-700" }
-	return { label: __("Pending review"), pill: "bg-orange-50 text-orange-700" }
-})
 
 function message(err) {
 	return err?.messages?.filter(Boolean).join("\n") || err?.message || __("Unable to send grooming. Try again.")

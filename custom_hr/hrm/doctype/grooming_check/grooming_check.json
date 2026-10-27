@@ -13,6 +13,8 @@
   "column_break_main",
   "grooming_date",
   "submitted_at",
+  "shift",
+  "checkin",
   "photos_section",
   "photos_html",
   "photos",
@@ -78,6 +80,22 @@
    "fieldname": "submitted_at",
    "fieldtype": "Datetime",
    "label": "Submitted At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "shift",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Shift",
+   "options": "Shift Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "checkin",
+   "fieldtype": "Link",
+   "label": "Check-in",
+   "options": "Employee Checkin",
    "read_only": 1
   },
   {

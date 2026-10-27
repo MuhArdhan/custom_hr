@@ -32,7 +32,7 @@ class GroomingGallery {
 		// a doc keeps set_value from firing onchange for unchanged values (preset <-> dates would ping-pong)
 		const doc = {};
 		const add = (fieldname, df) => {
-			const $wrapper = $(`<div class="gg-filter"></div>`).appendTo(this.$filters);
+			const $wrapper = $(`<div class="gg-filter gg-f-${fieldname}"></div>`).appendTo(this.$filters);
 			const control = frappe.ui.form.make_control({ df: { fieldname, ...df }, parent: $wrapper, doc, render_input: true });
 			control.refresh();
 			this.controls[fieldname] = control;
@@ -116,15 +116,16 @@ class GroomingGallery {
 		}
 		this.$grid.html(this.rows.map((row) => `
 			<div class="gg-card" data-name="${esc(row.name)}">
-				<div class="gg-card-head">
-					<div>
-						<div class="gg-name">${esc(row.employee_name || row.employee)}</div>
-						<div class="gg-sub">${esc([row.company, row.outlet].filter(Boolean).join(" · "))}</div>
-					</div>
+				<div class="gg-cover-wrap">
+					${row.photos.length ? `<img class="gg-cover" loading="lazy" src="${esc(row.photos[0].photo)}" alt="${esc(row.photos[0].title)}">` : ""}
 					<span class="gg-pill gg-pill-${GROOMING_PILLS[row.review_status] || "orange"}">${esc(__(row.review_status))}</span>
 				</div>
-				${row.photos.length ? `<img class="gg-cover" loading="lazy" src="${esc(row.photos[0].photo)}" alt="${esc(row.photos[0].title)}">` : ""}
-				<div class="gg-sub">${esc(frappe.datetime.str_to_user(row.submitted_at))}</div>
+				<div class="gg-card-body">
+					<div class="gg-name">${esc(row.employee_name || row.employee)}</div>
+					<div class="gg-line gg-muted">${esc([row.company, row.outlet].filter(Boolean).join(" · "))}</div>
+					${row.shift ? `<div class="gg-line">${esc(row.shift)}</div>` : ""}
+					<div class="gg-line gg-muted">${esc(frappe.datetime.str_to_user(row.submitted_at))}</div>
+				</div>
 			</div>`).join(""));
 		this.$more.html(this.has_more ? `<button class="btn btn-default btn-sm">${__("Load More")}</button>` : "");
 		this.$more.find("button").on("click", () => { this.start = this.rows.length; this.load(true); });
@@ -134,7 +135,7 @@ class GroomingGallery {
 		if (!row) return;
 		const esc = frappe.utils.escape_html;
 		const dialog = new frappe.ui.Dialog({
-			title: `${row.employee_name || row.employee} · ${frappe.datetime.str_to_user(row.grooming_date)}`,
+			title: `${row.employee_name || row.employee} · ${frappe.datetime.str_to_user(row.grooming_date)}${row.shift ? " · " + row.shift : ""}`,
 			size: "extra-large",
 			fields: [
 				{ fieldname: "photos", fieldtype: "HTML" },

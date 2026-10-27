@@ -30,6 +30,12 @@ class TestGroomingCheck(unittest.TestCase):
 		self.assertEqual(field.options.split("\n"), ["Menunggu", "Sesuai", "Tidak Sesuai"])
 		self.assertEqual(field.default, "Menunggu")
 
+	def test_the_shift_is_shown_in_the_list_and_can_be_filtered(self):
+		field = frappe.get_meta("Grooming Check").get_field("shift")
+		self.assertEqual((field.fieldtype, field.options, field.read_only), ("Link", "Shift Type", 1))
+		self.assertTrue(field.in_list_view and field.in_standard_filter)
+		self.assertEqual(frappe.get_meta("Grooming Check").get_field("checkin").options, "Employee Checkin")
+
 	def test_a_new_record_passes_the_native_field_checks(self):
 		doc = check()
 		doc.review_status = "Menunggu"
@@ -70,6 +76,9 @@ class TestGroomingCheck(unittest.TestCase):
 		for change in (dict(employee="EMP-2"), dict(grooming_date="2026-10-27"), dict(submitted_at="2026-10-26 09:00:00")):
 			with self.subTest(change=change), self.assertRaises(frappe.ValidationError):
 				check(**change).validate_unchanged(before)
+		for change in (dict(shift="Shift Malam"), dict(checkin="IN-9")):
+			with self.subTest(change=change), self.assertRaises(frappe.ValidationError):
+				check(**change).validate_unchanged(check(shift="Shift Pagi", checkin="IN-1"))
 		swapped = check()
 		swapped.photos[0].photo = "/private/files/other.jpg"
 		with self.assertRaises(frappe.ValidationError):
