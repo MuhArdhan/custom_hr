@@ -21,10 +21,10 @@ class TestHrmSidebar(unittest.TestCase):
 		doc = self.doc()
 		self.assertTrue(add_links(doc))
 		self.assertEqual([r.label for r in doc.items], [
-			"Home", "Employee Attendance Gallery", "Attendance", "Roster Outlet", "Outlet",
+			"Home", "Employee Attendance Gallery", "Grooming Gallery", "Attendance", "Grooming", "Roster Outlet", "Outlet",
 			"Pengajuan Lembur", "Contract Notification Settings", "Contract Notification Log", "HRM Payroll Settings",
 		])
-		self.assertEqual([r.idx for r in doc.items], list(range(1, 10)))
+		self.assertEqual([r.idx for r in doc.items], list(range(1, 12)))
 
 	def test_existing_rows_are_preserved_and_new_ones_are_plain_links(self):
 		doc = self.doc()
@@ -37,7 +37,7 @@ class TestHrmSidebar(unittest.TestCase):
 		doc = self.doc()
 		add_links(doc)
 		self.assertFalse(add_links(doc))
-		self.assertEqual(len(doc.items), 9)
+		self.assertEqual(len(doc.items), 11)
 
 	def test_a_link_the_admin_already_added_is_not_duplicated(self):
 		doc = self.doc(HRM_ROWS + [{"type": "Link", "label": "Daftar Outlet", "link_type": "DocType", "link_to": "Outlet"}])
@@ -47,4 +47,4 @@ class TestHrmSidebar(unittest.TestCase):
 	def test_falls_back_to_the_end_when_the_anchor_page_is_missing(self):
 		doc = self.doc([HRM_ROWS[0]])
 		add_links(doc)
-		self.assertEqual([r.label for r in doc.items][:3], ["Home", "Attendance", "Outlet"])
+		self.assertEqual([r.label for r in doc.items][:5], ["Home", "Attendance", "Grooming", "Grooming Gallery", "Outlet"])

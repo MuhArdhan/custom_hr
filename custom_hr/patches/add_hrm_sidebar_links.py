@@ -8,6 +8,8 @@ import frappe
 # (label, link_type, link_to, icon, place after the row linking to ...; None = end)
 LINKS = [
 	("Attendance", "DocType", "Attendance", "clipboard-check", "employee-attendance-gallery"),
+	("Grooming Gallery", "Page", "grooming-gallery", "image", "employee-attendance-gallery"),
+	("Grooming", "DocType", "Grooming Check", "camera", "Attendance"),
 	("Outlet", "DocType", "Outlet", "store", "outlet-roster"),
 	("Contract Notification Settings", "DocType", "Contract Notification Settings", "bell", None),
 	("Contract Notification Log", "DocType", "Contract Notification Log", "file-text", None),
