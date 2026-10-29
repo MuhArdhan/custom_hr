@@ -36,39 +36,37 @@ class TestMyOvertimeApi(unittest.TestCase):
 		self.addCleanup(patcher.stop)
 		return patcher.start()
 
-	def test_only_today_up_to_a_week_ahead_is_accepted(self):
-		for day in ("2026-10-25", "2026-11-03", "not-a-date"):
-			with self.subTest(day=day), self.assertRaises(frappe.ValidationError):
-				my_overtime.submit_my_overtime(day, "17:00", "19:00", "stok opname")
-		self.writer.assert_not_called()
-		for day in ("2026-10-26", "2026-11-02"):
-			my_overtime.submit_my_overtime(day, "17:00", "19:00", "stok opname")
-		self.assertEqual(self.writer.call_count, 2)
+	def test_the_request_is_always_for_today_and_no_date_can_be_sent(self):
+		my_overtime.submit_my_overtime("17:00", "19:00", "stok opname")
+		self.assertEqual(self.writer.call_args.args[0]["date"], "2026-10-26")  # the server date
+		with self.assertRaises(TypeError):
+			my_overtime.submit_my_overtime("17:00", "19:00", "stok opname", date="2026-11-02")
+		self.assertEqual(my_overtime.get_my_overtime()["date"], "2026-10-26")
 
 	def test_a_reason_is_required(self):
 		for reason in ("", "   ", None):
 			with self.subTest(reason=reason), self.assertRaises(frappe.ValidationError):
-				my_overtime.submit_my_overtime("2026-10-26", "17:00", "19:00", reason)
+				my_overtime.submit_my_overtime("17:00", "19:00", reason)
 		self.writer.assert_not_called()
 
 	def test_the_request_holds_only_the_session_employee_and_runs_the_normal_rules(self):
-		my_overtime.submit_my_overtime("2026-10-27", "17:00", "19:00", " stok opname ")
+		my_overtime.submit_my_overtime("17:00", "19:00", " stok opname ")
 		values = self.writer.call_args.args[0]
 		self.assertEqual(values["employees"], [{"employee": "EMP-1"}])
 		self.assertEqual((values["outlet"], values["company"], values["requested_by"], values["reason"]), ("OUT-1", "ROPI", USER, "stok opname"))
-		self.assertEqual((values["doctype"], values["overtime_type"], values["date"]), ("Overtime Request", "Lembur", "2026-10-27"))
+		self.assertEqual((values["doctype"], values["overtime_type"], values["date"]), ("Overtime Request", "Lembur", "2026-10-26"))
 		self.assertIs(self.doc.flags.overtime_self_request, SELF_REQUEST_TOKEN)
 		self.doc.insert.assert_called_once_with(ignore_permissions=True)
 
 	def test_the_chosen_overtime_type_is_used_and_an_unknown_one_is_refused(self):
 		self.exists.side_effect = lambda doctype, name=None: doctype != "Overtime Type" or name in ("Lembur", "Lembur Libur")
-		my_overtime.submit_my_overtime("2026-10-26", "17:00", "19:00", "stok opname", overtime_type="Lembur Libur")
+		my_overtime.submit_my_overtime("17:00", "19:00", "stok opname", overtime_type="Lembur Libur")
 		self.assertEqual(self.writer.call_args.args[0]["overtime_type"], "Lembur Libur")
-		my_overtime.submit_my_overtime("2026-10-26", "17:00", "19:00", "stok opname")
+		my_overtime.submit_my_overtime("17:00", "19:00", "stok opname")
 		self.assertEqual(self.writer.call_args.args[0]["overtime_type"], "Lembur")
 		for forged in ("Lembur Palsu", ["Lembur"]):
 			with self.subTest(forged=forged), self.assertRaises(frappe.ValidationError):
-				my_overtime.submit_my_overtime("2026-10-26", "17:00", "19:00", "stok opname", overtime_type=forged)
+				my_overtime.submit_my_overtime("17:00", "19:00", "stok opname", overtime_type=forged)
 		self.assertEqual(self.writer.call_count, 2)
 
 	def test_the_form_lists_the_types_with_their_cap_and_lembur_preselected(self):
@@ -155,3 +153,36 @@ class TestOvertimeCap(unittest.TestCase):
 					doc.validate_times()
 			uncapped.validate_times()
 		self.assertEqual(uncapped.planned_hours, 12)
+
+
+class TestCheckinShift(unittest.TestCase):
+	def test_the_shift_locked_at_check_in_is_found_by_its_work_date(self):
+		from datetime import date, datetime
+
+		from custom_hr.hrm.doctype.overtime_request.overtime_request import checkin_shift
+
+		ins = [
+			frappe._dict(shift="Malam", shift_work_date=date(2026, 10, 29), time=datetime(2026, 10, 29, 22, 0)),  # an outlet IN of the day before
+			frappe._dict(shift="Pagi", shift_work_date=date(2026, 10, 30), time=datetime(2026, 10, 30, 7, 0)),
+			frappe._dict(shift="Dept", shift_work_date=None, time=datetime(2026, 10, 31, 8, 0)),  # department IN: only its time
+		]
+		with patch("frappe.get_all", return_value=ins):
+			self.assertEqual(checkin_shift("EMP-1", "2026-10-30"), "Pagi")
+			self.assertEqual(checkin_shift("EMP-1", "2026-10-31"), "Dept")
+			self.assertIsNone(checkin_shift("EMP-1", "2026-11-01"))
+
+	def test_an_in_fills_only_that_days_overtime_rows_without_a_shift(self):
+		from datetime import date, datetime
+
+		from custom_hr.hrm.doctype.overtime_request.overtime_request import stamp_checkin_shift
+
+		rows = [frappe._dict(name="ROW-1", parent="OT-SAME-DAY"), frappe._dict(name="ROW-2", parent="OT-OTHER-DAY")]
+		def get_all(doctype, **kwargs):
+			return rows if doctype == "Overtime Request Employee" else ["OT-SAME-DAY"]
+		checkin = frappe._dict(log_type="IN", shift="Pagi", employee="EMP-1", shift_work_date=date(2026, 10, 30), time=datetime(2026, 10, 30, 7, 0))
+		with patch("frappe.get_all", side_effect=get_all) as listing, patch("frappe.db.set_value") as write:
+			stamp_checkin_shift(checkin)
+			stamp_checkin_shift(frappe._dict(checkin, log_type="OUT"))
+			stamp_checkin_shift(frappe._dict(checkin, shift=None))
+		write.assert_called_once_with("Overtime Request Employee", "ROW-1", "shift", "Pagi", update_modified=False)
+		self.assertEqual(listing.call_args_list[0].kwargs["filters"]["shift"], ["is", "not set"])  # a shift already set is kept

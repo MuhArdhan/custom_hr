@@ -10,12 +10,11 @@ The employee always comes from the session, never from the payload.
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import nowdate
 from hrms.api import get_current_employee
 
 from custom_hr.services.overtime_approval import PENDING_STATES, SELF_REQUEST_TOKEN, employee_state, waiting_for
 
-MAX_DAYS_AHEAD = 7
 HISTORY_LIMIT = 30
 DEFAULT_OVERTIME_TYPE = "Lembur"
 
@@ -31,9 +30,8 @@ def _can_cancel(doc, employee):
 
 @frappe.whitelist(methods=["GET"])
 def get_my_overtime() -> dict:
-	"""The date range the form accepts, and the requests the employee is part of (own or made by a leader)."""
+	"""Today's date for the form, and the requests the employee is part of (own or made by a leader)."""
 	employee = get_current_employee()
-	today = getdate(nowdate())
 	parents = frappe.get_all(
 		"Overtime Request Employee", filters={"employee": employee, "parenttype": "Overtime Request"}, pluck="parent",
 	)
@@ -52,23 +50,16 @@ def get_my_overtime() -> dict:
 	types = frappe.get_all("Overtime Type", fields=["name", "maximum_overtime_hours_allowed as max_hours"], order_by="name asc")
 	names = [row.name for row in types]
 	return {
-		"min_date": str(today), "max_date": str(add_days(today, MAX_DAYS_AHEAD)), "history": history,
+		"date": nowdate(), "history": history,
 		"overtime_types": [{"name": row.name, "max_hours": row.max_hours or 0} for row in types],  # 0 = no cap
 		"default_overtime_type": DEFAULT_OVERTIME_TYPE if DEFAULT_OVERTIME_TYPE in names else (names[0] if names else None),
 	}
 
 
 @frappe.whitelist(methods=["POST"])
-def submit_my_overtime(date, start_time, end_time, reason, overtime_type=None) -> dict:
-	"""Create an Overtime Request for the logged-in employee, from today up to MAX_DAYS_AHEAD days ahead."""
+def submit_my_overtime(start_time, end_time, reason, overtime_type=None) -> dict:
+	"""Create an Overtime Request for the logged-in employee, always for today (the server's date)."""
 	employee = get_current_employee()
-	today = getdate(nowdate())
-	try:
-		day = getdate(date)
-	except Exception:
-		frappe.throw(_("Tanggal lembur tidak valid."))
-	if not today <= day <= getdate(add_days(today, MAX_DAYS_AHEAD)):
-		frappe.throw(_("Lembur hanya bisa diajukan untuk hari ini sampai {0} hari ke depan.").format(MAX_DAYS_AHEAD))
 	if not (reason or "").strip():
 		frappe.throw(_("Alasan lembur wajib diisi."))
 	overtime_type = overtime_type or DEFAULT_OVERTIME_TYPE
@@ -77,7 +68,7 @@ def submit_my_overtime(date, start_time, end_time, reason, overtime_type=None) -
 
 	info = frappe.db.get_value("Employee", employee, ["outlet", "company"], as_dict=True)
 	doc = frappe.get_doc({
-		"doctype": "Overtime Request", "outlet": info.outlet, "company": info.company, "date": str(day),
+		"doctype": "Overtime Request", "outlet": info.outlet, "company": info.company, "date": nowdate(),
 		"overtime_type": overtime_type, "start_time": start_time, "end_time": end_time, "reason": reason.strip(),
 		"requested_by": frappe.session.user, "employees": [{"employee": employee}],
 	})

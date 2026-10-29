@@ -203,6 +203,9 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 
 	def after_insert(self):
 		self.queue_realtime_attendance()
+		from custom_hr.hrm.doctype.overtime_request.overtime_request import stamp_checkin_shift
+
+		stamp_checkin_shift(self)
 
 	def queue_realtime_attendance(self):
 		"""Mark attendance as soon as a check-out completes the day's pair.

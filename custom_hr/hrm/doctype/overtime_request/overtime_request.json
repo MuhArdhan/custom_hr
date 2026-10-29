@@ -6,10 +6,10 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
+  "company",
   "outlet",
   "date",
   "column_break_head",
-  "company",
   "overtime_type",
   "section_time",
   "start_time",
@@ -36,13 +36,15 @@
    "options": "LEMBUR-.YYYY.-.#####"
   },
   {
-   "description": "Kosongkan untuk unit non-outlet (pabrik/gudang). Karyawan non-outlet langsung ke approval HRD.",
+   "description": "Diisi otomatis dari Company",
    "fieldname": "outlet",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "in_list_view": 0,
    "in_standard_filter": 1,
    "label": "Outlet",
-   "options": "Outlet"
+   "options": "Outlet",
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "default": "Today",
@@ -62,7 +64,9 @@
    "fieldtype": "Link",
    "label": "Company",
    "options": "Company",
-   "read_only": 1
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "overtime_type",
@@ -160,7 +164,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-09 00:00:00.000000",
+ "modified": "2026-10-29 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "Overtime Request",

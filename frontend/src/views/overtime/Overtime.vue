@@ -21,10 +21,6 @@
 								<option v-for="type in state.overtime_types" :key="type.name" :value="type.name">{{ type.name }}</option>
 							</select>
 						</label>
-						<label class="flex flex-col gap-1 text-xs text-gray-600">
-							{{ __("Date") }}
-							<input v-model="form.date" type="date" :min="state.min_date" :max="state.max_date" required class="rounded border border-gray-300 px-2 py-2 text-sm text-gray-900" />
-						</label>
 						<div class="flex gap-3">
 							<label class="flex flex-col gap-1 flex-1 text-xs text-gray-600">
 								{{ __("Start") }}
@@ -67,12 +63,12 @@ const loading = ref(true)
 const loadError = ref("")
 const error = ref("")
 const sending = ref(false)
-const form = reactive({ overtime_type: "", date: "", start_time: "", end_time: "", reason: "" })
+const form = reactive({ overtime_type: "", start_time: "", end_time: "", reason: "" }) // always for today: the server sets the date
 
 const submitResource = createResource({ url: "custom_hr.api.my_overtime.submit_my_overtime", method: "POST", onError() {} })
 
 const maxHours = computed(() => state.value?.overtime_types?.find((type) => type.name === form.overtime_type)?.max_hours || 0)
-const ready = computed(() => form.overtime_type && form.date && form.start_time && form.end_time && form.reason.trim() && !sending.value)
+const ready = computed(() => form.overtime_type && form.start_time && form.end_time && form.reason.trim() && !sending.value)
 
 function message(err, fallback) {
 	return err?.messages?.filter(Boolean).join("\n") || err?.message || fallback
@@ -81,7 +77,6 @@ function message(err, fallback) {
 async function load() {
 	try {
 		const data = await myOvertime.reload()
-		form.date ||= data.min_date
 		form.overtime_type ||= data.default_overtime_type || ""
 	} catch (err) {
 		loadError.value = message(err, __("Unable to load overtime."))

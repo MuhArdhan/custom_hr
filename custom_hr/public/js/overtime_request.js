@@ -17,13 +17,15 @@ frappe.ui.form.on("Overtime Request", {
 		frm._allowed_outlets = await frappe
 			.xcall("custom_hr.api.roster.list_outlets")
 			.catch(() => []);
-		frm.set_query("outlet", () => {
+		// Outlets are named after their Company: a leader picks only the companies of their outlets, HR any company.
+		frm.set_query("company", () => {
+			if (frappe.user.has_role(["HR Manager", "HR User", "System Manager"])) return {};
 			return { filters: { name: ["in", frm._allowed_outlets] } };
 		});
 		frm.set_query("employee", "employees", () => {
 			const filters = { status: "Active" };
-			if (frm.doc.outlet) {
-				filters.outlet = frm.doc.outlet;
+			if (frm.doc.company) {
+				filters.company = frm.doc.company;
 			}
 			return { filters };
 		});

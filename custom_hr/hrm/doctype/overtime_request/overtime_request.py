@@ -3,9 +3,10 @@
 
 """Overtime Request: leader mengajukan lembur untuk sekelompok karyawan.
 
-Outlet diisi untuk kru outlet (approval berjenjang Leader/SPV lalu HRD).
-Untuk unit non-outlet (pabrik/gudang) outlet dikosongkan: approver kosong
-sehingga pengajuan langsung masuk antrean HRD.
+Admin memilih Company; outlet (tersembunyi) mengikuti Company karena nama Outlet
+sama dengan Company-nya. Kru outlet: approval berjenjang Leader/SPV lalu HRD.
+Company tanpa outlet (pabrik/gudang): approver kosong sehingga pengajuan
+langsung masuk antrean HRD.
 
 Approval berjenjang (Workflow "Pengajuan Lembur"):
 Menunggu Leader -> [Menunggu SPV] -> Menunggu HRD -> Disetujui / Ditolak.
@@ -19,12 +20,43 @@ Overtime Slip -> Additional Salary.
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate, time_diff_in_hours
+from frappe.utils import add_days, flt, getdate, time_diff_in_hours
 
 from custom_hr.api.roster import HR_ROLES
 from custom_hr.services.overtime_approval import DECISION_TOKEN, SELF_REQUEST_TOKEN, employee_state, protect_employee_decisions
 
 FINAL_STATES = ("Disetujui", "Ditolak")
+
+
+def checkin_shift(employee, day):
+	"""The shift the employee locked at check-in on that work date, the one actually worked.
+
+	Outlet check-ins carry their work date; Department check-ins only their time.
+	"""
+	day = getdate(day)
+	ins = frappe.get_all(
+		"Employee Checkin",
+		filters={"employee": employee, "log_type": "IN", "shift": ["is", "set"], "time": ["between", [f"{add_days(day, -1)} 00:00:00", f"{add_days(day, 1)} 23:59:59"]]},
+		fields=["shift", "shift_work_date", "time"], order_by="time asc",
+	)
+	return next((row.shift for row in ins if getdate(row.shift_work_date or row.time) == day), None)
+
+
+def stamp_checkin_shift(checkin):
+	"""After an IN, fill the shift of that day's overtime rows still without one (requests can be made days ahead)."""
+	if checkin.log_type != "IN" or not checkin.shift:
+		return
+	day = getdate(checkin.get("shift_work_date") or checkin.time)
+	rows = frappe.get_all(
+		"Overtime Request Employee",
+		filters={"employee": checkin.employee, "parenttype": "Overtime Request", "shift": ["is", "not set"]},
+		fields=["name", "parent"],
+	)
+	same_day = set(frappe.get_all("Overtime Request", filters={"name": ["in", [row.parent for row in rows]], "date": day}, pluck="name")) if rows else set()
+	for row in rows:
+		if row.parent in same_day:
+			# a plain column write: a decided request must keep its approval history untouched
+			frappe.db.set_value("Overtime Request Employee", row.name, "shift", checkin.shift, update_modified=False)
 
 
 class OvertimeRequest(Document):
@@ -82,10 +114,13 @@ class OvertimeRequest(Document):
 			self.stamp_assignments()
 
 	def fetch_outlet_details(self):
+		"""Outlets are named after their Company (as on Employee): the hidden outlet follows the chosen company."""
+		if not self.company and self.employees:
+			self.company = frappe.db.get_value("Employee", self.employees[0].employee, "company")
+		self.outlet = self.company if self.company and frappe.db.exists("Outlet", self.company) else None
 		if not self.outlet:
-			return
+			return  # a company without an outlet (factory, warehouse): no approvers, straight to HRD
 		outlet = frappe.get_cached_doc("Outlet", self.outlet)
-		self.company = outlet.company
 		if self.is_new():
 			self.requested_by = self.requested_by or frappe.session.user
 			self.approver_1 = outlet.approver_1
@@ -131,13 +166,12 @@ class OvertimeRequest(Document):
 			)
 			if not employee:
 				frappe.throw(_("Karyawan {0} tidak ditemukan").format(row.employee))
-			if self.outlet and employee.outlet != self.outlet:
+			if employee.company != self.company:  # one company, so one outlet and one set of approvers
 				frappe.throw(
-					_("{0} tidak berada di outlet {1}").format(
-						employee.employee_name or row.employee, self.outlet
+					_("{0} bukan karyawan {1}").format(
+						employee.employee_name or row.employee, self.company
 					)
 				)
-			self.company = self.company or employee.company
 
 			assignment = frappe.get_all(
 				"Shift Assignment",
@@ -153,7 +187,8 @@ class OvertimeRequest(Document):
 			)
 			# a shift is optional: requests are reported now, payroll (which needs the shift) comes later
 			row.employee_name = employee.employee_name
-			row.shift = assignment[0].shift_type if assignment else None
+			# a shift picked in the form is kept; an empty one comes from the check-in, then the assignment
+			row.shift = row.shift or checkin_shift(row.employee, self.date) or (assignment[0].shift_type if assignment else None)
 
 	def validate_no_duplicate(self):
 		employees = [row.employee for row in self.employees if employee_state(self, row) != "Ditolak"]
