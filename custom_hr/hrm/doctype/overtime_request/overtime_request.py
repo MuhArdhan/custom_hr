@@ -57,6 +57,7 @@ def stamp_checkin_shift(checkin):
 		if row.parent in same_day:
 			# a plain column write: a decided request must keep its approval history untouched
 			frappe.db.set_value("Overtime Request Employee", row.name, "shift", checkin.shift, update_modified=False)
+			frappe.db.set_value("Overtime List", {"overtime_request": row.parent, "employee": checkin.employee}, "shift", checkin.shift, update_modified=False)
 
 
 class OvertimeRequest(Document):
@@ -112,6 +113,25 @@ class OvertimeRequest(Document):
 	def on_update(self):
 		if self.status == "Disetujui" or self.flags.get("employee_decision_token") is DECISION_TOKEN:
 			self.stamp_assignments()
+		self.sync_overtime_list()
+
+	def on_trash(self):
+		frappe.db.delete("Overtime List", {"overtime_request": self.name})
+
+	def sync_overtime_list(self):
+		"""One Overtime List row per approved employee; a row whose employee is no longer approved goes."""
+		listed = {row.employee: row.name for row in frappe.get_all("Overtime List", filters={"overtime_request": self.name}, fields=["name", "employee"])}
+		for row in self.employees:
+			approved = employee_state(self, row) == "Disetujui"
+			if approved and row.employee not in listed:
+				frappe.get_doc({
+					"doctype": "Overtime List", "overtime_request": self.name, "employee": row.employee, "employee_name": row.employee_name,
+					"company": self.company, "outlet": self.outlet, "date": self.date, "overtime_type": self.overtime_type, "shift": row.shift,
+					"start_time": self.start_time, "end_time": self.end_time, "planned_hours": self.planned_hours, "reason": self.reason,
+					"approved_by": row.get("decision_by") or frappe.session.user,
+				}).insert(ignore_permissions=True)  # nobody may create these by hand; the approval writes them
+			elif not approved and row.employee in listed:
+				frappe.delete_doc("Overtime List", listed[row.employee], ignore_permissions=True, force=True)
 
 	def fetch_outlet_details(self):
 		"""Outlets are named after their Company (as on Employee): the hidden outlet follows the chosen company."""

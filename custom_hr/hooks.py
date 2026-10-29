@@ -64,10 +64,12 @@ doctype_list_js = {
 
 permission_query_conditions = {
 	"Overtime Request": "custom_hr.api.overtime.get_permission_query_conditions",
+	"Overtime List": "custom_hr.api.overtime.get_list_permission_query_conditions",
 }
 
 has_permission = {
 	"Overtime Request": "custom_hr.api.overtime.has_permission",
+	"Overtime List": "custom_hr.api.overtime.has_permission",
 }
 
 # ----------------------------------------------------------------------------

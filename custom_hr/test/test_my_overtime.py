@@ -41,7 +41,8 @@ class TestMyOvertimeApi(unittest.TestCase):
 		self.assertEqual(self.writer.call_args.args[0]["date"], "2026-10-26")  # the server date
 		with self.assertRaises(TypeError):
 			my_overtime.submit_my_overtime("17:00", "19:00", "stok opname", date="2026-11-02")
-		self.assertEqual(my_overtime.get_my_overtime()["date"], "2026-10-26")
+		with patch("frappe.get_all", return_value=[]):
+			self.assertEqual(my_overtime.get_my_overtime()["date"], "2026-10-26")
 
 	def test_a_reason_is_required(self):
 		for reason in ("", "   ", None):
@@ -184,5 +185,8 @@ class TestCheckinShift(unittest.TestCase):
 			stamp_checkin_shift(checkin)
 			stamp_checkin_shift(frappe._dict(checkin, log_type="OUT"))
 			stamp_checkin_shift(frappe._dict(checkin, shift=None))
-		write.assert_called_once_with("Overtime Request Employee", "ROW-1", "shift", "Pagi", update_modified=False)
+		self.assertEqual([call.args for call in write.call_args_list], [
+			("Overtime Request Employee", "ROW-1", "shift", "Pagi"),
+			("Overtime List", {"overtime_request": "OT-SAME-DAY", "employee": "EMP-1"}, "shift", "Pagi"),  # an approved row follows
+		])
 		self.assertEqual(listing.call_args_list[0].kwargs["filters"]["shift"], ["is", "not set"])  # a shift already set is kept

@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:OTL-{overtime_request}-{employee}",
+ "creation": "2026-10-29 20:00:00.000000",
+ "description": "Lembur yang sudah disetujui, satu baris per karyawan. Dibuat otomatis dari Overtime Request.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "company",
+  "outlet",
+  "column_break_main",
+  "date",
+  "overtime_type",
+  "shift",
+  "section_time",
+  "start_time",
+  "end_time",
+  "column_break_time",
+  "planned_hours",
+  "section_source",
+  "overtime_request",
+  "approved_by",
+  "column_break_source",
+  "reason"
+ ],
+ "fields": [
+  {
+   "read_only": 1,
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "fetch_from": "employee.employee_name",
+   "in_list_view": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "in_standard_filter": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "outlet",
+   "fieldtype": "Link",
+   "label": "Outlet",
+   "options": "Outlet",
+   "hidden": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Tanggal Lembur",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 0,
+   "search_index": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "overtime_type",
+   "fieldtype": "Link",
+   "label": "Jenis Lembur",
+   "options": "Overtime Type",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "shift",
+   "fieldtype": "Link",
+   "label": "Shift",
+   "options": "Shift Type",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_time",
+   "fieldtype": "Section Break",
+   "label": "Jam Lembur"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "Mulai"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "Selesai"
+  },
+  {
+   "fieldname": "column_break_time",
+   "fieldtype": "Column Break"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "planned_hours",
+   "fieldtype": "Float",
+   "label": "Total Jam",
+   "precision": "2",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_source",
+   "fieldtype": "Section Break",
+   "label": "Pengajuan"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "overtime_request",
+   "fieldtype": "Link",
+   "label": "Overtime Request",
+   "options": "Overtime Request",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "read_only": 1,
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Disetujui Oleh",
+   "options": "User"
+  },
+  {
+   "fieldname": "column_break_source",
+   "fieldtype": "Column Break"
+  },
+  {
+   "read_only": 1,
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Alasan"
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-29 20:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "Overtime List",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "delete": 1
+  },
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "role": "HR User",
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "role": "Outlet Leader",
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1
+  },
+  {
+   "role": "SPV Outlet",
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name",
+ "track_changes": 0
+}

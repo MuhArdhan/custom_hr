@@ -9,7 +9,7 @@ import frappe
 from custom_hr.api.roster import HR_ROLES
 
 
-def get_permission_query_conditions(user=None):
+def get_permission_query_conditions(user=None, doctype="Overtime Request"):
 	user = user or frappe.session.user
 	if _sees_all(user):
 		return ""
@@ -17,7 +17,12 @@ def get_permission_query_conditions(user=None):
 	if not outlets:
 		return "1=0"
 	escaped = ", ".join(frappe.db.escape(outlet) for outlet in outlets)
-	return "`tabOvertime Request`.`outlet` in ({0})".format(escaped)
+	return "`tab{0}`.`outlet` in ({1})".format(doctype, escaped)
+
+
+def get_list_permission_query_conditions(user=None):
+	"""Overtime List rows carry their request's outlet, so they follow the same scope."""
+	return get_permission_query_conditions(user, "Overtime List")
 
 
 def has_permission(doc, ptype="read", user=None, debug=False):
