@@ -35,7 +35,7 @@ test("day dialog lists applicants and both available decision buttons", async ()
 	assert.equal(ui.dialog.approval_items.length, 1)
 })
 
-test("calendar renders six weeks and leave badges only, ignoring stale overtime counts", () => {
+test("calendar renders six weeks with leave and overtime badges", () => {
 	const ui = calendar()
 	ui.instance.month = dayjs("2026-10-01")
 	ui.instance.render(dayjs("2026-09-27"), { "2026-10-22": { leave: 3, leave_request: 2, approved_leave: 1, overtime: 3 } })
@@ -44,8 +44,8 @@ test("calendar renders six weeks and leave badges only, ignoring stale overtime 
 	assert.match(ui.html(), /ac-current/)
 	assert.match(ui.html(), /Leave Request \(2\)/)
 	assert.match(ui.html(), /Leave \(1\)/)
-	assert.ok(!ui.html().includes("Lembur"))
-	assert.ok(!ui.html().includes('data-kind="overtime"'))
+	assert.match(ui.html(), /Overtime \(3\)/)
+	assert.match(ui.html(), /data-date="2026-10-22" data-kind="overtime"/)
 	assert.match(ui.html(), /data-date="2026-10-22" data-kind="leave"/)
 })
 
@@ -94,7 +94,7 @@ test("empty day explicitly says no pending requests", async () => {
 	const ui = calendar()
 	ui.instance.request = async () => ({ items: [] })
 	await ui.instance.load_day(ui.dialog)
-	assert.match(ui.text(), /There are no leave requests/)
+	assert.match(ui.text(), /There are no requests/)
 })
 
 test("compact table uses one row per employee rather than large request cards", async () => {
@@ -141,7 +141,7 @@ test("rejected/stale decision refreshes both dialog and calendar and does not re
 	assert.equal(ui.alerts[0].indicator, "red")
 })
 
-test("requests always select leave even with stale overtime filters", async () => {
+test("requests pass the chosen kind through to the server", async () => {
 	const ui = calendar()
 	let args
 	ui.frappe.call = async value => {
@@ -150,20 +150,24 @@ test("requests always select leave even with stale overtime filters", async () =
 		return { message: { items: [] } }
 	}
 	await ui.instance.request("2026-10-01", "2026-10-31", { kind: "overtime" })
-	assert.equal(args.kind, "leave")
+	assert.equal(args.kind, "overtime")
+	await ui.instance.request("2026-10-01", "2026-10-31")
+	assert.equal(args.kind, undefined)
 })
 
-test("stale overtime rows cannot display actions or send approval posts", async () => {
+test("overtime rows show as Overtime and post the decision for that one employee", async () => {
 	const ui = calendar()
-	const overtime = { ...item(), kind: "overtime", doctype: "Overtime Request" }
+	const overtime = { ...item(), kind: "overtime", doctype: "Overtime Request", name: "LEMBUR-1", employee: "EMP-B", employees: [{ employee: "EMP-B", employee_name: "Crew B" }], actions: [{ action: "Setujui", kind: "approve", next_state: "Menunggu SPV" }] }
 	ui.instance.request = async () => ({ items: [overtime] })
+	ui.instance.load = async () => {}
 	await ui.instance.load_day(ui.dialog)
-	assert.equal(ui.dialog.approval_items.length, 0)
-	let posts = 0
-	ui.frappe.call = async () => { posts++ }
+	assert.equal(ui.dialog.approval_items.length, 1)
+	assert.match(ui.html(), /ac-kind ac-overtime">Overtime/)
+	const posts = []
+	ui.frappe.call = async value => { posts.push(value); return {} }
 	await ui.instance.decide(ui.dialog, overtime, overtime.actions[0])
-	assert.equal(posts, 0)
-	assert.match(ui.alerts[0].message, /temporarily disabled/)
+	const decision = posts.find(post => post.method === "custom_hr.api.leave_calendar.decide_approval")
+	assert.deepEqual({ ...decision.args }, { doctype: "Overtime Request", name: "LEMBUR-1", action: "Setujui", modified: "STAMP", employee: "EMP-B" })
 })
 
 test("other-stage and completed rows display read-only without decision buttons", async () => {

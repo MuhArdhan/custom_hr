@@ -1,4 +1,4 @@
-"""Add Leave Calendar beside Leave Application without replacing sidebar layouts."""
+"""Add the Working Calendar beside Leave Application without replacing sidebar layouts."""
 
 import frappe
 
@@ -8,7 +8,7 @@ def insert_calendar(doc, table_field):
 	if any(row.link_type == "Page" and row.link_to == "leave-calendar" for row in rows):
 		return False
 	position = next((i for i, row in enumerate(rows) if row.link_type == "DocType" and row.link_to == "Leave Application"), len(rows))
-	row = doc.append(table_field, dict(type="Link", label="Leave Calendar",
+	row = doc.append(table_field, dict(type="Link", label="Working Calendar",
 		link_type="Page", link_to="leave-calendar", icon="calendar-days",
 		child=0, indent=0, open_in_new_tab=1))
 	rows = doc.get(table_field)

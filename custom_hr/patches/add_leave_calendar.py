@@ -8,7 +8,7 @@ def execute():
 		return
 	workspace = frappe.get_doc("Workspace", "Shift & Attendance")
 	changed = False
-	label = "Leave Calendar"
+	label = "Working Calendar"
 	if not any(row.type == "Page" and row.link_to == "leave-calendar" for row in workspace.shortcuts):
 		workspace.append("shortcuts", {"type": "Page", "label": label, "link_to": "leave-calendar", "color": "Blue"})
 		changed = True

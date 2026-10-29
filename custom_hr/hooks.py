@@ -202,7 +202,7 @@ fixtures = [
 	},
 	{
 		"doctype": "Workflow Action Master",
-		"filters": [["name", "in", ["Setujui", "Setujui (HRD)", "Tolak"]]],
+		"filters": [["name", "in", ["Setujui", "Tolak"]]],
 	},
 	{"doctype": "Salary Component", "filters": [["name", "in", ["Lembur", "Tunjangan Tetap"]]]},
 	{"doctype": "Overtime Type", "filters": [["name", "=", "Lembur"]]},

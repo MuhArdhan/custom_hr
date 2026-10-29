@@ -16,5 +16,7 @@ custom_hr.patches.add_leave_workflow_hrd_route
 custom_hr.patches.allow_hr_self_created_leave_approval
 custom_hr.patches.add_hrm_sidebar_links
 custom_hr.patches.add_grooming_sidebar_link
+custom_hr.patches.rename_to_working_calendar
+custom_hr.patches.add_approval_override
 # Patches added in this section will be executed after doctypes are migrated
 custom_hr.patches.fill_employee_user_username

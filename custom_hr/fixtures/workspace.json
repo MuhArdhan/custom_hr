@@ -6,7 +6,7 @@
     "label": "Attendance Count"
    }
   ],
-   "content": "[{\"id\": \"r0a57m9-Yx\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Attendance Count\", \"col\": 12}}, {\"id\": \"9_DQbkhJgn\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"mYz7o2zWVf\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan style=\\\"font-size:18px\\\"\\u003e\\u003cb\\u003eMasters &amp; Reports\\u003c/b\\u003e\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"eagShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Attendance Gallery\", \"col\": 4}}, {\"id\": \"leaveCalendar1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Leave Calendar\", \"col\": 4}}, {\"id\": \"iBvYqY6Ul6\", \"type\": \"card\", \"data\": {\"card_name\": \"Shifts\", \"col\": 4}}, {\"id\": \"aCKU8VAUu8\", \"type\": \"card\", \"data\": {\"card_name\": \"Attendance\", \"col\": 4}}, {\"id\": \"CMPmxSUFjB\", \"type\": \"card\", \"data\": {\"card_name\": \"Time\", \"col\": 4}}, {\"id\": \"v61fwPM9fG\", \"type\": \"card\", \"data\": {\"card_name\": \"Overtime\", \"col\": 4}}, {\"id\": \"WAO9X_IrfP\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}]",
+   "content": "[{\"id\": \"r0a57m9-Yx\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Attendance Count\", \"col\": 12}}, {\"id\": \"9_DQbkhJgn\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"mYz7o2zWVf\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan style=\\\"font-size:18px\\\"\\u003e\\u003cb\\u003eMasters &amp; Reports\\u003c/b\\u003e\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"eagShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Attendance Gallery\", \"col\": 4}}, {\"id\": \"leaveCalendar1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Working Calendar\", \"col\": 4}}, {\"id\": \"iBvYqY6Ul6\", \"type\": \"card\", \"data\": {\"card_name\": \"Shifts\", \"col\": 4}}, {\"id\": \"aCKU8VAUu8\", \"type\": \"card\", \"data\": {\"card_name\": \"Attendance\", \"col\": 4}}, {\"id\": \"CMPmxSUFjB\", \"type\": \"card\", \"data\": {\"card_name\": \"Time\", \"col\": 4}}, {\"id\": \"v61fwPM9fG\", \"type\": \"card\", \"data\": {\"card_name\": \"Overtime\", \"col\": 4}}, {\"id\": \"WAO9X_IrfP\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}]",
   "custom_blocks": [],
   "docstatus": 0,
   "doctype": "Workspace",
@@ -410,7 +410,7 @@
    "shortcuts": [
     {
      "type": "Page",
-     "label": "Leave Calendar",
+     "label": "Working Calendar",
      "link_to": "leave-calendar",
      "color": "Blue"
     },

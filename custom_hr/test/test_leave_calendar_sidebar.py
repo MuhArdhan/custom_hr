@@ -18,7 +18,7 @@ class TestLeaveCalendarSidebar(unittest.TestCase):
 				{"type": "Link", "label": "Custom Report", "link_type": "Report", "link_to": "My Report"},
 			])
 			self.assertTrue(insert_calendar(doc, field))
-			self.assertEqual([r.label for r in doc.get(field)], ["Home", "Leave Calendar", "Leave Application", "Custom Report"])
+			self.assertEqual([r.label for r in doc.get(field)], ["Home", "Working Calendar", "Leave Application", "Custom Report"])
 			self.assertEqual([r.idx for r in doc.get(field)], [1, 2, 3, 4])
 			self.assertFalse(insert_calendar(doc, field))
 			self.assertEqual(len(doc.get(field)), 4)

@@ -6,6 +6,8 @@ does not overwrite it on subsequent migrations.
 
 import frappe
 
+from custom_hr.services.approval_override import leave_transitions
+
 NAME = "Approval Cuti dan Izin"
 STATE_FIELD = "leave_workflow_state"
 
@@ -41,6 +43,7 @@ def configuration():
 	pl_condition = f'{outlet} and doc.leave_approver == frappe.session.user and {pl} == frappe.session.user'
 	transition("Menunggu PL", "Approve", "Menunggu HRD", "PL Outlet", f'{pl_condition} and {not_self}')
 	transition("Menunggu PL", "Reject", "Rejected", "PL Outlet", pl_condition, 1)
+	transitions.extend(leave_transitions())  # a user holding every approver role may step in when PL is stuck
 	# HR may approve a request it created for someone else, never its own leave.
 	transition("Menunggu HRD", "Approve", "Approved", "HR Manager", f'{outlet} and {employee_user} != frappe.session.user', 1)
 	transition("Menunggu HRD", "Reject", "Rejected", "HR Manager", outlet, 1)

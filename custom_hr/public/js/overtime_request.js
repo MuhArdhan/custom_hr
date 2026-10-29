@@ -35,7 +35,7 @@ frappe.ui.form.on("Overtime Request", {
 	},
 	refresh(frm) {
 		if (!frm.is_new()) {
-			frm.set_intro(__("Approval lembur di Leave Calendar dinonaktifkan sementara. Fokus saat ini cuti/izin."), "blue");
+			frm.set_intro(__("Approve atau tolak lembur per karyawan di Working Calendar."), "blue");
 		}
 	},
 	start_time: update_planned_hours,

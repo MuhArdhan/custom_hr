@@ -15,11 +15,11 @@ from frappe.utils import cint, flt, getdate
 from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 
 from custom_hr.services.leave_approver import stage_label
-from custom_hr.services.overtime_approval import decide_employee, employee_state, employee_view
+from custom_hr.services.overtime_approval import FINAL_STATES, decide_employee, employee_state, employee_view
+from custom_hr.services.overtime_approval import stage_label as overtime_stage_label
 
 TYPES = {"leave": "Leave Application", "overtime": "Overtime Request"}
-# Overtime implementation is retained, but not enabled in the approval inbox.
-ENABLED_KINDS = frozenset({"leave"})
+ENABLED_KINDS = frozenset({"leave", "overtime"})
 HR_ROLES = {"HR Manager", "System Manager"}
 MAX_REQUESTS = 500
 LEAVE_CALENDAR_STATUSES = ("leave_request", "approved_leave", "rejected", "cancelled")
@@ -117,7 +117,7 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		"employee": employees[0]["employee"],
 		"calendar_status": _leave_calendar_status(doc) if kind == "leave" else None,
 		"from_date": str(start), "to_date": str(end), "employees": employees,
-		"status": employee_state(doc, overtime_row) if overtime_row else (stage_label(doc.get(workflow.workflow_state_field), doc) if workflow else doc.status),
+		"status": overtime_stage_label(doc, employee_state(doc, overtime_row)) if overtime_row else (stage_label(doc.get(workflow.workflow_state_field), doc) if workflow else doc.status),
 		"details": details, "description": description, "company": doc.company,
 		"outlet": frappe.db.get_value("Employee", doc.employee, "outlet") if kind == "leave" else doc.get("outlet"),
 		"modified": str(doc.modified), "actions": actions,
@@ -132,7 +132,7 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 	if kind and kind not in TYPES:
 		frappe.throw(_("Invalid request type."))
 	if kind and kind not in ENABLED_KINDS:
-		frappe.throw(_("Overtime approval in the Leave Calendar is temporarily disabled. The current focus is leave."))
+		frappe.throw(_("Overtime approval in the Working Calendar is temporarily disabled. The current focus is leave."))
 	items = []
 	for category, doctype in TYPES.items():
 		if category not in ENABLED_KINDS:
@@ -166,11 +166,11 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 				if member and employee and member.employee != employee:
 					continue
 				view = employee_view(doc, member) if member else doc
-				actions = _actions(view, workflow)
-				if category == "leave" or actions:
-					item = _request(doc, category, actions, workflow, member)
-					if getdate(item["from_date"]) <= end and getdate(item["to_date"]) >= start:
-						items.append(item)
+				if member and employee_state(doc, member) in FINAL_STATES:
+					continue  # a grouped request stays pending while some of its employees are already decided
+				item = _request(doc, category, _actions(view, workflow), workflow, member)
+				if getdate(item["from_date"]) <= end and getdate(item["to_date"]) >= start:
+					items.append(item)
 	return {"items": items, "counts": _tally(items, start, end), "start_date": str(start), "end_date": str(end)}
 
 
@@ -195,21 +195,43 @@ def get_leave_counts(start_date, end_date, employee=None, company=None):
 	Day details and actions stay in get_leave_calendar.
 	"""
 	start, end = _range(start_date, end_date)
-	if not frappe.has_permission("Leave Application", "read"):
-		return {"counts": {}, "total": 0, "start_date": str(start), "end_date": str(end)}
-	filters = {"from_date": ["<=", end], "to_date": [">=", start]}
+	items = []
+	if frappe.has_permission("Leave Application", "read"):
+		filters = {"from_date": ["<=", end], "to_date": [">=", start]}
+		if company:
+			filters["company"] = company
+		if employee:
+			filters["employee"] = employee
+		rows = frappe.get_list(
+			"Leave Application", filters=filters, fields=["from_date", "to_date", "status", "docstatus"], limit_page_length=0
+		)
+		items += [
+			{"kind": "leave", "calendar_status": _leave_calendar_status(row), "from_date": row.from_date, "to_date": row.to_date}
+			for row in rows
+		]
+	if frappe.has_permission("Overtime Request", "read"):
+		items += _overtime_count_items(start, end, employee, company)
+	return {"counts": _tally(items, start, end), "total": len(items), "start_date": str(start), "end_date": str(end)}
+
+
+def _overtime_count_items(start, end, employee, company):
+	"""One item per pending employee, the same rows the day detail lists."""
+	filters = {"docstatus": 0, "date": ["between", [start, end]], "status": ["not in", list(FINAL_STATES)]}
 	if company:
 		filters["company"] = company
-	if employee:
-		filters["employee"] = employee
-	rows = frappe.get_list(
-		"Leave Application", filters=filters, fields=["from_date", "to_date", "status", "docstatus"], limit_page_length=0
+	requests = {row.name: row for row in frappe.get_list("Overtime Request", filters=filters, fields=["name", "date", "status"], limit_page_length=0)}
+	if not requests:
+		return []
+	# the parents above are already permission-scoped, so reading their rows directly leaks nothing
+	members = frappe.get_all(
+		"Overtime Request Employee", filters={"parent": ["in", list(requests)], "parenttype": "Overtime Request"},
+		fields=["parent", "employee", "approval_state"],
 	)
-	items = [
-		{"kind": "leave", "calendar_status": _leave_calendar_status(row), "from_date": row.from_date, "to_date": row.to_date}
-		for row in rows
+	return [
+		{"kind": "overtime", "from_date": requests[row.parent].date, "to_date": requests[row.parent].date}
+		for row in members
+		if (not employee or row.employee == employee) and employee_state(requests[row.parent], row) not in FINAL_STATES
 	]
-	return {"counts": _tally(items, start, end), "total": len(items), "start_date": str(start), "end_date": str(end)}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -218,7 +240,7 @@ def decide_approval(doctype, name, action, modified, employee=None):
 	if doctype not in TYPES.values() or not name or not modified:
 		frappe.throw(_("Invalid request."))
 	if doctype == "Overtime Request" and "overtime" not in ENABLED_KINDS:
-		frappe.throw(_("Overtime approval in the Leave Calendar is temporarily disabled. The current focus is leave."))
+		frappe.throw(_("Overtime approval in the Working Calendar is temporarily disabled. The current focus is leave."))
 	# Verify read access before acquiring locks, and never trust a client document.
 	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("read")
