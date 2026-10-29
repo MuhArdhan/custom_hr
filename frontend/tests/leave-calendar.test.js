@@ -339,3 +339,18 @@ test("Enter then leaving the field saves once, and Esc saves nothing", async () 
 	await ui.instance.save_time(ui.dialog, cancelled)
 	assert.equal(posts.length, 1)
 })
+
+test("overtime stays in the day list after a decision, coloured by its status and view only", async () => {
+	const ui = calendar()
+	ui.instance.request = async () => ({ items: [
+		overtimeItem({ name: "LEMBUR-1", status: "Waiting for Budi" }),
+		overtimeItem({ name: "LEMBUR-2", status: "Disetujui", actions: [] }),
+		overtimeItem({ name: "LEMBUR-3", status: "Ditolak", actions: [] }),
+	] })
+	await ui.instance.load_day(ui.dialog)
+	assert.ok(ui.html().includes('<span class="ac-stage ac-leave_request">Waiting for Budi</span>'))
+	assert.ok(ui.html().includes('<span class="ac-stage ac-approved_leave">Disetujui</span>'))
+	assert.ok(ui.html().includes('<span class="ac-stage ac-rejected">Ditolak</span>'))
+	assert.equal((ui.html().match(/View only/g) || []).length, 2)
+	assert.equal((ui.html().match(/class="ac-time"/g) || []).length, 1)  // only the pending one has editable hours
+})

@@ -152,8 +152,7 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 				filters["employee"] = employee
 		else:
 			filters["docstatus"] = 0
-			filters["date"] = ["between", [start, end]]
-			filters["status"] = ["not in", ["Disetujui", "Ditolak"]]
+			filters["date"] = ["between", [start, end]]  # every stage, approved and rejected included, like leave
 		# Never use get_all/ignore_permissions: list counts must not leak other teams.
 		rows = frappe.get_list(doctype, filters=filters, fields=["name"], order_by="creation asc", limit_page_length=MAX_REQUESTS + 1)
 		if len(rows) > MAX_REQUESTS:
@@ -167,8 +166,6 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 				if member and employee and member.employee != employee:
 					continue
 				view = employee_view(doc, member) if member else doc
-				if member and employee_state(doc, member) in FINAL_STATES:
-					continue  # a grouped request stays pending while some of its employees are already decided
 				item = _request(doc, category, _actions(view, workflow), workflow, member)
 				if getdate(item["from_date"]) <= end and getdate(item["to_date"]) >= start:
 					items.append(item)
@@ -216,8 +213,8 @@ def get_leave_counts(start_date, end_date, employee=None, company=None):
 
 
 def _overtime_count_items(start, end, employee, company):
-	"""One item per pending employee, the same rows the day detail lists."""
-	filters = {"docstatus": 0, "date": ["between", [start, end]], "status": ["not in", list(FINAL_STATES)]}
+	"""One item per employee at any stage, the same rows the day detail lists."""
+	filters = {"docstatus": 0, "date": ["between", [start, end]]}
 	if company:
 		filters["company"] = company
 	requests = {row.name: row for row in frappe.get_list("Overtime Request", filters=filters, fields=["name", "date", "status"], limit_page_length=0)}
@@ -231,7 +228,7 @@ def _overtime_count_items(start, end, employee, company):
 	return [
 		{"kind": "overtime", "from_date": requests[row.parent].date, "to_date": requests[row.parent].date}
 		for row in members
-		if (not employee or row.employee == employee) and employee_state(requests[row.parent], row) not in FINAL_STATES
+		if not employee or row.employee == employee
 	]
 
 

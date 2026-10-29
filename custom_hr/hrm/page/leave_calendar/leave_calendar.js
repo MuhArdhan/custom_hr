@@ -149,13 +149,18 @@ class LeaveCalendar {
 				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small></td>
 					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${this.details_html(item, index)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
 					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button></div>${this.balance_html(item)}${item.description ? `<div class="ac-reason">${escape(item.description)}</div>` : ""}</td>
-					<td><span class="ac-stage ac-${status}">${escape(item.status)}</span></td>
+					<td><span class="ac-stage ac-${item.kind === "overtime" ? this.overtime_tone(item.status) : status}">${escape(item.status)}</span></td>
 					<td><div class="ac-request-actions">${item.actions.length ? item.actions.map((action, actionIndex) => `<button class="btn btn-xs ${action.kind === "approve" ? "btn-primary" : "btn-danger"} ac-decision" data-index="${index}" data-action="${actionIndex}" title="${escape(action.next_state)}">${action.kind === "approve" ? __("Approve") : __("Reject")}</button>`).join("") : `<span class="text-muted">${__("View only")}</span>`}</div></td></tr>`;
 			});
 			body.html(html + "</tbody></table></div>");
 		} catch {
 			if (token === dialog.leave_load_token) body.text(__("Failed to load requests. Close and reopen this date."));
 		}
+	}
+
+	// Overtime stages reuse the leave colours: pending, approved, rejected.
+	overtime_tone(status) {
+		return { Disetujui: "approved_leave", Ditolak: "rejected" }[status] || "leave_request";
 	}
 
 	// The total hours read as plain text; for the current approver a click turns them into an input.

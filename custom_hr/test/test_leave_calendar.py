@@ -246,13 +246,13 @@ class TestLeaveCalendar(unittest.TestCase):
 		api.get_leave_calendar("2026-10-01", "2026-10-31", kind="overtime")
 		self.assertEqual(self.listing.call_args.args[0], "Overtime Request")
 
-	def test_pending_overtime_is_listed_view_only_for_a_non_approver_and_decided_employees_drop_out(self):
+	def test_overtime_stays_listed_after_a_decision_and_is_view_only_for_a_non_approver(self):
 		doc = leave(doctype="Overtime Request", date="2026-10-22", start_time="17:00:00", end_time="19:00:00", planned_hours=2, status="Menunggu SPV", employees=[frappe._dict(employee="EMP-A", employee_name="A"), frappe._dict(employee="EMP-B", employee_name="B", approval_state="Ditolak")])
 		self.factory.return_value = doc
 		self.listing.side_effect = lambda dt, **kwargs: [frappe._dict(name="OT")] if dt == "Overtime Request" else []
 		with patch(MODULE + "_actions", return_value=[]):
 			result = api.get_leave_calendar("2026-10-22", "2026-10-22", kind="overtime")
-		self.assertEqual([(i["employee"], i["status"], i["actions"]) for i in result["items"]], [("EMP-A", "Menunggu SPV", [])])
+		self.assertEqual([(i["employee"], i["status"], i["actions"]) for i in result["items"]], [("EMP-A", "Menunggu SPV", []), ("EMP-B", "Ditolak", [])])
 
 	def test_overtime_status_names_the_leader_or_spv_like_leave(self):
 		approvers = {"approver_1": "leader@example.com", "approver_2": "spv@example.com"}
@@ -303,7 +303,7 @@ class TestLeaveCalendar(unittest.TestCase):
 				api.update_overtime_hours("OT-1", hours, str(doc.modified))
 		doc.save.assert_not_called()
 
-	def test_month_counts_include_each_pending_overtime_employee(self):
+	def test_month_counts_include_each_overtime_employee_at_any_stage(self):
 		requests = [frappe._dict(name="OT-1", date="2026-10-22", status="Menunggu Leader"), frappe._dict(name="OT-2", date="2026-10-23", status="Menunggu HRD")]
 		members = [
 			frappe._dict(parent="OT-1", employee="EMP-A", approval_state=None),
@@ -314,8 +314,9 @@ class TestLeaveCalendar(unittest.TestCase):
 		with patch("frappe.get_all", return_value=members) as rows:
 			result = api.get_leave_counts("2026-10-01", "2026-10-31", company="Company")
 			filtered = api.get_leave_counts("2026-10-01", "2026-10-31", employee="EMP-B")
-		self.assertEqual((result["counts"]["2026-10-22"]["overtime"], result["counts"]["2026-10-23"]["overtime"], result["total"]), (1, 1, 2))
-		self.assertEqual(filtered["total"], 0)
+		self.assertEqual((result["counts"]["2026-10-22"]["overtime"], result["counts"]["2026-10-23"]["overtime"], result["total"]), (2, 1, 3))  # EMP-B is approved
+		self.assertEqual(filtered["total"], 1)
+		self.assertNotIn("status", next(call.kwargs for call in self.listing.call_args_list if call.args[0] == "Overtime Request")["filters"])
 		listing = next(call.kwargs for call in self.listing.call_args_list if call.args[0] == "Overtime Request")
 		self.assertEqual(listing["filters"]["company"], "Company")
 		self.assertNotIn("ignore_permissions", listing)
