@@ -30,7 +30,7 @@ const __ = inject("$translate")
 const quickLinks = [
 	{
 		icon: markRaw(GroomingIcon),
-		title: __("Grooming"),
+		title: __("SOP Grooming"),
 		route: "GroomingView",
 	},
 	{
