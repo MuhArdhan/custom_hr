@@ -3,10 +3,11 @@
 GROOMING_STEPS = (
 	{"key": "right_hand", "title": "Tangan kanan", "hint": "Foto telapak dan kuku tangan kanan. Kuku pendek dan bersih."},
 	{"key": "left_hand", "title": "Tangan kiri", "hint": "Foto telapak dan kuku tangan kiri. Kuku pendek dan bersih."},
-	{"key": "cap", "title": "Topi", "hint": "Foto wajah dan kepala. Pakai topi sesuai SOP."},
 	{"key": "trousers", "title": "Celana", "hint": "Foto celana dari pinggang ke bawah. Tidak boleh jeans."},
 	{"key": "footwear", "title": "Alas kaki", "hint": "Foto sepatu yang dipakai. Tidak boleh sandal."},
 )
+# Older groomings still hold a cap photo: the step was dropped because the hand photos already show the cap.
+STEP_TITLES = {"cap": "Topi", **{step["key"]: step["title"] for step in GROOMING_STEPS}}
 
 
 MAX_IMAGE_BYTES = 2_500_000

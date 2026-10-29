@@ -1,4 +1,4 @@
-"""Grooming API: the employee and date are the server's, all five photos or nothing, once a day."""
+"""Grooming API: the employee and date are the server's, all photos or nothing, once a day."""
 
 import base64
 import unittest
@@ -59,7 +59,7 @@ class TestGroomingApi(unittest.TestCase):
 		self.addCleanup(patcher.stop)
 		return patcher.start()
 
-	def test_status_lists_the_five_steps_and_not_submitted(self):
+	def test_status_lists_the_steps_and_not_submitted(self):
 		status = grooming.get_grooming_status()
 		self.assertEqual([step["key"] for step in status["steps"]], KEYS)
 		self.assertEqual((status["date"], status["submitted"], status["review_status"]), ("2026-10-26", False, None))
@@ -89,7 +89,7 @@ class TestGroomingApi(unittest.TestCase):
 		detail = grooming.get_grooming_detail("G1")
 		self.assertEqual((detail["name"], detail["shift"], detail["review_status"], detail["review_note"]), ("G1", "Shift Pagi", "Tidak Sesuai", "kuku panjang"))
 		self.assertEqual([(p["step"], p["title"]) for p in detail["photos"]][:2], [("right_hand", "Tangan kanan"), ("left_hand", "Tangan kiri")])
-		self.assertEqual(len(detail["photos"]), 5)
+		self.assertEqual(len(detail["photos"]), len(KEYS))
 
 	def test_detail_refuses_another_employees_or_a_missing_record_with_the_same_message(self):
 		self.record = frappe._dict(name="G1", employee="EMP-2", grooming_date="2026-10-26")
@@ -103,18 +103,18 @@ class TestGroomingApi(unittest.TestCase):
 	def test_submit_requires_a_checkin_today_and_writes_nothing_without_one(self):
 		self.checkin = None
 		with self.assertRaisesRegex(frappe.ValidationError, "check in"):
-			grooming.submit_grooming([JPEG] * 5)
+			grooming.submit_grooming([JPEG] * len(KEYS))
 		self.writer.assert_not_called()
 		self.save.assert_not_called()
 
 	def test_submit_stores_the_shift_and_checkin_of_the_day(self):
-		grooming.submit_grooming([JPEG] * 5)
+		grooming.submit_grooming([JPEG] * len(KEYS))
 		values = self.writer.call_args.args[0]
 		self.assertEqual((values["shift"], values["checkin"]), ("Shift Pagi", "IN-1"))
 
 	def test_an_off_shift_checkin_still_allows_grooming_without_a_shift(self):
 		self.checkin = frappe._dict(name="IN-2", shift=None)
-		grooming.submit_grooming([JPEG] * 5)
+		grooming.submit_grooming([JPEG] * len(KEYS))
 		self.assertIsNone(self.writer.call_args.args[0]["shift"])
 
 	def test_status_shows_todays_review_result(self):
@@ -123,7 +123,7 @@ class TestGroomingApi(unittest.TestCase):
 		self.assertEqual((status["submitted"], status["review_status"], status["review_note"]), (True, "Tidak Sesuai", "kuku panjang"))
 
 	def test_submit_creates_one_record_for_the_session_employee(self):
-		result = grooming.submit_grooming([JPEG, PNG, JPEG, PNG, JPEG])
+		result = grooming.submit_grooming(([JPEG, PNG] * len(KEYS))[:len(KEYS)])
 		values = self.writer.call_args.args[0]
 		self.assertEqual((values["doctype"], values["employee"], values["grooming_date"], values["submitted_at"]), ("Grooming Check", "EMP-1", "2026-10-26", NOW))
 		self.assertEqual([row["step"] for row in values["photos"]], KEYS)
@@ -132,16 +132,16 @@ class TestGroomingApi(unittest.TestCase):
 
 	def test_payload_cannot_name_another_employee(self):
 		with self.assertRaises(TypeError):
-			grooming.submit_grooming([JPEG] * 5, employee="EMP-2")
+			grooming.submit_grooming([JPEG] * len(KEYS), employee="EMP-2")
 
 	def test_user_without_an_active_employee_is_refused(self):
 		self.employee.side_effect = frappe.ValidationError("no employee")
 		with self.assertRaises(frappe.ValidationError):
-			grooming.submit_grooming([JPEG] * 5)
+			grooming.submit_grooming([JPEG] * len(KEYS))
 		self.writer.assert_not_called()
 
-	def test_four_or_six_photos_are_refused_and_nothing_is_written(self):
-		for count in (0, 4, 6):
+	def test_too_few_or_too_many_photos_are_refused_and_nothing_is_written(self):
+		for count in (0, len(KEYS) - 1, len(KEYS) + 1):
 			with self.subTest(count=count), self.assertRaises(frappe.ValidationError):
 				grooming.submit_grooming([JPEG] * count)
 		self.writer.assert_not_called()
@@ -158,18 +158,18 @@ class TestGroomingApi(unittest.TestCase):
 		self.exists.return_value = "GRM-EMP-1-2026-10-26"
 		self.record = frappe._dict(name="GRM-1", review_status="Tidak Sesuai")
 		with self.assertRaisesRegex(frappe.ValidationError, "sudah"):
-			grooming.submit_grooming([JPEG] * 5)
+			grooming.submit_grooming([JPEG] * len(KEYS))
 		self.writer.assert_not_called()
 
 	def test_a_simultaneous_duplicate_is_reported_as_already_sent(self):
 		self.doc.insert.side_effect = frappe.DuplicateEntryError("Grooming Check", self.doc.name, Exception("dup"))
 		with self.assertRaisesRegex(frappe.ValidationError, "sudah"):
-			grooming.submit_grooming([JPEG] * 5)
+			grooming.submit_grooming([JPEG] * len(KEYS))
 		self.save.assert_not_called()
 
 	def test_photos_are_saved_in_step_order_on_the_record(self):
-		grooming.submit_grooming([JPEG] * 5)
-		self.assertEqual([call.args[1:3] for call in self.save.call_args_list], [("Grooming Check", self.doc.name)] * 5)
+		grooming.submit_grooming([JPEG] * len(KEYS))
+		self.assertEqual([call.args[1:3] for call in self.save.call_args_list], [("Grooming Check", self.doc.name)] * len(KEYS))
 		self.assertEqual([call.args[3] for call in self.save.call_args_list], [f"grooming-{self.doc.name}-{key}" for key in KEYS])
-		self.assertEqual([call.args[1] for call in self.set_value.call_args_list], [f"ROW-{i}" for i in range(5)])
+		self.assertEqual([call.args[1] for call in self.set_value.call_args_list], [f"ROW-{i}" for i in range(len(KEYS))])
 		self.assertEqual([call.args[3] for call in self.set_value.call_args_list], [f"/private/files/grooming-{self.doc.name}-{key}.jpg" for key in KEYS])

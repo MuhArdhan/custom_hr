@@ -1,4 +1,4 @@
-"""Grooming gallery API: filtered cards with their five photos, and review straight from the gallery."""
+"""Grooming gallery API: filtered cards with their photos, and review straight from the gallery."""
 
 import unittest
 from unittest.mock import MagicMock, patch
@@ -45,7 +45,7 @@ class TestGroomingGallery(unittest.TestCase):
 			grooming.review_grooming("G1", "Sesuai")
 		self.only_for.assert_called_with(("HR Manager", "HR User", "System Manager"))
 
-	def test_cards_carry_their_five_photos_in_step_order_with_titles(self):
+	def test_cards_carry_their_photos_in_step_order_with_titles(self):
 		rows = grooming.get_grooming_gallery()["rows"]
 		self.assertEqual([r["name"] for r in rows], ["G1", "G2"])
 		self.assertEqual([(p["step"], p["title"]) for p in rows[0]["photos"]], [("right_hand", "Tangan kanan"), ("left_hand", "Tangan kiri")])

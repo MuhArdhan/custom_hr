@@ -13,10 +13,11 @@ REVIEWED = ("Sesuai", "Tidak Sesuai")
 
 class GroomingCheck(Document):
 	def validate(self):
-		self.validate_photos()
 		before = None if self.is_new() else self.get_doc_before_save()
 		if before:
-			self.validate_unchanged(before)
+			self.validate_unchanged(before)  # photos are fixed, so an older record keeps the steps of its day
+		else:
+			self.validate_photos()
 		self.stamp_review(before)
 
 	def validate_photos(self):

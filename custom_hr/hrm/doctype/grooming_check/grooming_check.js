@@ -1,4 +1,4 @@
-// The five photos side by side, in the order they were taken, for the SOP review.
+// The photos side by side, in the order they were taken, for the SOP review.
 const GROOMING_TITLES = {
 	right_hand: "Tangan kanan",
 	left_hand: "Tangan kiri",

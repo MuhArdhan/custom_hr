@@ -1,12 +1,13 @@
-"""Grooming Check: five photos in step order, review stamping, and an immutable submission."""
+"""Grooming Check: one photo per step in order, review stamping, and an immutable submission."""
 
 import unittest
 
 import frappe
 
-from custom_hr.services.grooming import GROOMING_STEPS
+from custom_hr.services.grooming import GROOMING_STEPS, STEP_TITLES
 
-KEYS = ["right_hand", "left_hand", "cap", "trousers", "footwear"]
+KEYS = ["right_hand", "left_hand", "trousers", "footwear"]
+OLD_KEYS = ["right_hand", "left_hand", "cap", "trousers", "footwear"]  # before the cap step was dropped
 
 
 def check(keys=None, **values):
@@ -18,10 +19,14 @@ def check(keys=None, **values):
 
 
 class TestGroomingSteps(unittest.TestCase):
-	def test_steps_are_the_five_in_order(self):
+	def test_steps_are_the_four_in_order(self):
 		self.assertEqual([step["key"] for step in GROOMING_STEPS], KEYS)
 		for step in GROOMING_STEPS:
 			self.assertTrue(step["title"] and step["hint"])
+
+	def test_older_cap_photos_keep_their_title(self):
+		self.assertEqual(STEP_TITLES["cap"], "Topi")
+		self.assertTrue(all(STEP_TITLES[key] for key in KEYS))
 
 
 class TestGroomingCheck(unittest.TestCase):
@@ -42,11 +47,19 @@ class TestGroomingCheck(unittest.TestCase):
 		doc._validate_selects()
 		doc._validate_data_fields()
 
-	def test_exactly_five_photos_in_step_order_are_required(self):
+	def test_exactly_one_photo_per_step_in_order_is_required(self):
 		check().validate_photos()
-		for keys in (KEYS[:4], KEYS + ["footwear"], list(reversed(KEYS)), [], KEYS[:2] + KEYS[3:] + ["cap"]):
+		for keys in (KEYS[:3], KEYS + ["footwear"], list(reversed(KEYS)), [], OLD_KEYS):
 			with self.subTest(keys=keys), self.assertRaises(frappe.ValidationError):
 				check(keys).validate_photos()
+
+	def test_an_older_record_with_a_cap_photo_can_still_be_reviewed(self):
+		before = check(OLD_KEYS)
+		after = check(OLD_KEYS, review_status="Sesuai")
+		after.is_new = lambda: False
+		after.get_doc_before_save = lambda: before
+		after.validate()
+		self.assertEqual(after.reviewed_by, frappe.session.user)
 
 	def test_a_photo_row_without_a_photo_is_refused(self):
 		doc = check()

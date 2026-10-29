@@ -9,7 +9,7 @@ from frappe.utils import cint, getdate, now_datetime, nowdate
 from hrms.api import get_current_employee
 
 from custom_hr.api.face import _save_photo_data_url
-from custom_hr.services.grooming import GROOMING_STEPS, check_image
+from custom_hr.services.grooming import GROOMING_STEPS, STEP_TITLES, check_image
 
 GALLERY_ROLES = ("HR Manager", "HR User", "System Manager")
 REVIEW_STATUSES = ("Menunggu", "Sesuai", "Tidak Sesuai")
@@ -56,7 +56,7 @@ def get_grooming_status() -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def get_grooming_detail(name) -> dict:
-	"""One of the logged-in employee's own groomings, with its five photos."""
+	"""One of the logged-in employee's own groomings, with its photos."""
 	employee = get_current_employee()
 	record = frappe.db.get_value(
 		"Grooming Check", name,
@@ -64,19 +64,18 @@ def get_grooming_detail(name) -> dict:
 	)
 	if not record or record.employee != employee:  # a missing and a foreign record look the same
 		frappe.throw(_("Grooming tidak ditemukan."), frappe.PermissionError)
-	titles = {step["key"]: step["title"] for step in GROOMING_STEPS}
 	photos = frappe.get_all("Grooming Photo", filters={"parent": name, "parenttype": "Grooming Check"}, fields=["step", "photo"], order_by="idx asc")
 	return {
 		"name": record.name, "date": str(record.grooming_date), "shift": record.shift, "submitted_at": str(record.submitted_at or ""),
 		"review_status": record.review_status, "review_note": record.review_note,
 		"reviewed_on": str(record.reviewed_on) if record.reviewed_on else None,
-		"photos": [{"step": item.step, "title": titles.get(item.step, item.step), "photo": item.photo} for item in photos],
+		"photos": [{"step": item.step, "title": STEP_TITLES.get(item.step, item.step), "photo": item.photo} for item in photos],
 	}
 
 
 @frappe.whitelist(methods=["POST"])
 def submit_grooming(photos) -> dict:
-	"""Store all five photos (data URLs, in step order) as one Grooming Check; once a day, final."""
+	"""Store all photos (data URLs, in step order) as one Grooming Check; once a day, final."""
 	employee = get_current_employee()
 	if isinstance(photos, str):
 		photos = frappe.parse_json(photos)
@@ -111,7 +110,7 @@ def submit_grooming(photos) -> dict:
 def get_grooming_gallery(
 	company=None, outlet=None, employee=None, review_status=None, from_date=None, to_date=None, search=None, start=0, page_length=24,
 ) -> dict:
-	"""Cards for the SOP team: one per grooming, with its five photos in step order."""
+	"""Cards for the SOP team: one per grooming, with its photos in step order."""
 	frappe.only_for(GALLERY_ROLES)
 	to_date = getdate(to_date) if to_date else getdate(nowdate())
 	from_date = getdate(from_date) if from_date else to_date
@@ -137,14 +136,13 @@ def get_grooming_gallery(
 	if not rows:
 		return {"rows": [], "has_more": False}
 
-	titles = {step["key"]: step["title"] for step in GROOMING_STEPS}
 	photos = frappe.get_all(
 		"Grooming Photo", filters={"parent": ["in", [row.name for row in rows]], "parenttype": "Grooming Check"},
 		fields=["parent", "step", "photo", "idx"], order_by="idx asc",
 	)
 	for row in rows:
 		row["photos"] = [
-			{"step": item.step, "title": titles.get(item.step, item.step), "photo": item.photo} for item in photos if item.parent == row.name
+			{"step": item.step, "title": STEP_TITLES.get(item.step, item.step), "photo": item.photo} for item in photos if item.parent == row.name
 		]
 	return {"rows": rows, "has_more": has_more}
 

@@ -23,7 +23,7 @@
 						<Button variant="solid" class="w-full py-5" @click="goBack">{{ __("Go to Home") }}</Button>
 					</div>
 
-					<!-- Review all five photos, then send -->
+					<!-- Review all photos, then send -->
 					<div v-else-if="view === 'capture' && reviewing" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
 						<div>
 							<h3 class="text-lg font-semibold text-gray-900">{{ __("Check your photos") }}</h3>

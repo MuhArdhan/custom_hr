@@ -1,4 +1,4 @@
-// Helpers for the Grooming screen: five photos, one per SOP step, sent together.
+// Helpers for the Grooming screen: one photo per SOP step, sent together.
 
 // Scale so the long side is at most `max`; never upscale.
 export function fitWithin(width, height, max) {
