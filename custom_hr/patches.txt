@@ -19,5 +19,6 @@ custom_hr.patches.add_grooming_sidebar_link
 custom_hr.patches.rename_to_working_calendar
 custom_hr.patches.add_approval_override
 custom_hr.patches.create_overtime_list
+custom_hr.patches.tidy_hrm_sidebar
 # Patches added in this section will be executed after doctypes are migrated
 custom_hr.patches.fill_employee_user_username
