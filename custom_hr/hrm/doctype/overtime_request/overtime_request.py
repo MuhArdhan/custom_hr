@@ -22,10 +22,9 @@ from frappe.model.document import Document
 from frappe.utils import flt, getdate, time_diff_in_hours
 
 from custom_hr.api.roster import HR_ROLES
-from custom_hr.services.overtime_approval import DECISION_TOKEN, employee_state, protect_employee_decisions
+from custom_hr.services.overtime_approval import DECISION_TOKEN, SELF_REQUEST_TOKEN, employee_state, protect_employee_decisions
 
 FINAL_STATES = ("Disetujui", "Ditolak")
-MAX_OVERTIME_HOURS = 4
 
 
 class OvertimeRequest(Document):
@@ -66,6 +65,11 @@ class OvertimeRequest(Document):
 				apply_workflow(self, action)
 			finally:
 				self.flags.pop("employee_initialization_token", None)
+		else:
+			# no workflow step skips an empty approver level (HR may only decide at Menunggu HRD),
+			# and the target comes from initial_state, never from the request
+			self.db_set("status", target)
+			self.add_comment("Workflow", _("Tanpa approver: langsung {0}").format(target))
 
 	def validate_workflow(self):
 		# The employee transition was checked against the same Workflow before
@@ -104,9 +108,11 @@ class OvertimeRequest(Document):
 			hours += 24
 		if hours <= 0:
 			frappe.throw(_("Jam selesai harus setelah jam mulai"))
-		if hours > MAX_OVERTIME_HOURS:
+		# the cap is the Overtime Type's own; 0 or empty means no cap, as in the native Overtime Slip
+		limit = flt(frappe.db.get_value("Overtime Type", self.overtime_type, "maximum_overtime_hours_allowed")) if self.overtime_type else 0
+		if limit and hours > limit:
 			frappe.throw(
-				_("Lembur maksimal {0} jam per pengajuan (PP 35/2021)").format(MAX_OVERTIME_HOURS)
+				_("Jenis lembur {0} maksimal {1} jam per pengajuan").format(self.overtime_type, f"{flt(limit, 2):g}")
 			)
 		self.planned_hours = flt(hours, 2)
 
@@ -145,15 +151,9 @@ class OvertimeRequest(Document):
 				fields=["shift_type"],
 				ignore_permissions=True,
 			)
-			if not assignment:
-				frappe.throw(
-					_("Belum ada jadwal shift {0} pada {1}. Atur dulu di Roster Outlet.").format(
-						employee.employee_name or row.employee, frappe.bold(self.date)
-					)
-				)
-
+			# a shift is optional: requests are reported now, payroll (which needs the shift) comes later
 			row.employee_name = employee.employee_name
-			row.shift = assignment[0].shift_type
+			row.shift = assignment[0].shift_type if assignment else None
 
 	def validate_no_duplicate(self):
 		employees = [row.employee for row in self.employees if employee_state(self, row) != "Ditolak"]
@@ -195,9 +195,18 @@ class OvertimeRequest(Document):
 			return
 		if user and user in (self.approver_1, self.approver_2):
 			return
+		if self.is_self_request():
+			return
 		frappe.throw(
 			_("Anda tidak punya akses membuat pengajuan untuk outlet ini"), frappe.PermissionError
 		)
+
+	def is_self_request(self):
+		"""Created from the HRMS app by an employee, for that employee alone."""
+		if self.flags.get("overtime_self_request") is not SELF_REQUEST_TOKEN:
+			return False
+		own = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+		return bool(own) and [row.employee for row in self.employees] == [own]
 
 	def initial_state(self):
 		user = frappe.session.user

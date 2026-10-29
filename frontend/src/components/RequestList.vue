@@ -37,7 +37,9 @@
 		:initial-breakpoint="1"
 		:breakpoints="[0, 1]"
 	>
+		<OvertimeActionSheet v-if="selectedRequest?.doctype === 'Overtime Request'" v-model="selectedRequest" />
 		<RequestActionSheet
+			v-else
 			:fields="fieldsMap[selectedRequest?.doctype]" 
 			v-model="selectedRequest"
 		/>
@@ -48,6 +50,7 @@
 import { ref, inject } from "vue"
 import { IonModal } from "@ionic/vue"
 import RequestActionSheet from "@/components/RequestActionSheet.vue"
+import OvertimeActionSheet from "@/components/OvertimeActionSheet.vue"
 
 import {
 	LEAVE_FIELDS,

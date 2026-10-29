@@ -31,6 +31,7 @@ import { FeatherIcon, Badge } from "frappe-ui"
 import ListItem from "@/components/ListItem.vue"
 import LeaveIcon from "@/components/icons/LeaveIcon.vue"
 import { getLeaveDates } from "@/data/leaves"
+import { listStatus } from "@/utils/requestStatus"
 
 const props = defineProps({
 	doc: {
@@ -47,12 +48,13 @@ const props = defineProps({
 })
 
 const status = computed(() => {
-	return props.workflowStateField ? props.doc[props.workflowStateField] : props.doc.status
+	return listStatus(props.workflowStateField ? props.doc[props.workflowStateField] : props.doc.status)
 })
 
 const colorMap = {
 	Approved: "green",
 	Rejected: "red",
 	Open: "orange",
+	Menunggu: "orange",
 }
 </script>

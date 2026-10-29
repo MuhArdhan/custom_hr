@@ -8,13 +8,29 @@ from frappe.model.workflow import get_transitions, has_approval_access
 from frappe.utils import now_datetime
 
 DECISION_TOKEN = object()  # Identity cannot be supplied through a JSON document/flags.
+SELF_REQUEST_TOKEN = object()  # set only by custom_hr.api.my_overtime, for an employee requesting for themselves
 FINAL_STATES = {"Disetujui", "Ditolak"}
 PENDING_STATES = ("Menunggu Leader", "Menunggu SPV", "Menunggu HRD")
 AUDIT_FIELDS = ("approval_state", "decision_by", "decision_on")
+WAITING_FIELDS = {"Menunggu Leader": "approver_1", "Menunggu SPV": "approver_2"}
 
 
 def employee_state(doc, row):
 	return row.get("approval_state") or doc.status
+
+
+def waiting_for(doc, status):
+	"""Who a pending stage waits for, by name; the HRD stage is a role, not one person."""
+	user = doc.get(WAITING_FIELDS[status]) if status in WAITING_FIELDS else None
+	if user:
+		return frappe.db.get_value("User", user, "full_name") or user
+	return "HRD" if status == "Menunggu HRD" else None
+
+
+def stage_label(doc, status):
+	"""Working Calendar label: the approver by name, like the leave PL stage."""
+	name = waiting_for(doc, status) if status in WAITING_FIELDS else None
+	return f"Waiting for {name}" if name else status
 
 
 def employee_view(doc, row):
@@ -36,7 +52,7 @@ def protect_employee_decisions(doc):
 		return
 	if doc.is_new() or not doc.get("name"):
 		if any(row.get(field) for row in doc.employees for field in AUDIT_FIELDS):
-			frappe.throw(_("Tahap approval hanya boleh diubah melalui Leave Calendar."), frappe.PermissionError)
+			frappe.throw(_("Tahap approval hanya boleh diubah melalui Working Calendar."), frappe.PermissionError)
 		return
 	old = doc.get_doc_before_save()
 	if not old:
@@ -46,13 +62,13 @@ def protect_employee_decisions(doc):
 	for row in doc.employees:
 		previous = old_rows.get(row.name)
 		if any(str(row.get(field) or "") != str((previous.get(field) if previous else None) or "") for field in AUDIT_FIELDS):
-			frappe.throw(_("Tahap approval hanya boleh diubah melalui Leave Calendar."), frappe.PermissionError)
+			frappe.throw(_("Tahap approval hanya boleh diubah melalui Working Calendar."), frappe.PermissionError)
 	if started:
 		fixed = ("date", "start_time", "end_time", "overtime_type", "company", "outlet", "approver_1", "approver_2", "status")
 		if any(str(doc.get(field) or "") != str(old.get(field) or "") for field in fixed) or [(r.name, r.employee) for r in doc.employees] != [(r.name, r.employee) for r in old.employees]:
 			frappe.throw(_("Pengajuan yang sudah diproses per karyawan tidak boleh diubah atau diputuskan sekaligus."))
 	elif len(doc.employees) > 1 and doc.status != old.status and doc.flags.get("employee_initialization_token") is not DECISION_TOKEN:
-		frappe.throw(_("Gunakan Leave Calendar untuk approve/reject setiap karyawan secara terpisah."))
+		frappe.throw(_("Gunakan Working Calendar untuk approve/reject setiap karyawan secara terpisah."))
 
 
 def decide_employee(doc, employee, action, workflow):

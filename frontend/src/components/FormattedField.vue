@@ -4,7 +4,7 @@
 	<Badge
 		v-else-if="props.fieldtype === 'Select'"
 		variant="outline"
-		:theme="colorMap[props.value]"
+		:theme="colorMap[props.value] || (isWaiting(props.value) ? 'orange' : undefined)"
 		:label="__(props.value)"
 		size="md"
 	/>
@@ -68,6 +68,7 @@ import { inject } from "vue"
 import { Badge, FormControl, Input } from "frappe-ui"
 
 import EmployeeAvatar from "@/components/EmployeeAvatar.vue"
+import { isWaiting } from "@/utils/requestStatus"
 
 const dayjs = inject("$dayjs")
 

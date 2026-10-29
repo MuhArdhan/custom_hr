@@ -161,6 +161,7 @@ import { settings } from "@/data/settings"
 import { formatCurrency } from "@/utils/formatters"
 
 import useWorkflow from "@/composables/workflow"
+import { leaveDetailStatus } from "@/utils/requestStatus"
 
 const __ = inject("$translate")
 
@@ -252,6 +253,8 @@ const fieldsWithValues = computed(() => {
 				)
 			}
 			field.value = document?.doc?.[field.fieldname] || props.modelValue[field.fieldname]
+			if (field.fieldname === "status" && props.modelValue.doctype === "Leave Application")
+				field.value = leaveDetailStatus(document?.doc, props.modelValue.workflow_state_field) || field.value
 		}
 
 		return field.value
