@@ -20,10 +20,6 @@
 					<option v-for="choice in choices" :key="choice.shift" :value="choice.shift">{{ shiftChoiceLabel(choice) }}</option>
 				</select>
 			</div>
-			<div v-if="context?.incomplete_session" class="mt-3 text-sm text-orange-700" role="status">
-				{{ __("Missing Check-out") }} · {{ context.incomplete_session.shift_work_date }}
-				<div>{{ context.incomplete_session.message }}</div>
-			</div>
 			<p v-if="submission.pending?.uncertain && !submission.busy" class="mt-3 text-sm text-orange-700" role="status">
 				{{ __("The previous request is not confirmed. Check its status or retry the same action; do not start a new session.") }}
 				<span v-if="submission.pending.work_date" class="block">{{ __("Original attempt work date") }}: {{ submission.pending.work_date }}</span>

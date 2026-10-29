@@ -296,8 +296,8 @@ test("camera-open preview is not submitted as shift or browser timestamp", async
 		assert.match(ui.text(), /Shift 2 FINAL/); assert.equal(ui.nodes("modal").length, 0)
 	} finally { ui.unmount() }
 })
-test("incomplete session warning comes from server, not a browser date comparison", async () => {
-	const ui = mount({ context: { incomplete_session: { shift_work_date: "2026-10-14", message: "Contact HR; OUT remains empty" } } }); try { await flush(); assert.match(ui.text(), /Missing Check-out/); assert.match(ui.text(), /OUT remains empty/) } finally { ui.unmount() }
+test("missed check-out from an earlier session shows no warning", async () => {
+	const ui = mount({ context: { incomplete_session: { shift_work_date: "2026-10-14", message: "Contact HR; OUT remains empty" } } }); try { await flush(); assert.doesNotMatch(ui.text(), /Missing Check-out/); assert.doesNotMatch(ui.text(), /OUT remains empty/) } finally { ui.unmount() }
 })
 test("failed context refresh removes a stale enabled action", async () => {
 	const ui = mount(); try { await flush(); ui.failContext(); ui.listeners.get("online")(); await flush(); assert.match(ui.text(), /context offline/); await ui.click("Check In"); assert.equal(ui.nodes("modal").length, 0) } finally { ui.unmount() }
