@@ -1,6 +1,6 @@
 """Date-based approval inbox. Native permissions and workflows remain authoritative."""
 
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
 import frappe
 from frappe import _
@@ -11,11 +11,11 @@ from frappe.model.workflow import (
 	get_workflow_name,
 	has_approval_access,
 )
-from frappe.utils import cint, flt, getdate
+from frappe.utils import cint, flt, get_fullname, get_time, getdate
 from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 
 from custom_hr.services.leave_approver import stage_label
-from custom_hr.services.overtime_approval import FINAL_STATES, decide_employee, employee_state, employee_view
+from custom_hr.services.overtime_approval import FINAL_STATES, TIME_EDIT_TOKEN, decide_employee, employee_state, employee_view
 from custom_hr.services.overtime_approval import stage_label as overtime_stage_label
 
 TYPES = {"leave": "Leave Application", "overtime": "Overtime Request"}
@@ -112,6 +112,7 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		start = end = getdate(doc.date)
 		details = f"{doc.start_time} – {doc.end_time} ({doc.planned_hours} " + _("hours") + ")"
 		description = doc.get("reason") or ""
+		overtime = {"start_time": str(doc.start_time), "end_time": str(doc.end_time), "planned_hours": doc.planned_hours, "employee_count": len(doc.employees)}
 	return {
 		"doctype": doc.doctype, "name": doc.name, "kind": kind,
 		"employee": employees[0]["employee"],
@@ -121,7 +122,7 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		"details": details, "description": description, "company": doc.company,
 		"outlet": frappe.db.get_value("Employee", doc.employee, "outlet") if kind == "leave" else doc.get("outlet"),
 		"modified": str(doc.modified), "actions": actions,
-		**(_leave_balance(doc) if kind == "leave" else {}),
+		**(_leave_balance(doc) if kind == "leave" else overtime),
 	}
 
 
@@ -269,3 +270,42 @@ def decide_approval(doctype, name, action, modified, employee=None):
 		doc.submit()
 		result = doc
 	return {"name": result.name, "status": result.get(workflow.workflow_state_field) if workflow else result.status}
+
+
+@frappe.whitelist(methods=["POST"])
+def update_overtime_hours(name, hours, modified):
+	"""The approver of the current stage corrects the total overtime hours; the end time follows from the start.
+
+	The change applies to the whole request, so to every employee on it.
+	"""
+	if not name or not modified:
+		frappe.throw(_("Invalid request."))
+	hours = flt(hours, 2)
+	if not 0 < hours < 24:
+		frappe.throw(_("Total jam lembur harus lebih dari 0 dan kurang dari 24 jam."))
+	doc = frappe.get_doc("Overtime Request", name)
+	doc.check_permission("read")
+	frappe.db.get_value("Overtime Request", name, "name", for_update=True)
+	doc.reload()
+	if str(doc.modified) != modified:
+		frappe.throw(_("The request has changed. Reload the list before processing."))
+	workflow = _workflow("Overtime Request")
+	pending = [row for row in doc.employees if employee_state(doc, row) not in FINAL_STATES]
+	if not any(_actions(employee_view(doc, row), workflow) for row in pending):
+		frappe.throw(_("Hanya approver tahap ini yang dapat mengubah jam lembur."), frappe.PermissionError)
+	before = _hours_label(doc)
+	start = datetime.combine(date.min, get_time(doc.start_time))
+	# both as text: the stored start is a timedelta, which validate_times cannot subtract from a string
+	doc.start_time = start.time().strftime("%H:%M:%S")
+	doc.end_time = (start + timedelta(hours=hours)).time().strftime("%H:%M:%S")  # past midnight wraps, as validate_times expects
+	doc.flags.overtime_time_token = TIME_EDIT_TOKEN
+	try:
+		doc.save()  # normal write permission and every overtime rule, including the hour cap of the type
+	finally:
+		doc.flags.pop("overtime_time_token", None)
+	doc.add_comment("Info", _("Total jam lembur diubah oleh {0}: {1} → {2}").format(get_fullname(frappe.session.user), before, _hours_label(doc)))
+	return {"name": doc.name, "start_time": str(doc.start_time), "end_time": str(doc.end_time), "planned_hours": doc.planned_hours, "modified": str(doc.modified)}
+
+
+def _hours_label(doc):
+	return f"{flt(doc.planned_hours, 2):g} " + _("jam") + f" ({str(doc.start_time)[:5]}–{str(doc.end_time)[:5]})"

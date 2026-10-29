@@ -1,6 +1,7 @@
 """Calendar scope, permissions, workflow and concurrency tests; no business writes."""
 
 import unittest
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -260,6 +261,47 @@ class TestLeaveCalendar(unittest.TestCase):
 			doc = leave(doctype="Overtime Request", date="2026-10-22", start_time="17:00:00", end_time="19:00:00", planned_hours=2, status=status, **approvers, employees=[frappe._dict(employee="EMP-A", employee_name="A")])
 			with self.subTest(status=status), patch("frappe.db.get_value", side_effect=lambda doctype, name, field: names[name]):
 				self.assertEqual(api._request(doc, "overtime", [], None, doc.employees[0])["status"], expected)
+
+	def overtime(self, **changes):
+		values = dict(doctype="Overtime Request", name="OT-1", date="2026-10-22", start_time="17:00:00", end_time="21:00:00", planned_hours=4, status="Menunggu Leader", employees=[frappe._dict(employee="EMP-A", employee_name="A")])
+		values.update(changes)
+		doc = leave(**values)
+		doc.flags = frappe._dict()
+		self.factory.return_value = doc
+		return doc
+
+	def change_hours(self, doc, hours):
+		seen = {}
+		def save():  # the real save recomputes planned_hours in validate_times
+			seen.update(token=doc.flags.get("overtime_time_token"), end=doc.end_time)
+			doc.planned_hours = hours
+		doc.save.side_effect = save
+		with patch(MODULE + "_actions", return_value=[{"action": "Setujui", "kind": "approve", "next_state": "Menunggu SPV"}]), patch(MODULE + "get_fullname", return_value="Budi"):
+			api.update_overtime_hours(doc.name, hours, str(doc.modified))
+		return seen
+
+	def test_the_approver_changes_the_total_and_the_end_time_follows_from_the_start(self):
+		doc = self.overtime()
+		seen = self.change_hours(doc, 1.5)
+		self.assertEqual((doc.start_time, seen["end"]), ("17:00:00", "18:30:00"))
+		self.assertIs(seen["token"], api.TIME_EDIT_TOKEN)
+		self.assertNotIn("overtime_time_token", doc.flags)
+		self.assertIn("4 jam (17:00–21:00) → 1.5 jam (17:00–18:30)", doc.add_comment.call_args.args[1])
+		late = self.overtime(start_time="22:00:00", end_time="23:00:00", planned_hours=1)
+		self.assertEqual(self.change_hours(late, 3)["end"], "01:00:00")  # past midnight wraps
+		stored = self.overtime(start_time=timedelta(hours=17, minutes=9), end_time=timedelta(hours=19, minutes=9), planned_hours=2)
+		self.assertEqual((self.change_hours(stored, 1.5)["end"], stored.start_time), ("18:39:00", "17:09:00"))  # the database gives timedeltas
+
+	def test_only_the_current_approver_may_change_a_valid_total(self):
+		doc = self.overtime()
+		with patch(MODULE + "_actions", return_value=[]), self.assertRaises(frappe.PermissionError):
+			api.update_overtime_hours("OT-1", 2, str(doc.modified))
+		with self.assertRaisesRegex(frappe.ValidationError, "has changed"):
+			api.update_overtime_hours("OT-1", 2, "OLD")
+		for hours in (0, -1, 24, "abc"):
+			with self.subTest(hours=hours), self.assertRaises(frappe.ValidationError):
+				api.update_overtime_hours("OT-1", hours, str(doc.modified))
+		doc.save.assert_not_called()
 
 	def test_month_counts_include_each_pending_overtime_employee(self):
 		requests = [frappe._dict(name="OT-1", date="2026-10-22", status="Menunggu Leader"), frappe._dict(name="OT-2", date="2026-10-23", status="Menunggu HRD")]

@@ -111,6 +111,15 @@ class LeaveCalendar {
 			const note = item.kind === "leave" && item.from_date !== item.to_date ? __("The decision applies to the whole date range of this request.") : "";
 			frappe.confirm(__("{0} request from {1} ({2})?", [action.kind === "approve" ? __("Approve") : __("Reject"), frappe.utils.escape_html(person.employee_name), frappe.utils.escape_html(item.name)]) + " " + note, () => this.decide(dialog, item, action));
 		});
+		const body = dialog.fields_dict.body.$wrapper;
+		body.on("click", ".ac-time", (event) => this.open_time_editor(dialog, event.currentTarget));
+		// Enter or leaving the field saves; Esc puts the text back.
+		body.on("focusout", ".ac-hours", (event) => this.save_time(dialog, event.currentTarget.closest(".ac-time-wrap")));
+		body.on("keydown", ".ac-hours", (event) => {
+			const wrap = event.currentTarget.closest(".ac-time-wrap");
+			if (event.key === "Enter") { event.preventDefault(); this.save_time(dialog, wrap); }
+			if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); wrap.dataset.done = "1"; this.load_day(dialog); }
+		});
 		dialog.show();
 		this.load_day(dialog);
 	}
@@ -138,7 +147,7 @@ class LeaveCalendar {
 				const person = item.employees[0];
 				const [status, label] = item.kind === "overtime" ? ["overtime", __("Overtime")] : this.leave_types().find(([key]) => key === item.calendar_status) || this.leave_types()[0];
 				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small></td>
-					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${escape(item.details)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
+					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${this.details_html(item, index)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
 					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button></div>${this.balance_html(item)}${item.description ? `<div class="ac-reason">${escape(item.description)}</div>` : ""}</td>
 					<td><span class="ac-stage ac-${status}">${escape(item.status)}</span></td>
 					<td><div class="ac-request-actions">${item.actions.length ? item.actions.map((action, actionIndex) => `<button class="btn btn-xs ${action.kind === "approve" ? "btn-primary" : "btn-danger"} ac-decision" data-index="${index}" data-action="${actionIndex}" title="${escape(action.next_state)}">${action.kind === "approve" ? __("Approve") : __("Reject")}</button>`).join("") : `<span class="text-muted">${__("View only")}</span>`}</div></td></tr>`;
@@ -146,6 +155,46 @@ class LeaveCalendar {
 			body.html(html + "</tbody></table></div>");
 		} catch {
 			if (token === dialog.leave_load_token) body.text(__("Failed to load requests. Close and reopen this date."));
+		}
+	}
+
+	// The total hours read as plain text; for the current approver a click turns them into an input.
+	// Only the total changes: the end time follows from the start on the server.
+	details_html(item, index) {
+		const escape = value => frappe.utils.escape_html(String(value || ""));
+		if (item.kind !== "overtime" || !item.actions.length || !item.start_time || !item.end_time || item.planned_hours == null) return escape(item.details);
+		const span = `${item.start_time.slice(0, 5)} – ${item.end_time.slice(0, 5)}`;
+		return `${escape(span)} (<span class="ac-time-wrap" data-index="${index}"><button type="button" class="ac-time" title="${__("Click to change the total hours")}">${escape(item.planned_hours)}</button></span> ${__("hours")})`;
+	}
+
+	open_time_editor(dialog, button) {
+		if (dialog.approval_busy) return;
+		const wrap = button.closest(".ac-time-wrap");
+		const item = dialog.approval_items[Number(wrap.dataset.index)];
+		const shared = item.employee_count > 1 ? `<small class="text-muted ac-subline">${__("The new hours apply to all {0} employees on {1}.", [item.employee_count, frappe.utils.escape_html(item.name)])}</small>` : "";
+		wrap.innerHTML = `<input type="number" class="ac-hours" min="0.5" max="23.5" step="0.5" value="${Number(item.planned_hours)}" aria-label="${__("Total hours")}">${shared}`;
+		wrap.querySelector(".ac-hours").focus();
+	}
+
+	async save_time(dialog, wrap) {
+		// done: Enter already saved (the following blur must not save again) or Esc cancelled
+		if (dialog.approval_busy || !wrap || wrap.dataset.done) return;
+		wrap.dataset.done = "1";
+		const item = dialog.approval_items[Number(wrap.dataset.index)];
+		const hours = Number(wrap.querySelector(".ac-hours")?.value);
+		if (item?.kind !== "overtime" || !item.actions.length || !(hours > 0) || hours === Number(item.planned_hours)) {
+			await this.load_day(dialog); // nothing to save: back to the plain text
+			return;
+		}
+		dialog.approval_busy = true;
+		try {
+			await frappe.call({ method: "custom_hr.api.leave_calendar.update_overtime_hours", type: "POST", args: { name: item.name, hours, modified: item.modified } });
+			frappe.show_alert({ message: __("Overtime hours updated."), indicator: "green" });
+		} catch {
+			frappe.show_alert({ message: __("Hours not updated. Check the error message and the latest list."), indicator: "red" });
+		} finally {
+			dialog.approval_busy = false;
+			await Promise.allSettled([this.load_day(dialog), this.load()]);
 		}
 	}
 

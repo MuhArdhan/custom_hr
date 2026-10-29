@@ -269,3 +269,73 @@ test("the month grid asks only for counts, never for the full request list", asy
 	assert.equal(calls[0].args.start_date, "2026-09-27")
 	assert.equal(calls[0].args.end_date, "2026-11-07")
 })
+
+const overtimeItem = (changes = {}) => ({ ...item(), kind: "overtime", doctype: "Overtime Request", name: "LEMBUR-1", details: "17:00:00 – 21:00:00 (4 hours)", start_time: "17:00:00", end_time: "21:00:00", planned_hours: 4, employee_count: 1, actions: [{ action: "Setujui", kind: "approve", next_state: "Menunggu SPV" }], ...changes })
+
+// A stand-in for the hours cell: dataset, innerHTML and the input the editor reads.
+function hoursCell(index, hours) {
+	const focused = []
+	return {
+		dataset: { index: String(index) }, innerHTML: "", focused,
+		closest() { return this },
+		querySelector(selector) {
+			return selector === ".ac-hours" ? { value: hours, focus: () => focused.push(selector) } : null
+		},
+	}
+}
+
+test("only the total hours are clickable, and only for the approver of the current stage", async () => {
+	const ui = calendar()
+	ui.instance.request = async () => ({ items: [overtimeItem(), overtimeItem({ name: "LEMBUR-2", actions: [] }), item()] })
+	await ui.instance.load_day(ui.dialog)
+	assert.equal((ui.html().match(/class="ac-time"/g) || []).length, 1)
+	assert.ok(ui.html().includes('17:00 – 21:00 (<span class="ac-time-wrap" data-index="0"><button type="button" class="ac-time"'))
+	assert.ok(ui.html().includes(">4</button></span> hours)"))
+	assert.ok(ui.html().includes("17:00:00 – 21:00:00 (4 hours)"))  // the view-only row keeps the plain text
+})
+
+test("a click turns the total hours into a number input", () => {
+	const ui = calendar()
+	ui.dialog.approval_items = [overtimeItem({ employee_count: 2 })]
+	const cell = hoursCell(0, "4")
+	ui.instance.open_time_editor(ui.dialog, cell)
+	assert.match(cell.innerHTML, /<input type="number" class="ac-hours" min="0.5" max="23.5" step="0.5" value="4"/)
+	assert.ok(!cell.innerHTML.includes('type="time"'))
+	assert.ok(!cell.innerHTML.includes("<button"))  // no save or cancel buttons: Enter, leaving the field, Esc
+	assert.ok(cell.innerHTML.includes("apply to all {0} employees"))  // the test __ leaves placeholders unfilled
+	assert.deepEqual([...cell.focused], [".ac-hours"])
+})
+
+test("saving posts the new total with the stamp and refreshes; view-only rows send nothing", async () => {
+	const ui = calendar()
+	ui.dialog.approval_items = [overtimeItem(), overtimeItem({ name: "LEMBUR-2", actions: [] })]
+	const posts = []
+	ui.frappe.call = async value => { posts.push(value); return {} }
+	let reloads = 0
+	ui.instance.load_day = async () => { reloads++ }
+	ui.instance.load = async () => { reloads++ }
+	await ui.instance.save_time(ui.dialog, hoursCell(0, "1.5"))
+	assert.equal(posts[0].method, "custom_hr.api.leave_calendar.update_overtime_hours")
+	assert.deepEqual({ ...posts[0].args }, { name: "LEMBUR-1", hours: 1.5, modified: "STAMP" })
+	assert.equal(reloads, 2)
+	await ui.instance.save_time(ui.dialog, hoursCell(1, "2"))
+	for (const empty of ["", "0", "-1", "abc", "4"]) await ui.instance.save_time(ui.dialog, hoursCell(0, empty))  // "4" is unchanged
+	assert.equal(posts.length, 1)
+})
+
+test("Enter then leaving the field saves once, and Esc saves nothing", async () => {
+	const ui = calendar()
+	ui.dialog.approval_items = [overtimeItem()]
+	const posts = []
+	ui.frappe.call = async value => { posts.push(value); return {} }
+	ui.instance.load_day = async () => {}
+	ui.instance.load = async () => {}
+	const cell = hoursCell(0, "2")
+	await ui.instance.save_time(ui.dialog, cell)  // Enter
+	await ui.instance.save_time(ui.dialog, cell)  // the blur that follows
+	assert.equal(posts.length, 1)
+	const cancelled = hoursCell(0, "3")
+	cancelled.dataset.done = "1"  // what Esc sets before the text is put back
+	await ui.instance.save_time(ui.dialog, cancelled)
+	assert.equal(posts.length, 1)
+})

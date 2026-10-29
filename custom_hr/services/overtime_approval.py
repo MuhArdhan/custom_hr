@@ -8,6 +8,7 @@ from frappe.model.workflow import get_transitions, has_approval_access
 from frappe.utils import now_datetime
 
 DECISION_TOKEN = object()  # Identity cannot be supplied through a JSON document/flags.
+TIME_EDIT_TOKEN = object()  # set only by the Working Calendar hour correction of the current approver
 SELF_REQUEST_TOKEN = object()  # set only by custom_hr.api.my_overtime, for an employee requesting for themselves
 FINAL_STATES = {"Disetujui", "Ditolak"}
 PENDING_STATES = ("Menunggu Leader", "Menunggu SPV", "Menunggu HRD")
@@ -65,6 +66,8 @@ def protect_employee_decisions(doc):
 			frappe.throw(_("Tahap approval hanya boleh diubah melalui Working Calendar."), frappe.PermissionError)
 	if started:
 		fixed = ("date", "start_time", "end_time", "overtime_type", "company", "outlet", "approver_1", "approver_2", "status")
+		if doc.flags.get("overtime_time_token") is TIME_EDIT_TOKEN:
+			fixed = tuple(field for field in fixed if field not in ("start_time", "end_time"))
 		if any(str(doc.get(field) or "") != str(old.get(field) or "") for field in fixed) or [(r.name, r.employee) for r in doc.employees] != [(r.name, r.employee) for r in old.employees]:
 			frappe.throw(_("Pengajuan yang sudah diproses per karyawan tidak boleh diubah atau diputuskan sekaligus."))
 	elif len(doc.employees) > 1 and doc.status != old.status and doc.flags.get("employee_initialization_token") is not DECISION_TOKEN:

@@ -103,6 +103,24 @@ class TestEmployeeOvertimeApproval(unittest.TestCase):
 		with patch.object(self.doc, "get_doc_before_save", return_value=old), self.assertRaises(frappe.ValidationError):
 			service.protect_employee_decisions(self.doc)
 
+	def test_only_the_calendar_hour_correction_may_change_the_hours_after_decisions_started(self):
+		for row in self.doc.employees:
+			row.approval_state = "Menunggu SPV"
+		old = deepcopy(self.doc)
+		self.doc.end_time = "18:00:00"
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), self.assertRaises(frappe.ValidationError):
+			service.protect_employee_decisions(self.doc)
+		self.doc.flags.overtime_time_token = service.TIME_EDIT_TOKEN
+		with patch.object(self.doc, "get_doc_before_save", return_value=old):
+			service.protect_employee_decisions(self.doc)
+			self.doc.date = "2026-10-29"  # the token unlocks the hours only
+			with self.assertRaises(frappe.ValidationError):
+				service.protect_employee_decisions(self.doc)
+		self.doc.flags.overtime_time_token = object()  # a look-alike flag unlocks nothing
+		self.doc.date = old.date
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), self.assertRaises(frappe.ValidationError):
+			service.protect_employee_decisions(self.doc)
+
 	def test_legacy_rows_keep_parent_state_until_first_individual_action(self):
 		self.doc.status = "Menunggu HRD"
 		self.assertEqual(service.employee_state(self.doc, self.doc.employees[0]), "Menunggu HRD")

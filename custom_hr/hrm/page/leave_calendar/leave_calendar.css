@@ -53,6 +53,8 @@
 .ac-balance { font-size: 11px; }
 .ac-over { color: var(--red-600, #c0392b); font-weight: 600; }
 .ac-stage { display: inline-block; padding: 4px 7px; border-radius: 5px; white-space: nowrap; font-size: 11px; }
+.ac-time { border: 0; padding: 0; background: none; color: inherit; font: inherit; border-bottom: 1px dashed currentColor; cursor: pointer; }
+.ac-time-wrap input { width: 56px; padding: 0 4px; border: 1px solid var(--border-color, #d1d8dd); border-radius: 4px; font: inherit; }
 .ac-request-actions { display: flex; gap: 5px; white-space: nowrap; font-size: 11px; }
 .ac-request-actions .btn { font-size: 11px; border-radius: 5px; }
 .ac-shell button:focus-visible, .ac-table button:focus-visible { outline: 2px solid var(--primary, #466fbf); outline-offset: 2px; }
