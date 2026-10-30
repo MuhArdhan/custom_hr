@@ -30,7 +30,7 @@ add_to_apps_screen = [
 		"name": "custom_hr",
 		"logo": "/assets/custom_hr/images/hrm-logo.svg",
 		"title": "HRM",
-		"route": "/app/employee-attendance-gallery",
+		"route": "/app/hrm",
 	}
 ]
 
