@@ -22,3 +22,4 @@ custom_hr.patches.create_overtime_list
 custom_hr.patches.tidy_hrm_sidebar
 # Patches added in this section will be executed after doctypes are migrated
 custom_hr.patches.fill_employee_user_username
+custom_hr.patches.add_leave_spv_stage

@@ -41,9 +41,21 @@ class TestApprovalOverride(unittest.TestCase):
 
 	def test_leave_needs_every_approver_role_and_never_the_own_leave(self):
 		doc = Doc(employee="EMP-1", leave_approver="pl@example.com", owner="crew@example.com")
-		approve, reject = leave_transitions()
-		self.assertEqual((approve["next_state"], reject["next_state"]), ("Menunggu HRD", "Rejected"))
+		steps = {(t["state"], t["action"], t["next_state"]): t for t in leave_transitions()}
+		approve = steps[("Menunggu PL", "Approve", "Menunggu HRD")]  # the outlet has no Approver 2 here
+		self.assertIn(("Menunggu PL", "Reject", "Rejected"), steps)
+		self.assertFalse(self.allowed(steps[("Menunggu PL", "Approve", "Menunggu SPV")], doc, "admin@example.com", LEAVE_ROLES))
 		self.assertTrue(self.allowed(approve, doc, "admin@example.com", LEAVE_ROLES))
 		self.assertFalse(self.allowed(approve, doc, "admin@example.com", ("HR Manager",)))
 		self.assertFalse(self.allowed(approve, doc, "pl@example.com", LEAVE_ROLES))
 		self.assertFalse(self.allowed(approve, Doc(doc, owner="admin@example.com"), "admin@example.com", LEAVE_ROLES))
+
+	def test_spv_stage_override_needs_spv_and_hr_roles(self):
+		from custom_hr.services.approval_override import SPV_LEAVE_ROLES
+
+		doc = Doc(employee="EMP-1", leave_approver="spv@example.com", owner="crew@example.com")
+		steps = {(t["state"], t["action"], t["next_state"]): t for t in leave_transitions()}
+		approve = steps[("Menunggu SPV", "Approve", "Menunggu HRD")]
+		self.assertTrue(self.allowed(approve, doc, "admin@example.com", SPV_LEAVE_ROLES))
+		self.assertFalse(self.allowed(approve, doc, "admin@example.com", ("HR Manager",)))
+		self.assertFalse(self.allowed(approve, doc, "spv@example.com", SPV_LEAVE_ROLES))  # the SPV uses the normal step

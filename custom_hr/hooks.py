@@ -105,6 +105,7 @@ doc_events = {
 	"Leave Application": {
 		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
 		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
+		"on_update": "custom_hr.services.leave_approver.hand_over_to_approver_2",
 	},
 	"Leave Type": {
 		"validate": "custom_hr.services.leave_auto_allocation.validate_leave_type",

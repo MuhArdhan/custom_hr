@@ -6,7 +6,8 @@ from hrms.api import get_leave_approval_details as hrms_get_leave_approval_detai
 from hrms.hr.doctype.leave_application.leave_application import get_employee_leave_approver
 
 PENDING_PL = "Menunggu PL"
-SUBMIT_ACTIONS = ("Ajukan ke PL", "Ajukan ke HRD")
+PENDING_STAGES = (PENDING_PL, "Menunggu SPV")  # stages that wait for one named approver
+SUBMIT_ACTIONS = ("Ajukan ke PL", "Ajukan ke SPV", "Ajukan ke HRD")
 
 
 @frappe.whitelist()
@@ -16,7 +17,7 @@ def get_leave_approver(employee, leave_application=None):
 	if approver:
 		return approver
 	outlet = frappe.db.get_value("Employee", employee, "outlet")
-	return outlet and frappe.db.get_value("Outlet", outlet, "approver_1")
+	return outlet and (frappe.db.get_value("Outlet", outlet, "approver_1") or frappe.db.get_value("Outlet", outlet, "approver_2"))
 
 
 @frappe.whitelist()
@@ -50,7 +51,23 @@ def submit_to_approver(doc, method=None):
 			return
 
 
+def hand_over_to_approver_2(doc, method=None):
+	"""on_update: at Menunggu SPV the outlet's Approver 2 becomes the leave approver.
+
+	Set after the save instead of through the workflow state: native on_update would then
+	un-share the request from the PL, which the PL has no permission to do. The PL keeps read access.
+	"""
+	if doc.get("leave_workflow_state") != "Menunggu SPV":
+		return
+	outlet = frappe.db.get_value("Employee", doc.employee, "outlet")
+	spv = outlet and frappe.db.get_value("Outlet", outlet, "approver_2")
+	if not spv or doc.leave_approver == spv:
+		return
+	doc.db_set({"leave_approver": spv, "leave_approver_name": frappe.utils.get_fullname(spv)})
+	frappe.share.add_docshare(doc.doctype, doc.name, spv, submit=1, flags={"ignore_share_permission": True})
+
+
 def stage_label(state, doc):
-	"""Name the approver instead of the generic 'Menunggu PL' state."""
+	"""Name the approver instead of the generic 'Menunggu PL' / 'Menunggu SPV' state."""
 	name = doc.get("leave_approver_name") or doc.get("leave_approver")
-	return f"Waiting for {name}" if state == PENDING_PL and name else state
+	return f"Waiting for {name}" if state in PENDING_STAGES and name else state

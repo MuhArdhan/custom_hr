@@ -12,17 +12,17 @@ from custom_hr.patches.setup_native_leave_workflow import configuration
 REQUESTER = "requester@example.com"
 
 
-def evaluate(rows, *, outlet, pl, employee_user, owner=REQUESTER, user=REQUESTER):
-	"""Transitions whose condition passes for the outlet/PL/employee setup."""
+def evaluate(rows, *, outlet, pl, employee_user, spv=None, owner=REQUESTER, user=REQUESTER, leave_approver=None):
+	"""Transitions whose condition passes for the outlet/PL/SPV/employee setup."""
 	def get_value(doctype, name, field=None, *args, **kwargs):
 		if doctype == "Employee":
 			return {"outlet": outlet, "user_id": employee_user}[field]
 		if doctype == "Outlet":
-			return pl if name else None
+			return {"approver_1": pl, "approver_2": spv}[field] if name else None
 		if doctype == "HR Settings":
 			return 0
 
-	doc = frappe._dict(employee="EMP-1", owner=owner, leave_approver=None)
+	doc = frappe._dict(employee="EMP-1", owner=owner, leave_approver=leave_approver)
 	with patch("frappe.db.get_value", side_effect=get_value), patch("frappe.session", new=frappe._dict(user=user)):
 		return [
 			row for row in rows
@@ -34,6 +34,12 @@ def available_submissions(**setup):
 	"""Actions offered from Open for the outlet/PL/employee setup."""
 	rows = [row for row in configuration()["transitions"] if row["state"] == "Open" and row["action"].startswith("Ajukan")]
 	return [row["action"] for row in evaluate(rows, **setup)]
+
+
+def approval_targets(state, role, **setup):
+	"""Where Approve at `state` leads for the given approver role and setup."""
+	rows = [row for row in configuration()["transitions"] if row["state"] == state and row["action"] == "Approve" and row["allowed"] == role]
+	return [row["next_state"] for row in evaluate(rows, **setup)]
 
 
 def hrd_approval(**setup):
@@ -72,3 +78,35 @@ class TestLeaveWorkflowRouting(unittest.TestCase):
 
 	def test_only_the_document_owner_can_submit(self):
 		self.assertEqual(available_submissions(outlet="OUT-1", pl=None, employee_user=REQUESTER, owner="other@example.com"), [])
+
+
+PL_USER, SPV_USER = "pl@example.com", "spv@example.com"
+
+
+class TestLeaveApprover2Routing(unittest.TestCase):
+	def test_pl_is_still_first_when_both_approvers_are_set(self):
+		self.assertEqual(available_submissions(outlet="OUT-1", pl=PL_USER, spv=SPV_USER, employee_user=REQUESTER), ["Ajukan ke PL"])
+
+	def test_outlet_with_only_approver_2_goes_to_spv(self):
+		self.assertEqual(available_submissions(outlet="OUT-1", pl=None, spv=SPV_USER, employee_user=REQUESTER), ["Ajukan ke SPV"])
+
+	def test_spv_own_leave_without_pl_goes_to_hrd(self):
+		self.assertEqual(available_submissions(outlet="OUT-1", pl=None, spv=REQUESTER, employee_user=REQUESTER), ["Ajukan ke HRD"])
+
+	def test_pl_approval_moves_to_spv_only_when_approver_2_is_set(self):
+		setup = dict(outlet="OUT-1", pl=PL_USER, employee_user=REQUESTER, user=PL_USER, leave_approver=PL_USER)
+		self.assertEqual(approval_targets("Menunggu PL", "PL Outlet", spv=SPV_USER, **setup), ["Menunggu SPV"])
+		self.assertEqual(approval_targets("Menunggu PL", "PL Outlet", spv=None, **setup), ["Menunggu HRD"])
+
+	def test_same_person_as_approver_1_and_2_is_asked_once(self):
+		setup = dict(outlet="OUT-1", pl=PL_USER, spv=PL_USER, employee_user=REQUESTER, user=PL_USER, leave_approver=PL_USER)
+		self.assertEqual(approval_targets("Menunggu PL", "PL Outlet", **setup), ["Menunggu HRD"])
+
+	def test_spv_leave_skips_its_own_stage_after_the_pl(self):
+		setup = dict(outlet="OUT-1", pl=PL_USER, spv=REQUESTER, employee_user=REQUESTER, user=PL_USER, leave_approver=PL_USER)
+		self.assertEqual(approval_targets("Menunggu PL", "PL Outlet", **setup), ["Menunggu HRD"])
+
+	def test_only_the_recorded_approver_2_decides_the_spv_stage(self):
+		setup = dict(outlet="OUT-1", pl=PL_USER, spv=SPV_USER, employee_user=REQUESTER, leave_approver=SPV_USER)
+		self.assertEqual(approval_targets("Menunggu SPV", "SPV Outlet", user=SPV_USER, **setup), ["Menunggu HRD"])
+		self.assertEqual(approval_targets("Menunggu SPV", "SPV Outlet", user="other.spv@example.com", **setup), [])

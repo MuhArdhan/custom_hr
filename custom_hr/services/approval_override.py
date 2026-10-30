@@ -7,6 +7,7 @@ Users with just one of the roles still act only at their own stage.
 
 OVERTIME_ROLES = ("Outlet Leader", "SPV Outlet", "HR Manager")
 LEAVE_ROLES = ("PL Outlet", "HR Manager")
+SPV_LEAVE_ROLES = ("SPV Outlet", "HR Manager")
 OVERRIDE_ROLE = "HR Manager"  # the transition's role; the condition demands the rest
 
 
@@ -38,11 +39,17 @@ def overtime_transitions():
 
 
 def leave_transitions():
-	"""Override steps for a stuck Menunggu PL stage; never for the user's own leave."""
+	"""Override steps for a stuck Menunggu PL / Menunggu SPV stage; never for the user's own leave."""
+	from custom_hr.patches.setup_native_leave_workflow import NEEDS_SPV, SKIP_SPV
+
 	outlet = 'frappe.db.get_value("Employee", doc.employee, "outlet")'
 	not_self = 'doc.owner != frappe.session.user and frappe.db.get_value("Employee", doc.employee, "user_id") != frappe.session.user'
 	override = f"{outlet} and {holds_roles(*LEAVE_ROLES)} and doc.leave_approver != frappe.session.user"
+	spv_override = f"{outlet} and {holds_roles(*SPV_LEAVE_ROLES)} and doc.leave_approver != frappe.session.user"
 	return [
-		dict(state="Menunggu PL", action="Approve", next_state="Menunggu HRD", allowed=OVERRIDE_ROLE, condition=f"{override} and {not_self}", allow_self_approval=0),
+		dict(state="Menunggu PL", action="Approve", next_state="Menunggu SPV", allowed=OVERRIDE_ROLE, condition=f"{override} and {not_self} and {NEEDS_SPV}", allow_self_approval=0),
+		dict(state="Menunggu PL", action="Approve", next_state="Menunggu HRD", allowed=OVERRIDE_ROLE, condition=f"{override} and {not_self} and {SKIP_SPV}", allow_self_approval=0),
 		dict(state="Menunggu PL", action="Reject", next_state="Rejected", allowed=OVERRIDE_ROLE, condition=override, allow_self_approval=1),
+		dict(state="Menunggu SPV", action="Approve", next_state="Menunggu HRD", allowed=OVERRIDE_ROLE, condition=f"{spv_override} and {not_self}", allow_self_approval=0),
+		dict(state="Menunggu SPV", action="Reject", next_state="Rejected", allowed=OVERRIDE_ROLE, condition=spv_override, allow_self_approval=1),
 	]

@@ -20,6 +20,7 @@ test("leave at the PL stage shows the leave approver; HRD and final states are l
 	assert.equal(leaveDetailStatus(doc, "leave_workflow_state"), "Menunggu Siti")
 	assert.equal(leaveDetailStatus({ ...doc, leave_approver_name: "" }, "leave_workflow_state"), "Menunggu pl@example.com")
 	assert.equal(leaveDetailStatus({ ...doc, leave_workflow_state: "Menunggu HRD" }, "leave_workflow_state"), "Menunggu HRD")
+	assert.equal(leaveDetailStatus({ ...doc, leave_workflow_state: "Menunggu SPV" }, "leave_workflow_state"), "Menunggu Siti")
 	assert.equal(leaveDetailStatus({ ...doc, leave_workflow_state: "Approved" }, "leave_workflow_state"), null)
 	assert.equal(leaveDetailStatus(doc, undefined), null)
 	assert.equal(leaveDetailStatus(null, "leave_workflow_state"), null)
