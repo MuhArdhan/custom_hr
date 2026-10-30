@@ -63,6 +63,8 @@ def read_outlet_geofence(outlet_name):
 		"Shift Location", outlet.shift_location, ["name", "latitude", "longitude", "checkin_radius"],
 		as_dict=True, for_update=True,
 	) if outlet.shift_location else None
+	if not outlet.shift_location:
+		return None  # Same as native: no linked location means GPS is recorded without a radius check.
 	if not location:
 		frappe.throw(_("Konfigurasi lokasi Outlet {0} belum lengkap: Shift Location belum dihubungkan atau tidak ditemukan.").format(outlet.name))
 	location["shift_location"] = location.name
@@ -71,13 +73,17 @@ def read_outlet_geofence(outlet_name):
 	return location
 
 
+def require_gps(latitude, longitude):
+	try:
+		return coordinates(latitude, longitude)
+	except ValueError:
+		frappe.throw(_("GPS tidak tersedia atau koordinat tidak valid. Aktifkan izin lokasi dan kirim Latitude serta Longitude yang lengkap."), title=_("Lokasi Diperlukan"))
+
+
 def check_position(outlet, latitude, longitude):
 	"""Pure radius check in meters. Exact boundary is inclusive, no extra buffer."""
 	lat, lon, radius = validate_configuration(outlet)
-	try:
-		gps_lat, gps_lon = coordinates(latitude, longitude)
-	except ValueError:
-		frappe.throw(_("GPS tidak tersedia atau koordinat tidak valid. Aktifkan izin lokasi dan kirim Latitude serta Longitude yang lengkap."), title=_("Lokasi Diperlukan"))
+	gps_lat, gps_lon = require_gps(latitude, longitude)
 	if radius == 0:
 		return None  # Native HRMS semantics: record GPS, no radius enforcement.
 	try:
@@ -109,6 +115,9 @@ def validate_outlet_geofence(doc):
 		lat, lon = doc.get("latitude"), doc.get("longitude")
 	else:
 		lat, lon = flt(lat, doc.precision("latitude")), flt(lon, doc.precision("longitude"))
-	check_position(outlet, lat, lon)
+	if outlet:
+		check_position(outlet, lat, lon)
+	else:
+		require_gps(lat, lon)
 	doc.latitude, doc.longitude = lat, lon
 	return True

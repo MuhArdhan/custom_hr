@@ -169,11 +169,18 @@ class TestGeofenceLifecycle(TestCase):
 			service.validate_outlet_geofence(self.doc)
 		self.reader.assert_not_called()
 
-	def test_missing_link_rejects_even_when_legacy_outlet_coordinates_are_valid(self):
+	def test_missing_link_records_gps_without_a_radius_check(self):
 		self.config.shift_location = None
-		with self.assertRaisesRegex(frappe.ValidationError, "Shift Location belum dihubungkan"):
-			service.validate_outlet_geofence(self.doc)
+		self.doc.latitude, self.doc.longitude = 40, -70  # far from the legacy outlet coordinates
+		self.assertTrue(service.validate_outlet_geofence(self.doc))
+		self.assertEqual((self.doc.latitude, self.doc.longitude), (40, -70))
 		self.assertEqual(self.reader.call_count, 1)
+
+	def test_missing_link_still_requires_gps(self):
+		self.config.shift_location = None
+		self.doc.latitude = self.doc.longitude = None
+		with self.assertRaisesRegex(frappe.ValidationError, "GPS tidak tersedia"):
+			service.validate_outlet_geofence(self.doc)
 
 	def test_deleted_link_target_does_not_fall_back_to_legacy_radius(self):
 		self.reader.side_effect = [self.config, None]
@@ -272,6 +279,7 @@ class TestAbsenceGeofenceSafety(TestCase):
 		from custom_hr.services.test_outlet_scheduler import stable_records
 
 		employee, config = stable_records()
+		config.shift_location = "Linked Location"  # linked, but without coordinates
 		with patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", True), patch("frappe.db.get_single_value", return_value=1), patch("frappe.db.get_value", side_effect=lambda dt, *a, **k: employee if dt == "Employee" else config):
 			with self.assertRaisesRegex(frappe.ValidationError, "Konfigurasi lokasi Outlet"):
 				_day_context("EMP", "2026-10-15")
