@@ -208,10 +208,12 @@ def _settled_dates(employee, start, end):
 	"""Advisory pruning only; the date worker always rechecks under lock."""
 	rows = frappe.get_all(
 		"Attendance", filters={"employee": employee, "attendance_date": ["between", [start, end]]},
-		fields=["attendance_date", "docstatus", "status", "modify_half_day_status", "attendance_request", "source_checkin"],
+		fields=["attendance_date", "docstatus", "status", "modify_half_day_status", "attendance_request", "source_checkin", "leave_application"],
 	)
 	groups = {}
 	for row in rows:
+		if cint(row.docstatus) == 2 and row.leave_application:
+			continue  # cancelled together with its leave; the day still needs its outlet session
 		groups.setdefault(getdate(row.attendance_date), []).append(row)
 	return {
 		day for day, records in groups.items() if not any(

@@ -279,6 +279,11 @@ class TestSessionPersistence(TestCase):
 		self.assertEqual(self.run_session()["reason"], "cancelled_attendance")
 		self.writer.assert_not_called()
 
+	def test_attendance_cancelled_with_its_leave_does_not_block_the_session(self):
+		self.existing(docstatus=2, status="On Leave", leave_application="LEAVE-CANCELLED")
+		self.assertEqual(self.run_session()["status"], "created")
+		self.writer.assert_called()
+
 	def test_draft_attendance_is_not_submitted_or_overwritten(self):
 		self.existing(docstatus=0)
 		with self.assertRaises(frappe.ValidationError):

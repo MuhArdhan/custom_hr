@@ -331,3 +331,8 @@ class TestNativeIsolation(TestCase):
 		with patch("frappe.get_all", return_value=rows):
 			result = service._settled_dates("EMP", "2026-10-15", "2026-10-17")
 		self.assertEqual({str(day) for day in result}, {"2026-10-15", "2026-10-17"})
+
+	def test_attendance_cancelled_with_its_leave_does_not_settle_the_day(self):
+		rows = [frappe._dict(attendance_date="2026-10-15", docstatus=2, status="On Leave", leave_application="LEAVE-CANCELLED")]
+		with patch("frappe.get_all", return_value=rows):
+			self.assertEqual(service._settled_dates("EMP", "2026-10-15", "2026-10-15"), set())

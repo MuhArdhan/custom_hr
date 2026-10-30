@@ -219,9 +219,10 @@ def _process_session(source_checkin, source_checkout, *, finalize_missing=False)
 		if linked:
 			_link_logs(entry, checkout, existing.name)
 			return {"status": "already_processed", "attendance": existing.name}
-	elif attendances:
+	elif any(not row.leave_application for row in attendances):
 		# A cancelled result is an administrative decision, not an invitation to
-		# recreate it on retry. T09 will also use this guard for recovery scans.
+		# recreate it on retry. A leave's attendance cancelled with that leave
+		# (Cuti/Izin withdrawn) is not, so the employee's real session counts.
 		return {"status": "skipped", "reason": "cancelled_attendance"}
 	leaves = _approved_leaves(entry)
 	if len(leaves) > 1:
