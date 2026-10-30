@@ -14,7 +14,6 @@ from frappe.utils import add_days, cint, date_diff, getdate
 from hrms.api import get_current_employee, get_holidays_for_calendar
 
 
-EMPLOYEE_GALLERY_ROLES = ("HR Manager", "HR User", "System Manager")
 ATTENDANCE_STATUSES = ("Present", "Half Day", "Absent", "On Leave", "Work From Home")
 # Filtering logs by the attendance of their day is done in Python, so keep the range small.
 MAX_FILTERED_DAYS = 31
@@ -131,8 +130,14 @@ def get_leave_types(employee: str, date: str) -> list:
 	return leave_types
 
 
+def require_page_access(page: str) -> None:
+	"""A page's APIs follow the page's roles, managed in Role Permission for Page and Report."""
+	if not frappe.get_doc("Page", page).is_permitted():
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
 def _require_employee_gallery_access() -> None:
-	frappe.only_for(EMPLOYEE_GALLERY_ROLES)
+	require_page_access("employee-attendance-gallery")
 
 
 def _get_accessible_employees(company: str | None = None) -> list[str]:

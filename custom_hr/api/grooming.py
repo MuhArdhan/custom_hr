@@ -8,10 +8,11 @@ from frappe import _
 from frappe.utils import cint, getdate, now_datetime, nowdate
 from hrms.api import get_current_employee
 
+from custom_hr.api import require_page_access
 from custom_hr.api.face import _save_photo_data_url
 from custom_hr.services.grooming import GROOMING_STEPS, STEP_TITLES, check_image
 
-GALLERY_ROLES = ("HR Manager", "HR User", "System Manager")
+GALLERY_PAGE = "grooming-gallery"
 REVIEW_STATUSES = ("Menunggu", "Sesuai", "Tidak Sesuai")
 HISTORY_LIMIT = 30
 CARD_FIELDS = ["name", "employee", "employee_name", "company", "outlet", "shift", "grooming_date", "submitted_at", "review_status", "review_note", "reviewed_by", "reviewed_on"]
@@ -111,7 +112,7 @@ def get_grooming_gallery(
 	company=None, outlet=None, employee=None, review_status=None, from_date=None, to_date=None, search=None, start=0, page_length=24,
 ) -> dict:
 	"""Cards for the SOP team: one per grooming, with its photos in step order."""
-	frappe.only_for(GALLERY_ROLES)
+	require_page_access(GALLERY_PAGE)
 	to_date = getdate(to_date) if to_date else getdate(nowdate())
 	from_date = getdate(from_date) if from_date else to_date
 	if from_date > to_date:
@@ -150,7 +151,7 @@ def get_grooming_gallery(
 @frappe.whitelist(methods=["POST"])
 def review_grooming(name, review_status, review_note=None) -> dict:
 	"""Judge a grooming from the gallery. Saved through the document so the reviewer stamp and permissions apply."""
-	frappe.only_for(GALLERY_ROLES)
+	require_page_access(GALLERY_PAGE)
 	if review_status not in REVIEW_STATUSES:
 		frappe.throw(_("Status penilaian tidak valid."))
 	doc = frappe.get_doc("Grooming Check", name)

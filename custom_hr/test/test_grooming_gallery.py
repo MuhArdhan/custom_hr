@@ -21,7 +21,7 @@ class TestGroomingGallery(unittest.TestCase):
 		self.cards = [card("G1"), card("G2", "Sesuai")]
 		self.photos = [photo("G1", "left_hand", 2), photo("G1", "right_hand", 1), photo("G2", "right_hand", 1)]
 		self.calls = []
-		self.only_for = self.patch("frappe.only_for")
+		self.only_for = self.patch("custom_hr.api.grooming.require_page_access")
 		self.patch("frappe.get_all", side_effect=self.get_all)
 		self.patch("custom_hr.api.grooming.nowdate", return_value="2026-10-26")
 
@@ -37,13 +37,13 @@ class TestGroomingGallery(unittest.TestCase):
 			return self.cards[start : start + length]
 		return [p for p in sorted(self.photos, key=lambda p: p.idx) if p.parent in filters["parent"][1]]
 
-	def test_only_hr_roles_may_open_the_gallery_or_review(self):
+	def test_only_roles_of_the_page_may_open_the_gallery_or_review(self):
 		self.only_for.side_effect = frappe.PermissionError("nope")
 		with self.assertRaises(frappe.PermissionError):
 			grooming.get_grooming_gallery()
 		with self.assertRaises(frappe.PermissionError):
 			grooming.review_grooming("G1", "Sesuai")
-		self.only_for.assert_called_with(("HR Manager", "HR User", "System Manager"))
+		self.only_for.assert_called_with("grooming-gallery")
 
 	def test_cards_carry_their_photos_in_step_order_with_titles(self):
 		rows = grooming.get_grooming_gallery()["rows"]
@@ -87,7 +87,7 @@ class TestReviewGrooming(unittest.TestCase):
 		self.doc.name = "G1"
 		self.doc.reviewed_by = "hr@example.com"
 		self.doc.reviewed_on = "2026-10-26 09:00:00"
-		for target, kwargs in (("frappe.only_for", {}), ("frappe.get_doc", {"return_value": self.doc})):
+		for target, kwargs in (("custom_hr.api.grooming.require_page_access", {}), ("frappe.get_doc", {"return_value": self.doc})):
 			patcher = patch(target, **kwargs)
 			self.addCleanup(patcher.stop)
 			patcher.start()
@@ -106,3 +106,17 @@ class TestReviewGrooming(unittest.TestCase):
 		with self.assertRaises(frappe.ValidationError):
 			grooming.review_grooming("G1", "Bagus")
 		self.doc.save.assert_not_called()
+
+
+class TestRequirePageAccess(unittest.TestCase):
+	def test_follows_the_page_roles(self):
+		from custom_hr.api import require_page_access
+
+		page = MagicMock()
+		with patch("frappe.get_doc", return_value=page) as get_doc:
+			page.is_permitted.return_value = True
+			require_page_access("grooming-gallery")
+			get_doc.assert_called_with("Page", "grooming-gallery")
+			page.is_permitted.return_value = None
+			with self.assertRaises(frappe.PermissionError):
+				require_page_access("grooming-gallery")
