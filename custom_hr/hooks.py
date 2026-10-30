@@ -14,7 +14,10 @@ after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
 after_sync = "custom_hr.install.set_default_overtime_component"
 
 scheduler_events = {
-	"daily": ["custom_hr.contract_notifications.send_contract_expiry_reminders"],
+	"daily": [
+		"custom_hr.contract_notifications.send_contract_expiry_reminders",
+		"custom_hr.services.leave_auto_allocation.allocate",
+	],
 	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
 }
 
@@ -103,6 +106,10 @@ doc_events = {
 		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
 		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
 	},
+	"Leave Type": {
+		"validate": "custom_hr.services.leave_auto_allocation.validate_leave_type",
+		"on_update": "custom_hr.services.leave_auto_allocation.on_leave_type_update",
+	},
 	"Shift Location": {
 		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
 	},
@@ -151,6 +158,12 @@ fixtures = [
 				[
 					"Employee-outlet",
 					"Employee-user_username",
+					"Leave Type-auto_allocation_section",
+					"Leave Type-auto_allocate",
+					"Leave Type-auto_allocate_every",
+					"Leave Type-auto_allocate_leaves",
+					"Leave Type-auto_allocate_for",
+					"Leave Type-auto_allocate_start_day",
 					"Employee Checkin-face_verification_section",
 					"Employee Checkin-face_verified",
 					"Employee Checkin-face_score",
