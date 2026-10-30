@@ -58,10 +58,19 @@ class TestOutletLocation(unittest.TestCase):
 			sync_outlet_location(self.doc)
 		factory.assert_not_called()
 
-	def test_conflicting_name_never_overwrites_an_existing_master(self):
-		with patch("frappe.db.exists", return_value=True), patch("frappe.get_doc") as factory, self.assertRaisesRegex(frappe.ValidationError, "sudah ada"):
+	def test_existing_location_used_by_another_outlet_is_never_taken_over(self):
+		with patch("frappe.db.exists", return_value=True), patch("frappe.db.get_value", return_value="OTHER-OUTLET"), patch("frappe.get_doc") as factory, self.assertRaisesRegex(frappe.ValidationError, "sudah dipakai"):
 			sync_outlet_location(self.doc)
 		factory.assert_not_called()
+
+	def test_relinking_reuses_the_outlets_own_location(self):
+		with patch("frappe.db.exists", return_value=True), patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location) as factory:
+			sync_outlet_location(self.doc)
+		self.assertEqual(factory.call_args.args, ("Shift Location", "Outlet - TEST-OUTLET"))
+		self.assertEqual((self.location.latitude, self.location.longitude), (-7.1234567, 110.7654321))
+		self.location.save.assert_called_once()
+		self.location.insert.assert_not_called()
+		self.assertEqual(self.doc.shift_location, "LINKED")
 
 	def test_linked_location_coordinate_update_keeps_native_radius(self):
 		self.doc.shift_location = "LINKED"
@@ -90,14 +99,42 @@ class TestOutletLocation(unittest.TestCase):
 		self.location.save.assert_not_called()
 		self.assertEqual(self.doc.latitude, -7)
 
+	def test_clearing_both_coordinates_clears_the_linked_location(self):
+		self.doc.shift_location = "LINKED"
+		old = frappe._dict(shift_location="LINKED", latitude=self.doc.latitude, longitude=self.doc.longitude)
+		self.doc.latitude = self.doc.longitude = 0
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location):
+			sync_outlet_location(self.doc)
+		self.assertEqual((self.location.latitude, self.location.longitude), (0, 0))
+		self.location.save.assert_called_once()
+		self.assertEqual(self.doc.shift_location, "LINKED")
+
+	def test_clearing_one_coordinate_is_still_rejected(self):
+		self.doc.shift_location = "LINKED"
+		old = frappe._dict(shift_location="LINKED", latitude=self.doc.latitude, longitude=self.doc.longitude)
+		self.doc.longitude = 0
+		self.doc.latitude = 95
+		with patch.object(self.doc, "get_doc_before_save", return_value=old), self.assertRaisesRegex(frappe.ValidationError, "Koordinat Outlet tidak valid"):
+			sync_outlet_location(self.doc)
+
+	def test_location_without_coordinates_is_adopted_as_empty(self):
+		self.doc.shift_location = "LINKED"
+		self.location.latitude = self.location.longitude = 0
+		with patch("frappe.db.get_value", return_value=None), patch("frappe.get_doc", return_value=self.location):
+			sync_outlet_location(self.doc)
+		self.assertEqual((self.doc.latitude, self.doc.longitude), (0, 0))
+
 	def test_shared_outlet_location_is_rejected(self):
 		self.doc.shift_location = "LINKED"
 		with patch("frappe.db.get_value", return_value="OTHER-OUTLET"), self.assertRaisesRegex(frappe.ValidationError, "sudah dipakai"):
 			sync_outlet_location(self.doc)
 
-	def test_clearing_link_cannot_generate_duplicate(self):
-		with patch.object(self.doc, "get_doc_before_save", return_value=frappe._dict(shift_location="LINKED", latitude=self.doc.latitude, longitude=self.doc.longitude)), self.assertRaisesRegex(frappe.ValidationError, "tidak boleh dikosongkan"):
+	def test_clearing_link_removes_the_outlet_location_without_touching_the_master(self):
+		with patch.object(self.doc, "get_doc_before_save", return_value=frappe._dict(shift_location="LINKED", latitude=self.doc.latitude, longitude=self.doc.longitude)), patch("frappe.get_doc") as factory:
 			sync_outlet_location(self.doc)
+		factory.assert_not_called()
+		self.assertEqual((self.doc.latitude, self.doc.longitude), (0, 0))
+		self.assertFalse(self.doc.get("shift_location"))
 
 	def test_zero_axis_is_supported(self):
 		self.doc.latitude = 0

@@ -49,15 +49,19 @@ def sync_outlet_location(doc, *, migrate=False):
 		or (not old and not linked and doc.get("checkin_radius") != 0)
 	)
 	radius = radius_value(doc.checkin_radius) if radius_changed else None
+	if old and old.get("shift_location") and not linked:
+		# Unlinking removes the outlet's location (check-in records GPS only); the Shift Location itself is kept.
+		doc.latitude = doc.longitude = 0
+		return
 	point = None
+	# Both coordinates empty means the outlet has no location: check-in only records GPS.
+	cleared = not doc.get("latitude") and not doc.get("longitude")
 	try:
 		point = coordinates(doc.get("latitude"), doc.get("longitude"))
 	except ValueError:
-		if coordinates_changed or (not linked and (doc.get("latitude") or doc.get("longitude"))):
+		if not cleared and (coordinates_changed or not linked):
 			frappe.throw(_("Koordinat Outlet tidak valid. Isi Latitude -90 sampai 90 dan Longitude -180 sampai 180; gunakan pemisah desimal sesuai format angka sistem."))
 
-	if old and old.get("shift_location") and not linked:
-		frappe.throw(_("Shift Location yang sudah terhubung tidak boleh dikosongkan. Pilih lokasi pengganti agar tidak membuat duplikat."))
 	if not linked and not point:
 		return
 	if linked:
@@ -66,14 +70,16 @@ def sync_outlet_location(doc, *, migrate=False):
 			frappe.throw(_("Shift Location ini sudah dipakai Outlet {0}. Gunakan lokasi tersendiri agar perubahan koordinat tidak memengaruhi Outlet lain.").format(other))
 		location = frappe.get_doc("Shift Location", linked, for_update=True)
 		location_changed = False
-		if coordinates_changed and point:
-			location.latitude, location.longitude = point
+		if coordinates_changed and (point or cleared):
+			location.latitude, location.longitude = point or (0, 0)
 			location_changed = True
 		else:
 			try:
 				point = coordinates(location.latitude, location.longitude)
 			except ValueError:
-				frappe.throw(_("Koordinat Shift Location belum valid. Perbaiki lokasi terkait atau isi ulang koordinat Outlet."))
+				if location.latitude or location.longitude:
+					frappe.throw(_("Koordinat Shift Location belum valid. Perbaiki lokasi terkait atau isi ulang koordinat Outlet."))
+				point = (0, 0)  # the linked location has no coordinates either
 			doc.latitude, doc.longitude = point
 		# A replacement link always adopts the selected master's settings.
 		if radius_changed and old and old.get("shift_location") == linked:
@@ -86,9 +92,20 @@ def sync_outlet_location(doc, *, migrate=False):
 		name = "Outlet - " + (doc.name or doc.company)
 		if len(name) > 140:
 			name = name[:120] + "-" + sha256(name.encode()).hexdigest()[:16]
-		# Never silently adopt an unrelated existing master with the same name.
 		if frappe.db.exists("Shift Location", name):
-			frappe.throw(_("Shift Location {0} sudah ada. Pilih lokasi tersebut secara eksplisit atau gunakan nama lokasi lain.").format(name))
+			# This outlet's own location from an earlier link: reuse it instead of making a duplicate.
+			other = frappe.db.get_value("Outlet", {"shift_location": name, "name": ["!=", doc.name or doc.company]}, "name")
+			if other:
+				frappe.throw(_("Shift Location {0} sudah dipakai Outlet {1}. Gunakan lokasi tersendiri.").format(name, other))
+			location = frappe.get_doc("Shift Location", name, for_update=True)
+			location.latitude, location.longitude = point
+			if radius_changed:
+				location.checkin_radius = radius
+			location.flags.outlet_sync_origin = doc.name
+			location.save(ignore_permissions=True)
+			doc.shift_location = location.name
+			doc.checkin_radius = location.checkin_radius
+			return
 		radius = radius if radius_changed else doc.get("geofence_radius_m") if migrate or old else 0
 		if radius is None:
 			radius = 0

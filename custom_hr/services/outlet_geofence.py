@@ -67,6 +67,8 @@ def read_outlet_geofence(outlet_name):
 		return None  # Same as native: no linked location means GPS is recorded without a radius check.
 	if not location:
 		frappe.throw(_("Konfigurasi lokasi Outlet {0} belum lengkap: Shift Location belum dihubungkan atau tidak ditemukan.").format(outlet.name))
+	if not location.latitude and not location.longitude:
+		return None  # A location without coordinates is treated like no location: GPS is recorded only.
 	location["shift_location"] = location.name
 	location["name"] = outlet.name
 	validate_configuration(location)

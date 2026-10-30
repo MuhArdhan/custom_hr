@@ -176,6 +176,12 @@ class TestGeofenceLifecycle(TestCase):
 		self.assertEqual((self.doc.latitude, self.doc.longitude), (40, -70))
 		self.assertEqual(self.reader.call_count, 1)
 
+	def test_location_without_coordinates_records_gps_without_a_radius_check(self):
+		self.config.latitude = self.config.longitude = 0
+		self.doc.latitude, self.doc.longitude = 40, -70
+		self.assertTrue(service.validate_outlet_geofence(self.doc))
+		self.assertEqual((self.doc.latitude, self.doc.longitude), (40, -70))
+
 	def test_missing_link_still_requires_gps(self):
 		self.config.shift_location = None
 		self.doc.latitude = self.doc.longitude = None
@@ -279,7 +285,8 @@ class TestAbsenceGeofenceSafety(TestCase):
 		from custom_hr.services.test_outlet_scheduler import stable_records
 
 		employee, config = stable_records()
-		config.shift_location = "Linked Location"  # linked, but without coordinates
+		config.shift_location = "Linked Location"
+		config.latitude, config.longitude, config.checkin_radius = 100, 110, 50  # latitude out of range
 		with patch("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", True), patch("frappe.db.get_single_value", return_value=1), patch("frappe.db.get_value", side_effect=lambda dt, *a, **k: employee if dt == "Employee" else config):
 			with self.assertRaisesRegex(frappe.ValidationError, "Konfigurasi lokasi Outlet"):
 				_day_context("EMP", "2026-10-15")
