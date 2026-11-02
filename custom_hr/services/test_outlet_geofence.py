@@ -227,6 +227,7 @@ class TestGeofenceLifecycle(TestCase):
 
 	def test_native_controller_keeps_original_assignment_validation(self):
 		self.doc.attendance_source = None
+		self.reader.side_effect = lambda *args, **kwargs: None  # no Department, so no Department location
 		with patch("hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin.validate_distance_from_shift_location") as native:
 			self.doc.validate_distance_from_shift_location()
 		native.assert_called_once()
@@ -300,3 +301,70 @@ class TestAbsenceGeofenceSafety(TestCase):
 			with self.assertRaisesRegex(frappe.ValidationError, "schedule stub"):
 				_day_context("EMP", "2026-10-15")
 		geo.assert_not_called()
+
+
+class TestDepartmentGeofence(TestCase):
+	"""Non-outlet check-ins: the employee's Department may link a Shift Location; unlinked falls through to native."""
+
+	def setUp(self):
+		self.doc = frappe.get_doc({
+			"doctype": "Employee Checkin", "employee": "EMP", "log_type": "IN", "time": "2026-10-15 08:00:00",
+			"latitude": -7, "longitude": 110,
+		})
+		self.department, self.link = "Finance", "Finance Location"
+		self.location = frappe._dict(name="Finance Location", latitude=-7.0, longitude=110.0, checkin_radius=100)
+		self.setting = self.mock("frappe.db.get_single_value", return_value=1)
+		self.reader = self.mock("frappe.db.get_value", side_effect=self.read)
+
+	def read(self, dt, name, fields, **kwargs):
+		if dt == "Employee":
+			return self.department
+		if dt == "Department":
+			return self.link
+		self.assertEqual((dt, name), ("Shift Location", "Finance Location"))
+		return self.location.copy() if self.location else None
+
+	def test_inside_the_department_radius_is_accepted(self):
+		self.assertTrue(service.validate_department_geofence(self.doc))
+
+	def test_outside_the_department_radius_names_the_shift_location(self):
+		self.doc.latitude = -7.01
+		with self.assertRaisesRegex(CheckinRadiusExceededError, "dari Finance Location untuk"):
+			service.validate_department_geofence(self.doc)
+
+	def test_unlinked_department_or_no_department_falls_through_to_native(self):
+		for department, link in ((None, None), ("Finance", None)):
+			with self.subTest(department=department):
+				self.department, self.link = department, link
+				self.doc.latitude = 40  # far away: still accepted, no radius check here
+				self.assertFalse(service.validate_department_geofence(self.doc))
+
+	def test_linked_department_requires_gps(self):
+		self.doc.latitude = self.doc.longitude = None
+		with self.assertRaisesRegex(frappe.ValidationError, "GPS tidak tersedia"):
+			service.validate_department_geofence(self.doc)
+
+	def test_disabled_geolocation_or_outlet_source_is_not_claimed(self):
+		self.setting.return_value = 0
+		self.assertFalse(service.validate_department_geofence(self.doc))
+		self.setting.return_value = 1
+		self.doc.attendance_source = "Outlet"
+		self.assertFalse(service.validate_department_geofence(self.doc))
+		self.reader.assert_not_called()
+
+	def test_existing_log_is_not_revalidated(self):
+		self.doc.name = "STORED"
+		self.doc.set("__islocal", 0)
+		self.doc.latitude = 40
+		self.assertTrue(service.validate_department_geofence(self.doc))
+		self.reader.assert_not_called()
+
+	def test_checkin_controller_uses_the_department_before_native(self):
+		self.doc.latitude = -7.01
+		with patch("hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin.validate_distance_from_shift_location") as native:
+			with self.assertRaises(CheckinRadiusExceededError):
+				CustomEmployeeCheckin.validate_distance_from_shift_location(self.doc)
+			native.assert_not_called()
+			self.link = None
+			CustomEmployeeCheckin.validate_distance_from_shift_location(self.doc)
+			native.assert_called_once()

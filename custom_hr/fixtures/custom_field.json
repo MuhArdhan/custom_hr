@@ -951,6 +951,28 @@
   "module": "HRM"
  },
  {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-checkin_location_section",
+  "fieldname": "checkin_location_section",
+  "fieldtype": "Section Break",
+  "label": "Lokasi Check-in",
+  "insert_after": "auto_shift_help",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
+  "name": "Department-shift_location",
+  "fieldname": "shift_location",
+  "fieldtype": "Link",
+  "options": "Shift Location",
+  "label": "Shift Location",
+  "insert_after": "checkin_location_section",
+  "description": "Check-in karyawan departemen ini (non-outlet) harus berada dalam radius lokasi ini. Kosong: tidak dicek, sama seperti sebelumnya.",
+  "module": "HRM"
+ },
+ {
   "alignment": null,
   "allow_bulk_edit": 0,
   "allow_in_quick_entry": 0,

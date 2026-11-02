@@ -21,6 +21,7 @@ class TestLocationPreflight(CheckinTestCase):
 		self.probe = MagicMock()
 		self.make_doc = self.mock("frappe.get_doc", return_value=self.probe)
 		self.geofence = self.mock("custom_hr.services.outlet_geofence.validate_outlet_geofence", return_value=True)
+		self.department = self.mock("custom_hr.services.outlet_geofence.validate_department_geofence", return_value=False)
 		base = "hrms.hr.doctype.employee_checkin.employee_checkin.EmployeeCheckin."
 		self.native_shift = self.mock(base + "fetch_shift")
 		self.native_distance = self.mock(base + "validate_distance_from_shift_location")
@@ -72,3 +73,19 @@ class TestLocationPreflight(CheckinTestCase):
 		self.geofence.return_value = False
 		checkin.validate_checkin_location(-7, 110, "IN")
 		self.assertEqual(self.make_doc.call_args.args[0]["time"], datetime(2026, 10, 16, 10))
+
+	def test_department_location_is_checked_instead_of_native(self):
+		self.context.update(mode="Department", outlet="")
+		self.geofence.return_value = False
+		self.department.return_value = True
+		checkin.validate_checkin_location(-6.2, 106.8, "IN")
+		self.department.assert_called_once_with(self.probe)
+		self.native_distance.assert_not_called()
+
+	def test_outside_the_department_radius_propagates_before_submission(self):
+		self.context.update(mode="Department", outlet="")
+		self.geofence.return_value = False
+		self.department.side_effect = frappe.ValidationError("Outside department radius")
+		with self.assertRaisesRegex(frappe.ValidationError, "Outside department radius"):
+			checkin.validate_checkin_location(-6.2, 106.8, "IN")
+		self.probe.insert.assert_not_called()
