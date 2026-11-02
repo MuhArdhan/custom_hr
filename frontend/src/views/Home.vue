@@ -39,6 +39,11 @@ const quickLinks = [
 		route: "OvertimeView",
 	},
 	{
+		icon: markRaw(LeaveIcon),
+		title: __("Request Leave"),
+		route: "LeaveApplicationFormView",
+	},
+	{
 		icon: markRaw(AttendanceIcon),
 		title: __("Request Attendance"),
 		route: "AttendanceRequestFormView",
@@ -47,11 +52,6 @@ const quickLinks = [
 		icon: markRaw(ShiftIcon),
 		title: __("Request a Shift"),
 		route: "ShiftRequestFormView",
-	},
-	{
-		icon: markRaw(LeaveIcon),
-		title: __("Request Leave"),
-		route: "LeaveApplicationFormView",
 	},
 	{
 		icon: markRaw(ExpenseIcon),
