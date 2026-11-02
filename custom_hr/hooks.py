@@ -50,6 +50,7 @@ doctype_js = {
 	"Employee": "public/js/employee_face.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Shift Location": "public/js/shift_location.js",
 }
 
 doctype_list_js = {
