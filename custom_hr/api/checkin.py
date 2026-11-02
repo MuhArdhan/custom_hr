@@ -30,7 +30,7 @@ from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_
 def validate_checkin_location(latitude=None, longitude=None, log_type=None, expected_checkin=None):
 	"""Advisory preflight only: no punch, face verification or attendance writes."""
 	from hrms.hr.doctype.employee_checkin.employee_checkin import EmployeeCheckin
-	from custom_hr.services.outlet_geofence import validate_outlet_geofence
+	from custom_hr.services.outlet_geofence import validate_department_geofence, validate_outlet_geofence
 
 	context = get_checkin_context()
 	if not context["allowed"]:
@@ -48,7 +48,7 @@ def validate_checkin_location(latitude=None, longitude=None, log_type=None, expe
 		"latitude": latitude, "longitude": longitude,
 		"attendance_source": context["mode"], "outlet_at_checkin": context["outlet"],
 	})
-	if not validate_outlet_geofence(probe):
+	if not validate_outlet_geofence(probe) and not validate_department_geofence(probe):
 		# Call native methods directly; the override prepares a real session and
 		# requires face verification, neither of which belongs in a location probe.
 		EmployeeCheckin.fetch_shift(probe)

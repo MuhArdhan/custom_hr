@@ -50,6 +50,7 @@ doctype_js = {
 	"Employee": "public/js/employee_face.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Shift Location": "public/js/shift_location.js",
 }
 
 doctype_list_js = {
@@ -196,6 +197,8 @@ fixtures = [
 					"Department-auto_shift_effective_from",
 					"Department-auto_shifts",
 					"Department-auto_shift_help",
+					"Department-checkin_location_section",
+					"Department-shift_location",
 					"HR Settings-enable_face_checkin",
 					"HR Settings-require_face_checkin",
 					"HR Settings-face_match_threshold",

@@ -10,6 +10,15 @@
 							</h2>
 						</div>
 						<div class="flex flex-row items-center gap-3 ml-auto">
+							<!-- a standalone PWA has no browser reload; a fresh page also resets a crashed face detector -->
+							<button
+								type="button"
+								class="flex flex-col items-center text-gray-600"
+								:aria-label="__('Reload')"
+								@click="reloadPage"
+							>
+								<FeatherIcon name="refresh-cw" class="h-5 w-5" />
+							</button>
 							<router-link
 								:to="{ name: 'Notifications' }"
 								v-slot="{ navigate }"
@@ -57,6 +66,7 @@ import { unreadNotificationsCount } from "@/data/notifications"
 import { inject } from "vue"
 
 const user = inject("$user")
+const reloadPage = () => window.location.reload()
 
 const props = defineProps({
 	pageTitle: {

@@ -35,7 +35,7 @@ def coordinates(latitude, longitude):
 	return lat, lon
 
 
-def validate_configuration(outlet):
+def validate_configuration(outlet, place=None):
 	"""Validate master coordinates/radius independently of a device position."""
 	try:
 		lat, lon = coordinates(outlet.latitude, outlet.longitude)
@@ -46,7 +46,7 @@ def validate_configuration(outlet):
 			raise ValueError("invalid radius")
 	except (ValueError, TypeError, OverflowError):
 		frappe.throw(
-			_("Konfigurasi lokasi Outlet {0} belum lengkap atau tidak valid. Periksa Shift Location terkait, Latitude, Longitude, dan Checkin Radius (0 atau lebih).").format(outlet.name),
+			_("Konfigurasi lokasi {0} belum lengkap atau tidak valid. Periksa Shift Location terkait, Latitude, Longitude, dan Checkin Radius (0 atau lebih).").format(place or _("Outlet {0}").format(outlet.name)),
 			title=_("Konfigurasi Geofence Outlet"),
 		)
 	return lat, lon, radius
@@ -82,9 +82,10 @@ def require_gps(latitude, longitude):
 		frappe.throw(_("GPS tidak tersedia atau koordinat tidak valid. Aktifkan izin lokasi dan kirim Latitude serta Longitude yang lengkap."), title=_("Lokasi Diperlukan"))
 
 
-def check_position(outlet, latitude, longitude):
+def check_position(outlet, latitude, longitude, place=None):
 	"""Pure radius check in meters. Exact boundary is inclusive, no extra buffer."""
-	lat, lon, radius = validate_configuration(outlet)
+	place = place or _("Outlet {0}").format(outlet.name)
+	lat, lon, radius = validate_configuration(outlet, place)
 	gps_lat, gps_lon = require_gps(latitude, longitude)
 	if radius == 0:
 		return None  # Native HRMS semantics: record GPS, no radius enforcement.
@@ -94,7 +95,7 @@ def check_position(outlet, latitude, longitude):
 		frappe.throw(_("Jarak GPS tidak dapat dihitung. Periksa koordinat lokasi atau hubungi HR."))
 	if not isfinite(distance) or distance > radius:
 		frappe.throw(
-			_("Anda harus berada dalam radius {0} meter dari Outlet {1} untuk mencatat IN atau OUT.").format(radius, outlet.name),
+			_("Anda harus berada dalam radius {0} meter dari {1} untuk mencatat IN atau OUT.").format(radius, place),
 			exc=CheckinRadiusExceededError,
 		)
 	return distance
@@ -109,17 +110,42 @@ def validate_outlet_geofence(doc):
 	if (doc.get("name") and not doc.is_new()) or not cint(frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking")):
 		return True
 	outlet = read_outlet_geofence(doc.get("outlet_at_checkin"))
+	lat, lon = device_position(doc)
+	if outlet:
+		check_position(outlet, lat, lon)
+	else:
+		require_gps(lat, lon)
+	doc.latitude, doc.longitude = lat, lon
+	return True
+
+
+def device_position(doc):
 	# Validate before Frappe can coerce invalid strings to zero, and evaluate
 	# the same field precision that the Employee Checkin will actually store.
 	try:
 		lat, lon = coordinates(doc.get("latitude"), doc.get("longitude"))
 	except ValueError:
-		lat, lon = doc.get("latitude"), doc.get("longitude")
-	else:
-		lat, lon = flt(lat, doc.precision("latitude")), flt(lon, doc.precision("longitude"))
-	if outlet:
-		check_position(outlet, lat, lon)
-	else:
-		require_gps(lat, lon)
+		return doc.get("latitude"), doc.get("longitude")
+	return flt(lat, doc.precision("latitude")), flt(lon, doc.precision("longitude"))
+
+
+def validate_department_geofence(doc):
+	"""True when a non-outlet log was checked against its employee's Department Shift Location.
+
+	False (no link, no department, geolocation off) lets the native Shift Assignment check run.
+	"""
+	if doc.get("attendance_source") == "Outlet" or not cint(frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking")):
+		return False
+	if doc.get("name") and not doc.is_new():
+		return True  # same as outlet logs: an existing log is not re-evaluated against today's master
+	department = frappe.db.get_value("Employee", doc.employee, "department")
+	link = department and frappe.db.get_value("Department", department, "shift_location")
+	location = link and frappe.db.get_value(
+		"Shift Location", link, ["name", "latitude", "longitude", "checkin_radius"], as_dict=True
+	)
+	if not location:
+		return False
+	lat, lon = device_position(doc)
+	check_position(location, lat, lon, place=location.name)
 	doc.latitude, doc.longitude = lat, lon
 	return True
