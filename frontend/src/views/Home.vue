@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-import { inject, markRaw } from "vue"
+import { computed, inject, markRaw } from "vue"
 
 import CheckInPanel from "@/components/CheckInPanel.vue"
 import QuickLinks from "@/components/QuickLinks.vue"
@@ -26,8 +26,9 @@ import OvertimeIcon from "@/components/icons/OvertimeIcon.vue"
 import SalaryIcon from "@/components/icons/SalaryIcon.vue"
 
 const __ = inject("$translate")
+const employee = inject("$employee")
 
-const quickLinks = [
+const links = [
 	{
 		icon: markRaw(GroomingIcon),
 		title: __("SOP Grooming"),
@@ -64,4 +65,6 @@ const quickLinks = [
 		route: "SalarySlipsDashboard",
 	},
 ]
+// the SOP Grooming button is for outlet employees only
+const quickLinks = computed(() => links.filter((link) => link.route !== "GroomingView" || employee.data?.outlet))
 </script>

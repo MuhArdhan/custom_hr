@@ -91,6 +91,7 @@ override_doctype_class = {
 override_whitelisted_methods = {
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_approver": "custom_hr.services.leave_approver.get_leave_approver",
 	"hrms.api.get_leave_approval_details": "custom_hr.services.leave_approver.get_leave_approval_details",
+	"hrms.api.get_current_employee_info": "custom_hr.services.employee_outlet.get_current_employee_info",
 }
 
 doc_events = {
