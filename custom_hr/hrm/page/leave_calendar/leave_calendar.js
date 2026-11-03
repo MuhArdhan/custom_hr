@@ -151,7 +151,7 @@ class LeaveCalendar {
 			data.items.forEach((item, index) => {
 				const person = item.employees[0];
 				const [status, label] = item.kind === "overtime" ? ["overtime", __("Overtime")] : this.leave_types().find(([key]) => key === item.calendar_status) || this.leave_types()[0];
-				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small></td>
+				html += `<tr><td><strong>${escape(person.employee_name)}</strong><small class="text-muted ac-subline">${escape(person.employee)}</small>${item.company ? `<small class="text-muted ac-subline">${escape(item.company)}</small>` : ""}</td>
 					<td><span class="ac-kind ac-${status}">${escape(label)}</span> ${this.details_html(item, index)} ${item.from_date !== item.to_date ? `<small class="text-muted">(${escape(item.from_date)} – ${escape(item.to_date)})</small>` : ""}
 					<div class="ac-subline"><button class="btn btn-link ac-open" data-index="${index}">${escape(item.name)}</button></div>${this.balance_html(item)}${item.description ? `<div class="ac-reason">${escape(item.description)}</div>` : ""}</td>
 					<td><span class="ac-stage ac-${item.kind === "overtime" ? this.overtime_tone(item.status) : status}">${escape(item.status)}</span></td>
