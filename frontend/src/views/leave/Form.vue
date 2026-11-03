@@ -66,6 +66,11 @@ const formFields = createResource({
 		return fields.map((field) => {
 			if (field.fieldname === "half_day_date") field.hidden = true
 
+			// the server picks the approver (Outlet / Department stages, else the Employee's Leave Approver)
+			if (["leave_approver", "leave_approver_name"].includes(field.fieldname)) field.hidden = true
+			// a new form keeps nothing else in the Approval section (its status fields are excluded above)
+			if (field.fieldname === "section_break_7" && !props.id) field.hidden = true
+
 			if (field.fieldname === "posting_date") field.default = today
 
 			return field
@@ -154,7 +159,7 @@ watch(
   	(newApprover) => {
 			const approverField = formFields.data.find(f => f.fieldname === "leave_approver")
 			const selected = approverField?.documentList?.find(opt => opt.value === newApprover)
-			leaveApplication.value.leave_approver_name = selected?.full_name || ""
+			if (selected) leaveApplication.value.leave_approver_name = selected.full_name
   }
 )
 

@@ -40,6 +40,8 @@ export default function useWorkflow(doctype) {
 						(transition) => transition.allow_self_approval || !isSelfApproval
 					)
 					.map((transition) => transition.action)
+					// one button per action: a user holding several allowed roles matches one row per role
+					.filter((action, index, actions) => actions.indexOf(action) === index)
 			},
 		})
 
