@@ -145,9 +145,10 @@ def approver_companies():
 
 
 @frappe.whitelist(methods=["GET"])
-def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=None):
+def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=None, department=None):
 	"""Readable requests at every stage; actions remain native permission-gated."""
 	start, end = _range(start_date, end_date)
+	staff = _department_staff(department)
 	if kind and kind not in TYPES:
 		frappe.throw(_("Invalid request type."))
 	if kind and kind not in ENABLED_KINDS:
@@ -168,6 +169,8 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 			filters.update(from_date=["<=", end], to_date=[">=", start])
 			if employee:
 				filters["employee"] = employee
+			if department:
+				filters["department"] = department
 		else:
 			filters["docstatus"] = 0
 			filters["date"] = ["between", [start, end]]  # every stage, approved and rejected included, like leave
@@ -183,11 +186,21 @@ def get_leave_calendar(start_date, end_date, employee=None, company=None, kind=N
 			for member in members:
 				if member and employee and member.employee != employee:
 					continue
+				if member and staff is not None and member.employee not in staff:
+					continue
 				view = employee_view(doc, member) if member else doc
 				item = _request(doc, category, _actions(view, workflow), workflow, member)
 				if getdate(item["from_date"]) <= end and getdate(item["to_date"]) >= start:
 					items.append(item)
 	return {"items": items, "counts": _tally(items, start, end), "start_date": str(start), "end_date": str(end)}
+
+
+def _department_staff(department):
+	"""Employees now in the Department: an overtime request has no department, only its employees do."""
+	if not department:
+		return None
+	# names only, matched against rows the user can already read, so nothing leaks
+	return set(frappe.get_all("Employee", filters={"department": department}, pluck="name", ignore_permissions=True))
 
 
 def _tally(items, start, end):
@@ -204,7 +217,7 @@ def _tally(items, start, end):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_leave_counts(start_date, end_date, employee=None, company=None):
+def get_leave_counts(start_date, end_date, employee=None, company=None, department=None):
 	"""Month-grid counts only: one list query, no per-document load or workflow evaluation.
 
 	Rows come from get_list, so permission conditions still scope what each user counts.
@@ -218,6 +231,8 @@ def get_leave_counts(start_date, end_date, employee=None, company=None):
 			filters["company"] = company
 		if employee:
 			filters["employee"] = employee
+		if department:
+			filters["department"] = department
 		rows = frappe.get_list(
 			"Leave Application", filters=filters, fields=["from_date", "to_date", "status", "docstatus"], limit_page_length=0
 		)
@@ -226,11 +241,11 @@ def get_leave_counts(start_date, end_date, employee=None, company=None):
 			for row in rows
 		]
 	if frappe.has_permission("Overtime Request", "read"):
-		items += _overtime_count_items(start, end, employee, company)
+		items += _overtime_count_items(start, end, employee, company, _department_staff(department))
 	return {"counts": _tally(items, start, end), "total": len(items), "start_date": str(start), "end_date": str(end)}
 
 
-def _overtime_count_items(start, end, employee, company):
+def _overtime_count_items(start, end, employee, company, staff=None):
 	"""One item per employee at any stage, the same rows the day detail lists."""
 	filters = {"docstatus": 0, "date": ["between", [start, end]]}
 	if company:
@@ -246,7 +261,7 @@ def _overtime_count_items(start, end, employee, company):
 	return [
 		{"kind": "overtime", "from_date": requests[row.parent].date, "to_date": requests[row.parent].date}
 		for row in members
-		if not employee or row.employee == employee
+		if (not employee or row.employee == employee) and (staff is None or row.employee in staff)
 	]
 
 

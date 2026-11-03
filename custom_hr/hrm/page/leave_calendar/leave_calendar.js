@@ -27,6 +27,7 @@ class LeaveCalendar {
 		for (const df of [
 			{ fieldname: "employee", fieldtype: "Link", options: "Employee", label: __("Employee") },
 			{ fieldname: "company", fieldtype: "Link", options: "Company", label: __("Company"), get_query: company_query },
+			{ fieldname: "department", fieldtype: "Link", options: "Department", label: __("Department"), get_query: () => ({ filters: this.filters.company.get_value() ? { company: this.filters.company.get_value() } : {} }) },
 		]) {
 			this.filters[df.fieldname] = frappe.ui.form.make_control({ parent: this.page.main.find(".ac-filters"), df: { ...df, change: () => this.load() }, render_input: true });
 		}
