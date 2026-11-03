@@ -25,3 +25,4 @@ custom_hr.patches.tidy_hrm_sidebar
 custom_hr.patches.fill_employee_user_username
 custom_hr.patches.add_leave_spv_stage
 custom_hr.patches.point_hrm_icon_to_home
+custom_hr.patches.add_department_approval

@@ -229,7 +229,7 @@ class TestOutletShiftSchema(unittest.TestCase):
 			if fixture.get("doctype") == "Property Setter"
 			for name in fixture["filters"][0][2]
 		}
-		labels = {definition["field_name"]: definition["value"] for definition in definitions if definition["property"] == "label"}
+		labels = {definition["field_name"]: definition["value"] for definition in definitions if definition["property"] == "label" and definition["doc_type"] == "Shift Type"}
 		self.assertEqual(labels, {"late_entry_grace_period": "Toleransi Terlambat", "early_exit_grace_period": "Toleransi Pulang Awal"})
 		for definition in definitions:
 			self.assertIn(definition["name"], registered)

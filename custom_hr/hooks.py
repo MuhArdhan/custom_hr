@@ -83,6 +83,7 @@ has_permission = {
 # self-service check-in limits, face verification requirement, realtime
 # attendance marking right after check-out
 override_doctype_class = {
+	"Employee": "custom_hr.overrides.employee.CustomEmployee",
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
 	"Shift Type": "custom_hr.overrides.shift_type.CustomShiftType",
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
@@ -91,11 +92,15 @@ override_doctype_class = {
 override_whitelisted_methods = {
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_approver": "custom_hr.services.leave_approver.get_leave_approver",
 	"hrms.api.get_leave_approval_details": "custom_hr.services.leave_approver.get_leave_approval_details",
+	"hrms.api.get_current_employee_info": "custom_hr.services.employee_outlet.get_current_employee_info",
 }
 
 doc_events = {
 	"Department": {
-		"validate": "custom_hr.services.department_shift.validate_department",
+		"validate": [
+			"custom_hr.services.department_shift.validate_department",
+			"custom_hr.services.department_approvers.validate_department_approvers",
+		],
 	},
 	"Attendance": {
 		"validate": "custom_hr.services.attendance_duration.fill_durations",
@@ -130,6 +135,8 @@ fixtures = [
 				"in",
 				[
 					"Shift Location-latitude-precision",
+					"Department-leave_approvers-label",
+					"Department-leave_approvers-description",
 					"Shift Location-longitude-precision",
 					"Shift Type-late_entry_grace_period-label",
 					"Shift Type-late_entry_grace_period-description",

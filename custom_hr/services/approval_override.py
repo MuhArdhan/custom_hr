@@ -8,6 +8,8 @@ Users with just one of the roles still act only at their own stage.
 OVERTIME_ROLES = ("Outlet Leader", "SPV Outlet", "HR Manager")
 LEAVE_ROLES = ("PL Outlet", "HR Manager")
 SPV_LEAVE_ROLES = ("SPV Outlet", "HR Manager")
+# HRMS hands Leave Approver to anyone named as an approver, so it would let most HR Managers decide every stage alone.
+DEPARTMENT_LEAVE_ROLES = ("System Manager", "HR Manager")
 OVERRIDE_ROLE = "HR Manager"  # the transition's role; the condition demands the rest
 
 
@@ -52,4 +54,25 @@ def leave_transitions():
 		dict(state="Menunggu PL", action="Reject", next_state="Rejected", allowed=OVERRIDE_ROLE, condition=override, allow_self_approval=1),
 		dict(state="Menunggu SPV", action="Approve", next_state="Menunggu HRD", allowed=OVERRIDE_ROLE, condition=f"{spv_override} and {not_self}", allow_self_approval=0),
 		dict(state="Menunggu SPV", action="Reject", next_state="Rejected", allowed=OVERRIDE_ROLE, condition=spv_override, allow_self_approval=1),
+	]
+
+
+def department_leave_transitions():
+	"""Override steps for a stuck Menunggu Approver 1 / 2 stage of a non-outlet leave; never for the user's own leave."""
+	from custom_hr.patches.setup_native_leave_workflow import (
+		NEEDS_APPROVER_2, OUTLET, PENDING_APPROVER_1, PENDING_APPROVER_2, SKIP_APPROVER_2,
+	)
+
+	not_self = 'doc.owner != frappe.session.user and frappe.db.get_value("Employee", doc.employee, "user_id") != frappe.session.user'
+	override = f"not {OUTLET} and {holds_roles(*DEPARTMENT_LEAVE_ROLES)} and doc.leave_approver != frappe.session.user"
+	steps = [
+		(PENDING_APPROVER_1, "Approve", PENDING_APPROVER_2, f"{override} and {not_self} and {NEEDS_APPROVER_2}", 0),
+		(PENDING_APPROVER_1, "Approve", "Menunggu HRD", f"{override} and {not_self} and {SKIP_APPROVER_2}", 0),
+		(PENDING_APPROVER_1, "Reject", "Rejected", override, 1),
+		(PENDING_APPROVER_2, "Approve", "Menunggu HRD", f"{override} and {not_self}", 0),
+		(PENDING_APPROVER_2, "Reject", "Rejected", override, 1),
+	]
+	return [
+		dict(state=state, action=action, next_state=target, allowed=OVERRIDE_ROLE, condition=condition, allow_self_approval=self_approval)
+		for state, action, target, condition, self_approval in steps
 	]

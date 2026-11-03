@@ -25,3 +25,10 @@ test("leave at the PL stage shows the leave approver; HRD and final states are l
 	assert.equal(leaveDetailStatus(doc, undefined), null)
 	assert.equal(leaveDetailStatus(null, "leave_workflow_state"), null)
 })
+
+test("department stages name the leave approver like the PL and SPV stages", () => {
+	for (const state of ["Menunggu Approver 1", "Menunggu Approver 2"]) {
+		assert.equal(listStatus(state), "Menunggu")
+		assert.equal(leaveDetailStatus({ leave_workflow_state: state, leave_approver_name: "Budi" }, "leave_workflow_state"), "Menunggu Budi")
+	}
+})

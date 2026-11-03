@@ -5,9 +5,12 @@ from frappe.model.workflow import apply_workflow, get_transitions
 from hrms.api import get_leave_approval_details as hrms_get_leave_approval_details
 from hrms.hr.doctype.leave_application.leave_application import get_employee_leave_approver
 
+from custom_hr.services.department_approvers import stage_approvers
+
 PENDING_PL = "Menunggu PL"
-PENDING_STAGES = (PENDING_PL, "Menunggu SPV")  # stages that wait for one named approver
-SUBMIT_ACTIONS = ("Ajukan ke PL", "Ajukan ke SPV", "Ajukan ke HRD")
+PENDING_STAGES = (PENDING_PL, "Menunggu SPV", "Menunggu Approver 1", "Menunggu Approver 2")  # stages that wait for one named approver
+DEPARTMENT_STAGES = ("Menunggu Approver 1", "Menunggu Approver 2")  # waiting for row 1 / row 2
+SUBMIT_ACTIONS = ("Ajukan ke PL", "Ajukan ke SPV", "Ajukan ke Approver 1", "Ajukan ke Approver 2", "Ajukan ke HRD")
 
 
 @frappe.whitelist()
@@ -52,15 +55,22 @@ def submit_to_approver(doc, method=None):
 
 
 def hand_over_to_approver_2(doc, method=None):
-	"""on_update: at Menunggu SPV the outlet's Approver 2 becomes the leave approver.
+	"""on_update: at Menunggu SPV the outlet's Approver 2 becomes the leave approver; at Menunggu Approver 1 / 2 the Department's row 1 / 2
+	(stage 1 is the Employee's own Leave Approver when the Department has no table).
 
 	Set after the save instead of through the workflow state: native on_update would then
 	un-share the request from the PL, which the PL has no permission to do. The PL keeps read access.
 	"""
-	if doc.get("leave_workflow_state") != "Menunggu SPV":
+	state = doc.get("leave_workflow_state")
+	if state == "Menunggu SPV":
+		outlet = frappe.db.get_value("Employee", doc.employee, "outlet")
+		spv = outlet and frappe.db.get_value("Outlet", outlet, "approver_2")
+	elif state in DEPARTMENT_STAGES:
+		rows = stage_approvers(doc.employee)
+		row = DEPARTMENT_STAGES.index(state)
+		spv = rows[row] if len(rows) > row else None
+	else:
 		return
-	outlet = frappe.db.get_value("Employee", doc.employee, "outlet")
-	spv = outlet and frappe.db.get_value("Outlet", outlet, "approver_2")
 	if not spv or doc.leave_approver == spv:
 		return
 	doc.db_set({"leave_approver": spv, "leave_approver_name": frappe.utils.get_fullname(spv)})

@@ -338,6 +338,7 @@ import useWorkflow from "@/composables/workflow"
 import { getCompanyCurrency } from "@/data/currencies"
 import { formatCurrency } from "@/utils/formatters"
 import { useDownloadPDF } from "@/utils/commonUtils"
+import { leaveDetailStatus } from "@/utils/requestStatus"
 
 const props = defineProps({
 	doctype: {
@@ -413,7 +414,7 @@ const formModel = computed({
 	},
 })
 
-const status = computed(() => {
+const workflowState = computed(() => {
 	if (!props.id) return ""
 
 	if (workflow.value) {
@@ -422,6 +423,15 @@ const status = computed(() => {
 	}
 
 	return formModel.value.status || formModel.value.approval_status
+})
+
+// the badge names who a leave waits for ("Menunggu Budi"); its colour still follows the real stage
+const status = computed(() => {
+	const stateField = workflow.value?.getWorkflowStateField()
+	if (props.doctype === "Leave Application" && stateField) {
+		return leaveDetailStatus(formModel.value, stateField) || workflowState.value
+	}
+	return workflowState.value
 })
 
 watch(
@@ -442,7 +452,7 @@ watch(
 	() => status.value,
 	async (value) => {
 		if (!value) return
-		statusColor.value = await guessStatusColor(props.doctype, status.value)
+		statusColor.value = await guessStatusColor(props.doctype, workflowState.value)
 	},
 	{ immediate: true }
 )

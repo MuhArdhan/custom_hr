@@ -7,7 +7,7 @@ the administrator already edited is left untouched.
 
 import frappe
 
-from custom_hr.patches.setup_native_leave_workflow import NAME, configuration
+from custom_hr.patches.setup_native_leave_workflow import NAME, OUTLET, configuration
 
 PL_ACTION = "Ajukan ke PL"
 HRD_ACTION = "Ajukan ke HRD"
@@ -19,7 +19,8 @@ def execute():
 	wanted = {
 		row["action"]: row
 		for row in configuration()["transitions"]
-		if row["state"] == "Open" and row["action"] in (PL_ACTION, HRD_ACTION)
+		# outlet rows only: the department route (add_department_approval) has its own "Ajukan ke HRD"
+		if row["state"] == "Open" and row["action"] in (PL_ACTION, HRD_ACTION) and row["condition"].startswith(OUTLET)
 	}
 	# The previous condition is the new one without its trailing employee-is-PL check.
 	previous_pl_condition = wanted[PL_ACTION]["condition"].rsplit(" and ", 1)[0]

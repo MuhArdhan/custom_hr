@@ -214,5 +214,29 @@
   "value": "1",
   "module": "HRM",
   "is_system_generated": 1
+ },
+ {
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Department",
+  "field_name": "leave_approvers",
+  "module": "HRM",
+  "is_system_generated": 1,
+  "name": "Department-leave_approvers-label",
+  "property": "label",
+  "property_type": "Data",
+  "value": "Leave & Overtime Approvers"
+ },
+ {
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Department",
+  "field_name": "leave_approvers",
+  "module": "HRM",
+  "is_system_generated": 1,
+  "name": "Department-leave_approvers-description",
+  "property": "description",
+  "property_type": "Text",
+  "value": "Karyawan non-outlet: baris 1 approver tahap 1, baris 2 approver tahap 2 (opsional), untuk cuti dan lembur, lalu HRD. Maksimal 2 baris; approver perlu role Leave Approver dan Overtime Approver. Kosong: cuti tetap satu tingkat, lembur langsung ke HRD."
  }
 ]
