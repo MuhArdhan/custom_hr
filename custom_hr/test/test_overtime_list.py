@@ -47,7 +47,10 @@ class TestOvertimeList(unittest.TestCase):
 			request().on_trash()
 		delete.assert_called_once_with("Overtime List", {"overtime_request": "OT-1"})
 
-	def test_leaders_see_only_rows_of_their_outlets(self):
+	def test_leaders_see_rows_of_their_outlets_and_of_requests_naming_them(self):
+		# requests naming them as approver: the non-outlet (Department) requests, see test_overtime_department_approvers
+		named = "`tabOvertime Request`.`approver_1` = 'leader@example.com' or `tabOvertime Request`.`approver_2` = 'leader@example.com'"
 		with patch.object(overtime_permissions, "_sees_all", return_value=False), patch.object(overtime_permissions, "_their_outlets", return_value=["OUT-1"]):
-			self.assertEqual(overtime_permissions.get_list_permission_query_conditions("leader@example.com"), "`tabOvertime List`.`outlet` in ('OUT-1')")
-			self.assertEqual(overtime_permissions.get_permission_query_conditions("leader@example.com"), "`tabOvertime Request`.`outlet` in ('OUT-1')")
+			self.assertEqual(overtime_permissions.get_list_permission_query_conditions("leader@example.com"),
+				f"(`tabOvertime List`.`outlet` in ('OUT-1') or `tabOvertime List`.`overtime_request` in (select `tabOvertime Request`.`name` from `tabOvertime Request` where {named}))")
+			self.assertEqual(overtime_permissions.get_permission_query_conditions("leader@example.com"), f"(`tabOvertime Request`.`outlet` in ('OUT-1') or {named})")

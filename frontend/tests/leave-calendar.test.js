@@ -354,3 +354,8 @@ test("overtime stays in the day list after a decision, coloured by its status an
 	assert.equal((ui.html().match(/View only/g) || []).length, 2)
 	assert.equal((ui.html().match(/class="ac-time"/g) || []).length, 1)  // only the pending one has editable hours
 })
+
+test("the company filter options are fetched with GET, the only method approver_companies accepts", () => {
+	// frappe.xcall defaults to POST, which the GET-only endpoint answers with "Not permitted"
+	assert.match(source, /frappe\.xcall\("custom_hr\.api\.leave_calendar\.approver_companies", \{\}, "GET"\)/)
+})

@@ -125,6 +125,13 @@ class TestLeaveCalendar(unittest.TestCase):
 			actions = api._actions(self.doc, MagicMock())
 		self.assertEqual(actions, [{"action": "Setujui", "kind": "approve", "next_state": "Menunggu HRD"}])
 
+	def test_a_user_matching_several_role_rows_gets_one_button_per_action(self):
+		# Open leave has Approve/Reject for Leave Approver, HR Manager and System Manager: an admin holding all three saw them thrice
+		transitions = [frappe._dict(action=action, next_state=target) for _ in range(3) for action, target in (("Approve", "Approved"), ("Reject", "Rejected"))]
+		with patch(MODULE + "get_transitions", return_value=transitions), patch(MODULE + "has_approval_access", return_value=True):
+			actions = api._actions(self.doc, MagicMock())
+		self.assertEqual([a["action"] for a in actions], ["Approve", "Reject"])
+
 	def test_workflow_conditions_are_not_replaced_with_role_only_checks(self):
 		with patch(MODULE + "get_transitions", return_value=[]):
 			self.assertEqual(api._actions(self.doc, MagicMock()), [])

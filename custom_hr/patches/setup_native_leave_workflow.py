@@ -6,7 +6,7 @@ does not overwrite it on subsequent migrations.
 
 import frappe
 
-from custom_hr.services.approval_override import leave_transitions
+from custom_hr.services.approval_override import department_leave_transitions, leave_transitions
 
 NAME = "Approval Cuti dan Izin"
 STATE_FIELD = "leave_workflow_state"
@@ -17,6 +17,19 @@ EMPLOYEE_USER = 'frappe.db.get_value("Employee", doc.employee, "user_id")'
 # Approver 2 is optional: its stage runs only when set, not the employee and not the PL again.
 NEEDS_SPV = f'{SPV} and {SPV} != {PL} and {EMPLOYEE_USER} != {SPV}'
 SKIP_SPV = f'not ({NEEDS_SPV})'
+# Non-outlet employees: rows 1 and 2 of their Department's Leave & Overtime Approvers are the two optional stages.
+DEPARTMENT = 'frappe.db.get_value("Employee", doc.employee, "department")'
+APPROVER_1, APPROVER_2 = (
+	f'frappe.db.get_value("Department Approver", {{"parent": {DEPARTMENT}, "parentfield": "leave_approvers", "idx": {idx}}}, "approver")'
+	for idx in (1, 2)
+)
+NON_OUTLET = f'not {OUTLET}'
+# Every non-outlet leave ends at HRD. Without a department table the Employee's Leave Approver is stage 1.
+EMPLOYEE_APPROVER = 'frappe.db.get_value("Employee", doc.employee, "leave_approver")'
+STAGE_1 = f'({APPROVER_1} or {EMPLOYEE_APPROVER})'
+NEEDS_APPROVER_2 = f'{APPROVER_2} and {APPROVER_2} != {STAGE_1} and {EMPLOYEE_USER} != {APPROVER_2}'
+SKIP_APPROVER_2 = f'not ({NEEDS_APPROVER_2})'
+PENDING_APPROVER_1, PENDING_APPROVER_2 = "Menunggu Approver 1", "Menunggu Approver 2"
 
 
 def configuration():
@@ -28,6 +41,10 @@ def configuration():
 		("Menunggu PL", "0", "PL Outlet", "leave_approver", pl),
 		# Approver 2 becomes the leave approver in leave_approver.hand_over_to_approver_2, not here.
 		("Menunggu SPV", "0", "SPV Outlet", "status", "Open"),
+		# Rows 1 and 2 become the leave approver in leave_approver.hand_over_to_approver_2, as for the SPV:
+		# the row lookup does not fit the 140-character Update Value.
+		(PENDING_APPROVER_1, "0", "Leave Approver", "status", "Open"),
+		(PENDING_APPROVER_2, "0", "Leave Approver", "status", "Open"),
 		("Menunggu HRD", "0", "HR Manager", "status", "Open"),
 		("Approved", "1", "HR Manager", "status", "Approved"),
 		("Rejected", "1", "HR Manager", "status", "Rejected"),
@@ -57,17 +74,33 @@ def configuration():
 	transition("Menunggu SPV", "Approve", "Menunggu HRD", "SPV Outlet", f'{spv_condition} and {not_self}')
 	transition("Menunggu SPV", "Reject", "Rejected", "SPV Outlet", spv_condition, 1)
 	transitions.extend(leave_transitions())  # a user holding every approver role may step in when PL is stuck
+	# The SPV (row 2) outranks the Leader (row 1): the SPV's own leave goes straight to HRD, never to the Leader.
+	own_approver_2 = f'({APPROVER_2} and {employee_user} == {APPROVER_2})'
+	submitted = f'{NON_OUTLET} and doc.owner == frappe.session.user'
+	transition("Open", "Ajukan ke Approver 1", PENDING_APPROVER_1, "All",
+		f'{submitted} and {STAGE_1} and {employee_user} != {STAGE_1} and not {own_approver_2}', 1)
+	own_approver_1 = f'{submitted} and {STAGE_1} and {employee_user} == {STAGE_1}'
+	transition("Open", "Ajukan ke Approver 2", PENDING_APPROVER_2, "All", f'{own_approver_1} and {NEEDS_APPROVER_2}', 1)
+	# no stage 1 at all, or the requester is stage 1 / the SPV: straight to HRD
+	transition("Open", "Ajukan ke HRD", "Menunggu HRD", "All",
+		f'{submitted} and (not {STAGE_1} or {employee_user} == {STAGE_1} or {own_approver_2}) and {SKIP_APPROVER_2}', 1)
+	approver_1 = f'{NON_OUTLET} and doc.leave_approver == frappe.session.user and {STAGE_1} == frappe.session.user'
+	transition(PENDING_APPROVER_1, "Approve", PENDING_APPROVER_2, "Leave Approver", f'{approver_1} and {not_self} and {NEEDS_APPROVER_2}')
+	transition(PENDING_APPROVER_1, "Approve", "Menunggu HRD", "Leave Approver", f'{approver_1} and {not_self} and {SKIP_APPROVER_2}')
+	transition(PENDING_APPROVER_1, "Reject", "Rejected", "Leave Approver", approver_1, 1)
+	approver_2 = f'{NON_OUTLET} and doc.leave_approver == frappe.session.user and {APPROVER_2} == frappe.session.user'
+	transition(PENDING_APPROVER_2, "Approve", "Menunggu HRD", "Leave Approver", f'{approver_2} and {not_self}')
+	transition(PENDING_APPROVER_2, "Reject", "Rejected", "Leave Approver", approver_2, 1)
+	transitions.extend(department_leave_transitions())
 	# HR may approve a request it created for someone else, never its own leave.
 	transition("Menunggu HRD", "Approve", "Approved", "HR Manager", f'{outlet} and {employee_user} != frappe.session.user', 1)
 	transition("Menunggu HRD", "Reject", "Rejected", "HR Manager", outlet, 1)
-	# Company keeps one-level nominated Leave Approver / authorized HR decisions.
-	company_not_self = '(not frappe.db.get_value("HR Settings", None, "prevent_self_leave_approval") or frappe.db.get_value("Employee", doc.employee, "user_id") != frappe.session.user)'
-	for role in ["Leave Approver", "HR Manager", "System Manager"]:
-		condition = f'not {outlet}'
-		if role == "Leave Approver":
-			condition += ' and doc.leave_approver == frappe.session.user'
-		transition("Open", "Approve", "Approved", role, f'{condition} and {company_not_self}', int(role != "Leave Approver"))
-		transition("Open", "Reject", "Rejected", role, condition, 1)
+	# Every non-outlet leave at HRD came through the department stages; HR decides it even if the table changed since.
+	transition("Menunggu HRD", "Approve", "Approved", "HR Manager", f'not {outlet} and {employee_user} != frappe.session.user', 1)
+	transition("Menunggu HRD", "Reject", "Rejected", "HR Manager", f'not {outlet}', 1)
+	# No leave is approved from Open any more (every one reaches HRD); HR may still reject a draft left Open.
+	for role in ["HR Manager", "System Manager"]:
+		transition("Open", "Reject", "Rejected", role, NON_OUTLET, 1)
 	for role in ["HR Manager", "System Manager"]:
 		for state in ["Approved", "Rejected"]:
 			transition(state, "Cancel", "Cancelled", role, "", 1)

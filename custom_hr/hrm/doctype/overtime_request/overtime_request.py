@@ -23,6 +23,7 @@ from frappe.model.document import Document
 from frappe.utils import add_days, flt, getdate, time_diff_in_hours
 
 from custom_hr.api.roster import HR_ROLES
+from custom_hr.services.department_approvers import department_approvers
 from custom_hr.services.overtime_approval import DECISION_TOKEN, SELF_REQUEST_TOKEN, employee_state, protect_employee_decisions
 
 FINAL_STATES = ("Disetujui", "Ditolak")
@@ -64,6 +65,7 @@ class OvertimeRequest(Document):
 	def validate(self):
 		protect_employee_decisions(self)
 		self.fetch_outlet_details()
+		self.keep_recorded_approvers()
 		self.validate_editable()
 		self.validate_times()
 		self.validate_employees()
@@ -139,12 +141,32 @@ class OvertimeRequest(Document):
 			self.company = frappe.db.get_value("Employee", self.employees[0].employee, "company")
 		self.outlet = self.company if self.company and frappe.db.exists("Outlet", self.company) else None
 		if not self.outlet:
-			return  # a company without an outlet (factory, warehouse): no approvers, straight to HRD
+			# No outlet (office, factory, warehouse): the Department's Leave & Overtime Approvers; none means straight to HRD.
+			if self.is_new():
+				self.approver_1, self.approver_2 = self.department_approver_pair()
+			return
 		outlet = frappe.get_cached_doc("Outlet", self.outlet)
 		if self.is_new():
 			self.requested_by = self.requested_by or frappe.session.user
 			self.approver_1 = outlet.approver_1
 			self.approver_2 = outlet.approver_2
+
+	def keep_recorded_approvers(self):
+		"""Approvers are stamped at creation; read_only is browser-only, so a saved request keeps its stored pair."""
+		before = None if self.is_new() else self.get_doc_before_save()
+		if before:
+			self.approver_1, self.approver_2 = before.approver_1, before.approver_2
+
+	def department_approver_pair(self):
+		"""One pair for the whole request, as for an outlet: every employee's Department must name the same approvers."""
+		pairs = {
+			tuple(department_approvers(frappe.db.get_value("Employee", row.employee, "department")))
+			for row in self.employees
+		}
+		if len(pairs) > 1:
+			frappe.throw(_("Karyawan dalam satu pengajuan lembur harus punya approver departemen yang sama. Ajukan terpisah per departemen."))
+		approvers = list(pairs.pop()) if pairs else []
+		return (approvers + [None, None])[:2]
 
 	def validate_editable(self):
 		if self.is_new():
@@ -265,6 +287,8 @@ class OvertimeRequest(Document):
 
 	def initial_state(self):
 		user = frappe.session.user
+		if not self.outlet and self.approver_2 and self.approver_2 == user:
+			return "Menunggu HRD"  # a department SPV outranks its Leader: its own request goes straight to HRD
 		if self.approver_1 and self.approver_1 != user:
 			return "Menunggu Leader"
 		if self.approver_2 and self.approver_2 not in (user, self.approver_1):

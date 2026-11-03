@@ -139,3 +139,39 @@ class TestOutletApproverFallback(unittest.TestCase):
 		self.assertEqual(self.lookup("pl@example.com", "spv@example.com"), "pl@example.com")
 		self.assertEqual(self.lookup(None, "spv@example.com"), "spv@example.com")
 		self.assertFalse(self.lookup(None, None))
+
+
+class TestDepartmentStages(unittest.TestCase):
+	"""Non-outlet leaves go through rows 1 and 2 of the Department's Leave & Overtime Approvers."""
+
+	def test_submits_to_department_approver_1_or_2(self):
+		for action in ("Ajukan ke Approver 1", "Ajukan ke Approver 2"):
+			with self.subTest(action=action):
+				self.assertEqual(TestSubmitToApprover.run_hook(self, [action]).call_args.args[1], action)
+
+	def hand_over(self, state, leave_approver):
+		doc = frappe._dict(doctype="Leave Application", name="LA-2", employee="E2", leave_approver=leave_approver, leave_workflow_state=state)
+		doc.db_set = lambda values: dict.update(doc, values)
+		with patch("custom_hr.services.leave_approver.stage_approvers", return_value=self.rows) as rows, \
+			patch("frappe.utils.get_fullname", return_value="Budi"), patch("frappe.share.add_docshare") as share:
+			svc.hand_over_to_approver_2(doc)
+		rows.assert_called_once_with("E2")
+		return doc, share
+
+	rows = ["row1@example.com", "row2@example.com"]
+
+	def test_without_a_department_table_stage_1_is_the_employee_leave_approver(self):
+		self.rows = ["employee.approver@example.com"]
+		doc, _ = self.hand_over("Menunggu Approver 1", "someone@example.com")
+		self.assertEqual(doc.leave_approver, "employee.approver@example.com")
+
+	def test_each_department_stage_hands_over_to_its_row(self):
+		for state, current, expected in (("Menunggu Approver 1", "employee.choice@example.com", "row1@example.com"), ("Menunggu Approver 2", "row1@example.com", "row2@example.com")):
+			with self.subTest(state=state):
+				doc, share = self.hand_over(state, current)
+				self.assertEqual((doc.leave_approver, doc.leave_approver_name), (expected, "Budi"))
+				self.assertEqual(share.call_args.args[:3], ("Leave Application", "LA-2", expected))
+
+	def test_stage_label_names_department_approvers_too(self):
+		for state in ("Menunggu Approver 1", "Menunggu Approver 2"):
+			self.assertEqual(svc.stage_label(state, frappe._dict(leave_approver_name="Budi")), "Waiting for Budi")

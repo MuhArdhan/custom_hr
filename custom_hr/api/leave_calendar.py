@@ -58,7 +58,10 @@ def _actions(doc, workflow=None):
 				kind = "reject"
 			else:
 				continue
-			result.append({"action": transition.action, "kind": kind, "next_state": transition.next_state})
+			action = {"action": transition.action, "kind": kind, "next_state": transition.next_state}
+			# one button per action: a user holding several allowed roles matches one row per role
+			if action not in result:
+				result.append(action)
 		return result
 	if doc.doctype != "Leave Application" or doc.status != "Open" or not doc.has_permission("submit"):
 		return []
@@ -124,6 +127,21 @@ def _request(doc, kind, actions, workflow, overtime_row=None):
 		"modified": str(doc.modified), "actions": actions,
 		**(_leave_balance(doc) if kind == "leave" else overtime),
 	}
+
+
+@frappe.whitelist(methods=["GET"])
+def approver_companies():
+	"""Company filter options for a non-HR approver: their outlets (named after their Company) and their departments' companies."""
+	from custom_hr.api.overtime import _their_outlets
+
+	user = frappe.session.user
+	departments = frappe.get_all(
+		"Department Approver",
+		filters={"approver": user, "parenttype": "Department", "parentfield": "leave_approvers", "idx": ["<=", 2]},
+		pluck="parent", ignore_permissions=True,
+	)
+	companies = frappe.get_all("Department", filters={"name": ["in", departments]}, pluck="company", ignore_permissions=True) if departments else []
+	return sorted(set(_their_outlets(user)) | {company for company in companies if company})
 
 
 @frappe.whitelist(methods=["GET"])

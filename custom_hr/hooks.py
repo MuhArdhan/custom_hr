@@ -95,7 +95,10 @@ override_whitelisted_methods = {
 
 doc_events = {
 	"Department": {
-		"validate": "custom_hr.services.department_shift.validate_department",
+		"validate": [
+			"custom_hr.services.department_shift.validate_department",
+			"custom_hr.services.department_approvers.validate_department_approvers",
+		],
 	},
 	"Attendance": {
 		"validate": "custom_hr.services.attendance_duration.fill_durations",
@@ -130,6 +133,8 @@ fixtures = [
 				"in",
 				[
 					"Shift Location-latitude-precision",
+					"Department-leave_approvers-label",
+					"Department-leave_approvers-description",
 					"Shift Location-longitude-precision",
 					"Shift Type-late_entry_grace_period-label",
 					"Shift Type-late_entry_grace_period-description",

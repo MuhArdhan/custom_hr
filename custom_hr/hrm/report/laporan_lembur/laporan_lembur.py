@@ -65,11 +65,15 @@ def get_data(filters):
 		values.status = filters.status
 
 	if not _sees_all(frappe.session.user):
+		# their outlets' requests, and the (non-outlet) requests that name them as an approver
+		named = "otr.approver_1 = %(user)s or otr.approver_2 = %(user)s"
+		values.user = frappe.session.user
 		outlets = _their_outlets(frappe.session.user)
-		if not outlets:
-			return []
-		conditions.append("otr.outlet in %(outlets)s")
-		values.outlets = outlets
+		if outlets:
+			conditions.append(f"(otr.outlet in %(outlets)s or {named})")
+			values.outlets = outlets
+		else:
+			conditions.append(f"({named})")
 
 	where = " and ".join(conditions) or "1=1"
 	rows = frappe.db.sql(
