@@ -83,6 +83,7 @@ has_permission = {
 # self-service check-in limits, face verification requirement, realtime
 # attendance marking right after check-out
 override_doctype_class = {
+	"Employee": "custom_hr.overrides.employee.CustomEmployee",
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
 	"Shift Type": "custom_hr.overrides.shift_type.CustomShiftType",
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
