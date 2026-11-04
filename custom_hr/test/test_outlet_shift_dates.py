@@ -57,13 +57,17 @@ class TestActiveShiftNames(unittest.TestCase):
 		for text in (None, "", "   ", "Setiap hari", "setiap hari"):
 			self.assertEqual(parse_days(text), frozenset(range(7)))
 
-	def test_every_preset_in_the_dropdown_is_valid(self):
-		from custom_hr.hrm.doctype.outlet_shift.outlet_shift import DAY_PRESETS
-
-		self.assertEqual(DAY_PRESETS[0], "Setiap hari")
-		for text in DAY_PRESETS:
+	def test_the_day_checkboxes_text_and_the_old_dropdown_values_parse(self):
+		# public/js/shift_days.js writes ticked days as "Senin, Rabu, Minggu"; rows saved from the old dropdown keep ranges
+		for text, days in (
+			("Senin, Rabu, Minggu", {0, 2, 6}),
+			("Selasa", {1}),
+			("Senin, Selasa, Rabu, Kamis, Jumat, Sabtu", set(range(6))),
+			("Senin-Jumat", set(range(5))),
+			("Sabtu-Minggu", {5, 6}),
+		):
 			with self.subTest(text=text):
-				self.assertTrue(parse_days(text))
+				self.assertEqual(parse_days(text), frozenset(days))
 
 	def test_invalid_days_are_rejected(self):
 		for text in ("Funday", "Senin-", "Senin-Kamis-Jumat", "Senin,,Kamis", "1-3"):

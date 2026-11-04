@@ -47,8 +47,9 @@ app_include_js = "custom_hr.bundle.js"
 # ----------------------------------------------------------------------------
 
 doctype_js = {
+	"Department": "public/js/shift_days.js",
 	"Employee": "public/js/employee_face.js",
-	"Outlet": "public/js/outlet.js",
+	"Outlet": ["public/js/outlet.js", "public/js/shift_days.js"],
 	"Overtime Request": "public/js/overtime_request.js",
 	"Shift Location": "public/js/shift_location.js",
 }
