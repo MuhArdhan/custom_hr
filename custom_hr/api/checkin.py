@@ -23,7 +23,7 @@ from custom_hr.services.outlet_checkin import (
 	_latest_in_for_checkout,
 	validate_new_in_session,
 )
-from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_outlet_shift
+from custom_hr.services.outlet_shift import normalize_checkin_datetime, outlet_shift_mode_on, resolve_outlet_shift
 
 
 @frappe.whitelist(methods=["POST"])
@@ -149,9 +149,7 @@ def get_checkin_context():
 			use_session(latest)
 			context["next_action"] = "OUT"
 			return context
-		configured = bool(record.outlet) and bool(
-			frappe.db.get_value("Outlet", record.outlet, "enable_outlet_auto_shift")
-		)
+		configured = outlet_shift_mode_on(record.outlet)
 		resolution = resolve_outlet_shift(employee, now) if configured else {
 			"mode": "Native", "mode_applies": False, "matched": False,
 		}

@@ -47,8 +47,9 @@ app_include_js = "custom_hr.bundle.js"
 # ----------------------------------------------------------------------------
 
 doctype_js = {
+	"Department": "public/js/shift_days.js",
 	"Employee": "public/js/employee_face.js",
-	"Outlet": "public/js/outlet.js",
+	"Outlet": ["public/js/outlet.js", "public/js/shift_days.js"],
 	"Overtime Request": "public/js/overtime_request.js",
 	"Shift Location": "public/js/shift_location.js",
 }
@@ -143,6 +144,9 @@ fixtures = [
 					"Shift Type-early_exit_grace_period-label",
 					"Shift Type-early_exit_grace_period-description",
 					"Shift Type-enable_auto_attendance-default",
+					"Shift Type-allow_overtime-default",
+					"Shift Type-overtime_type-hidden",
+					"Shift Type-overtime_type-mandatory_depends_on",
 					"Shift Type-working_hours_threshold_for_half_day-default",
 					"Shift Type-late_entry_grace_period-default",
 					"Shift Type-early_exit_grace_period-default",

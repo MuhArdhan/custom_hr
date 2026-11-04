@@ -18,6 +18,8 @@ EXPECTED = {
 	# The grace periods are ignored unless their marking is switched on.
 	"enable_late_entry_marking": "1",
 	"enable_early_exit_marking": "1",
+	# actual overtime is recorded on every shift; pay still needs an approved Overtime Request
+	"allow_overtime": "1",
 }
 
 

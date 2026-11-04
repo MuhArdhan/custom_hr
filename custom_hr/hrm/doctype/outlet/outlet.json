@@ -20,6 +20,9 @@
   "geofence_radius_m",
   "shift_section",
   "enable_outlet_auto_shift",
+  "column_break_shift_mode",
+  "manual_shift_choice",
+  "shift_rules_section",
   "outlet_auto_shift_effective_from",
   "shift_transition_minutes",
   "shifts",
@@ -124,6 +127,21 @@
     "read_only": 0
   },
   {
+   "fieldname": "column_break_shift_mode",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Karyawan memilih sendiri shift-nya saat check-in, dari shift yang berlaku hari itu dan belum selesai. Pilih salah satu: ini atau Shift Otomatis Outlet.",
+   "fieldname": "manual_shift_choice",
+   "fieldtype": "Check",
+   "label": "Shift Manual"
+  },
+  {
+   "fieldname": "shift_rules_section",
+   "fieldtype": "Section Break"
+  },
+  {
     "description": "Tanggal dan waktu mulai mode otomatis. Log sebelum waktu ini tetap mengikuti alur native.",
    "fieldname": "outlet_auto_shift_effective_from",
    "hidden": 1,
@@ -134,10 +152,10 @@
   },
   {
    "default": "30",
-   "description": "IN berpindah ke shift berikutnya sejumlah menit sebelum jam mulainya. Bukan toleransi keterlambatan; Toleransi Terlambat dan Toleransi Pulang Awal tetap diatur pada Shift Type. Shift terakhir menerima IN sampai jam selesai.",
+   "description": "Default untuk shift yang kolom Jeda IN-nya di tabel kosong. IN berpindah ke shift berikutnya sejumlah menit sebelum jam mulainya. Bukan toleransi keterlambatan; Toleransi Terlambat dan Toleransi Pulang Awal tetap diatur pada Shift Type. Shift terakhir menerima IN sampai jam selesai.",
    "fieldname": "shift_transition_minutes",
    "fieldtype": "Int",
-   "label": "Jeda Peralihan IN (Menit)",
+   "label": "Jeda IN Default (Menit)",
    "non_negative": 1,
    "reqd": 1
   },
@@ -178,7 +196,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-15 10:00:00.000000",
+ "modified": "2026-11-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "Outlet",

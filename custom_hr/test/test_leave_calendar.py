@@ -329,6 +329,20 @@ class TestLeaveCalendar(unittest.TestCase):
 		self.assertNotIn("ignore_permissions", listing)
 		self.assertEqual(rows.call_args.kwargs["filters"]["parent"], ["in", ["OT-1", "OT-2"]])
 
+	def test_department_filter_scopes_leave_by_field_and_overtime_by_employee(self):
+		doc = leave(doctype="Overtime Request", date="2026-10-22", start_time="19:00:00", end_time="21:00:00", planned_hours=2, employees=[frappe._dict(employee="EMP-A", employee_name="A", approval_state="Menunggu HRD"), frappe._dict(employee="EMP-B", employee_name="B", approval_state="Menunggu HRD")])
+		self.factory.return_value = doc
+		self.listing.side_effect = lambda dt, **kwargs: [frappe._dict(name="OT", date="2026-10-22")] if dt == "Overtime Request" else []
+		members = [frappe._dict(parent="OT", employee="EMP-A"), frappe._dict(parent="OT", employee="EMP-B")]
+		staff = lambda dt, **kwargs: ["EMP-B"] if dt == "Employee" else members
+		with patch(MODULE + "_actions", return_value=[]), patch("frappe.get_all", side_effect=staff):
+			detail = api.get_leave_calendar("2026-10-22", "2026-10-22", department="IT")
+			counts = api.get_leave_counts("2026-10-01", "2026-10-31", department="IT")
+		self.assertEqual([i["employee"] for i in detail["items"]], ["EMP-B"])
+		self.assertEqual(counts["total"], 1)
+		leave_filters = [call.kwargs["filters"] for call in self.listing.call_args_list if call.args[0] == "Leave Application"]
+		self.assertTrue(leave_filters and all(f["department"] == "IT" for f in leave_filters))
+
 	def test_leave_classification_requires_native_final_submission(self):
 		for status, docstatus, expected in [
 			("Open", 0, "leave_request"),

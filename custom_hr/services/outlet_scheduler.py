@@ -23,7 +23,7 @@ from custom_hr.services.outlet_attendance import (
 )
 from custom_hr.services.outlet_checkin import _linked_checkout
 from custom_hr.services.outlet_geofence import read_outlet_geofence
-from custom_hr.services.outlet_shift import normalize_checkin_datetime, resolve_outlet_shift
+from custom_hr.services.outlet_shift import SHIFT_MODE_FIELDS, normalize_checkin_datetime, resolve_outlet_shift, shift_mode_on
 
 
 def _ceil_day(value):
@@ -59,13 +59,13 @@ def native_absence_is_managed(employee, work_date):
 	if not outlet:
 		return False
 	settings = frappe.db.get_value(
-		"Outlet", outlet, ["outlet_auto_shift_effective_from", "enable_outlet_auto_shift", "modified"],
+		"Outlet", outlet, ["outlet_auto_shift_effective_from", *SHIFT_MODE_FIELDS, "modified"],
 		as_dict=True, for_update=True,
 	)
 	if not settings or not settings.outlet_auto_shift_effective_from:
 		return False
 	return day >= getdate(settings.outlet_auto_shift_effective_from) and (
-		bool(settings.enable_outlet_auto_shift) or day <= getdate(settings.modified)
+		shift_mode_on(settings) or day <= getdate(settings.modified)
 	)
 
 
@@ -146,10 +146,10 @@ def _day_context(employee, work_date):
 		return None, "not_active_or_ready"
 	outlet = frappe.db.get_value(
 		"Outlet", record.outlet,
-		["name", "is_active", "enable_outlet_auto_shift", "outlet_auto_shift_effective_from", "modified", "holiday_list"],
+		["name", "is_active", *SHIFT_MODE_FIELDS, "outlet_auto_shift_effective_from", "modified", "holiday_list"],
 		as_dict=True, for_update=True,
 	)
-	if not outlet or not outlet.enable_outlet_auto_shift or not outlet.outlet_auto_shift_effective_from:
+	if not outlet or not shift_mode_on(outlet) or not outlet.outlet_auto_shift_effective_from:
 		return None, "mode_disabled"
 	if not outlet.is_active or not record.company:
 		frappe.throw(_("Outlet harus aktif dan Company karyawan harus terisi untuk evaluasi Absent."))

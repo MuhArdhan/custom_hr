@@ -20,6 +20,7 @@ from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
 from custom_hr.services.outlet_shift import (
 	get_employee_attendance_mode,
 	normalize_checkin_datetime,
+	outlet_shift_mode_on,
 	resolve_outlet_shift,
 )
 
@@ -280,18 +281,14 @@ def prepare_or_protect_checkin(doc) -> bool:
 		_reject_native_source_payload(doc)
 		if latest and get_datetime(latest.time) <= get_datetime(doc.time) <= _cutoff(latest) and not _has_out(latest):
 			return False  # Allow an open native IN from before mode activation.
-		configured = bool(employee.outlet) and bool(
-			frappe.db.get_value("Outlet", employee.outlet, "enable_outlet_auto_shift", for_update=True)
-		)
+		configured = outlet_shift_mode_on(employee.outlet, for_update=True)
 		mode = get_employee_attendance_mode(doc.employee, doc.time, for_update=True) if configured else None
 		if mode and mode["mode"] == "Unavailable":
 			frappe.throw(mode["message"])
 		if mode and mode["mode_applies"]:
 			frappe.throw(_("Tidak ada IN outlet terbuka untuk check-out. Lakukan check-in terlebih dahulu."), title=_("Tidak Ada Check-in"))
 		return False
-	configured = bool(employee.outlet) and bool(
-		frappe.db.get_value("Outlet", employee.outlet, "enable_outlet_auto_shift", for_update=True)
-	)
+	configured = outlet_shift_mode_on(employee.outlet, for_update=True)
 	# The employee's dropdown choice (same-start shifts) arrives as the checkin's shift; the resolver
 	# validates it against the candidates and ignores it when there is only one.
 	resolution = resolve_outlet_shift(doc.employee, doc.time, for_update=True, chosen_shift=doc.get("shift") or None) if configured else None

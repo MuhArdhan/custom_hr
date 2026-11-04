@@ -86,7 +86,8 @@ class TestOutletCheckout(unittest.TestCase):
 			return deepcopy(self.employee)
 		if doctype == "Outlet":
 			self.events.append("current_outlet")
-			return self.configured
+			# the shift mode fields (outlet_shift.outlet_shift_mode_on); configured = Otomatis on
+			return frappe._dict(enable_outlet_auto_shift=self.configured, manual_shift_choice=0)
 		if doctype == "Employee Checkin":
 			return deepcopy(self.stored)
 		raise AssertionError("Unexpected read: " + doctype)

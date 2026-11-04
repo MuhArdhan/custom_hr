@@ -205,6 +205,42 @@
  },
  {
   "doctype": "Property Setter",
+  "name": "Shift Type-allow_overtime-default",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "allow_overtime",
+  "property": "default",
+  "property_type": "Text",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 0
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-overtime_type-hidden",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "overtime_type",
+  "property": "hidden",
+  "property_type": "Check",
+  "value": "1",
+  "module": "HRM",
+  "is_system_generated": 0
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Shift Type-overtime_type-mandatory_depends_on",
+  "doctype_or_field": "DocField",
+  "doc_type": "Shift Type",
+  "field_name": "overtime_type",
+  "property": "mandatory_depends_on",
+  "property_type": "Code",
+  "value": "",
+  "module": "HRM",
+  "is_system_generated": 0
+ },
+ {
+  "doctype": "Property Setter",
   "name": "Shift Type-enable_auto_attendance-default",
   "doctype_or_field": "DocField",
   "doc_type": "Shift Type",

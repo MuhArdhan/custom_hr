@@ -12,8 +12,36 @@ from hrms.hr.doctype.shift_assignment.shift_assignment import get_employee_shift
 
 from custom_hr.services.outlet_scheduler import native_absence_is_managed
 
+PREFERRED_OVERTIME_TYPE = "Lembur"
+
+
+def overtime_marker() -> str | None:
+	"""The Overtime Type stamped on an overtime-allowing shift: Lembur, else the first one there is."""
+	if frappe.db.exists("Overtime Type", PREFERRED_OVERTIME_TYPE):
+		return PREFERRED_OVERTIME_TYPE
+	return (frappe.get_all("Overtime Type", pluck="name", order_by="name asc", limit=1) or [None])[0]
+
 
 class CustomShiftType(BaseShiftType):
+	def validate(self):
+		super().validate()
+		self.fill_overtime_marker()
+
+	def fill_overtime_marker(self):
+		"""Allow Overtime is the only switch; the Overtime Type field is hidden.
+
+		HRMS records actual overtime on Attendance only when the shift carries an Overtime Type
+		(employee_checkin.py), so it is filled here as a marker. The type that counts is the one
+		chosen on the Overtime Request: pay, hour caps and reports read that one.
+		"""
+		if not self.allow_overtime:
+			return
+		if self.overtime_type and frappe.db.exists("Overtime Type", self.overtime_type):
+			return
+		self.overtime_type = overtime_marker()
+		if not self.overtime_type:
+			frappe.throw(_("Buat minimal satu Overtime Type dulu sebelum mengizinkan lembur pada shift."))
+
 	def _native_logs(self, logs):
 		if not logs:
 			return []
