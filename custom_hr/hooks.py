@@ -144,6 +144,7 @@ fixtures = [
 					"Shift Type-early_exit_grace_period-label",
 					"Shift Type-early_exit_grace_period-description",
 					"Shift Type-enable_auto_attendance-default",
+					"Shift Type-allow_overtime-default",
 					"Shift Type-overtime_type-hidden",
 					"Shift Type-overtime_type-mandatory_depends_on",
 					"Shift Type-working_hours_threshold_for_half_day-default",

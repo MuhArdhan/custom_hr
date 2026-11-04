@@ -48,3 +48,7 @@ class TestShiftOvertimeFieldHidden(unittest.TestCase):
 	def test_the_overtime_type_field_is_hidden_and_not_mandatory(self):
 		field = frappe.get_meta("Shift Type").get_field("overtime_type")
 		self.assertEqual((field.hidden, field.mandatory_depends_on or ""), (1, ""))
+
+	def test_a_new_shift_type_allows_overtime(self):
+		self.assertEqual(str(frappe.get_meta("Shift Type").get_field("allow_overtime").default), "1")
+		self.assertEqual(frappe.new_doc("Shift Type").allow_overtime, 1)
