@@ -177,7 +177,7 @@ def get_employee_checkin_gallery(
 	missing_checkout: str | int | None = None,
 	attendance_status: str | None = None,
 	start: int = 0,
-	page_length: int = 24,
+	page_length: int = 20,
 ) -> dict:
 	"""Card gallery of employee check-in logs with the attendance status of that day.
 
@@ -223,7 +223,7 @@ def get_employee_checkin_gallery(
 		accessible = sorted({row_employee for row_employee, _day in matching_days})
 
 	start = cint(start) or 0
-	page_length = min(cint(page_length) or 24, 100)
+	page_length = min(cint(page_length) or 20, 500)  # the gallery's largest page size
 
 	filters = {
 		"employee": ["in", accessible],
@@ -258,11 +258,15 @@ def get_employee_checkin_gallery(
 		**({"limit_page_length": 0} if matching_days is not None else {"start": start, "page_length": page_length + 1}),
 	)
 	if matching_days is not None:
-		checkins = [row for row in checkins if (row.employee, str(getdate(row.time))) in matching_days][start:]
+		checkins = [row for row in checkins if (row.employee, str(getdate(row.time))) in matching_days]
+		total = len(checkins)
+		checkins = checkins[start:]
+	else:
+		total = frappe.db.count("Employee Checkin", filters)  # same filters as the page; employees already scoped
 	has_more = len(checkins) > page_length
 	checkins = checkins[:page_length]
 	if not checkins:
-		return {"rows": [], "has_more": False}
+		return {"rows": [], "has_more": False, "total": total}
 
 	employee_names = list({row.employee for row in checkins})
 	employees = {
@@ -295,7 +299,7 @@ def get_employee_checkin_gallery(
 		checkin["late_entry"] = attendance.late_entry if attendance else 0
 		checkin["early_exit"] = attendance.early_exit if attendance else 0
 
-	return {"rows": checkins, "has_more": has_more}
+	return {"rows": checkins, "has_more": has_more, "total": total}
 
 
 @frappe.whitelist()
@@ -439,7 +443,7 @@ def get_attendance_summary_by_employee(
 		filters["name"] = ["in", sorted(matching)]
 
 	start = cint(start) or 0
-	page_length = min(cint(page_length) or 20, 100)
+	page_length = min(cint(page_length) or 20, 500)  # the gallery's largest page size
 
 	employees = frappe.get_list(
 		"Employee",
@@ -451,8 +455,10 @@ def get_attendance_summary_by_employee(
 	)
 	has_more = len(employees) > page_length
 	employees = employees[:page_length]
+	# get_list, not db.count: the total must respect the same Employee permissions as the page
+	total = len(frappe.get_list("Employee", filters=filters, pluck="name", limit_page_length=0))
 	if not employees:
-		return {"rows": [], "has_more": False}
+		return {"rows": [], "has_more": False, "total": total}
 
 	employee_names = [row.name for row in employees]
 	placeholders = ", ".join(["%s"] * len(employee_names))
@@ -512,4 +518,4 @@ def get_attendance_summary_by_employee(
 			}
 		)
 
-	return {"rows": rows, "has_more": has_more}
+	return {"rows": rows, "has_more": has_more, "total": total}

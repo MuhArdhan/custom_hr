@@ -23,6 +23,7 @@ class TestGroomingGallery(unittest.TestCase):
 		self.calls = []
 		self.only_for = self.patch("custom_hr.api.grooming.require_page_access")
 		self.patch("frappe.get_all", side_effect=self.get_all)
+		self.patch("frappe.db.count", side_effect=lambda doctype, filters: len(self.cards))
 		self.patch("custom_hr.api.grooming.nowdate", return_value="2026-10-26")
 
 	def patch(self, target, **kwargs):
@@ -67,17 +68,17 @@ class TestGroomingGallery(unittest.TestCase):
 		with self.assertRaises(frappe.ValidationError):
 			grooming.get_grooming_gallery(from_date="2026-10-27", to_date="2026-10-26")
 
-	def test_paging_reports_more_and_caps_the_page_size(self):
+	def test_paging_reports_the_total_and_caps_the_page_size(self):
 		first = grooming.get_grooming_gallery(page_length=1)
-		self.assertEqual((len(first["rows"]), first["has_more"]), (1, True))
+		self.assertEqual((len(first["rows"]), first["has_more"], first["total"]), (1, True, 2))
 		last = grooming.get_grooming_gallery(start=1, page_length=1)
-		self.assertEqual((len(last["rows"]), last["has_more"]), (1, False))
+		self.assertEqual((len(last["rows"]), last["has_more"], last["total"]), (1, False, 2))
 		grooming.get_grooming_gallery(page_length=5000)
-		self.assertEqual(self.calls[-2][2]["page_length"], 101)
+		self.assertEqual(self.calls[-2][2]["page_length"], 501)
 
 	def test_no_cards_means_no_photo_query(self):
 		self.cards = []
-		self.assertEqual(grooming.get_grooming_gallery(), {"rows": [], "has_more": False})
+		self.assertEqual(grooming.get_grooming_gallery(), {"rows": [], "has_more": False, "total": 0})
 		self.assertEqual([call[0] for call in self.calls], ["Grooming Check"])
 
 

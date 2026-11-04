@@ -27,7 +27,7 @@
 .gg-muted { color: var(--text-muted); }
 
 .gg-empty { text-align: center; color: var(--text-muted); padding: 60px 0; grid-column: 1 / -1; }
-.gg-more { display: flex; justify-content: center; padding: 8px 0 24px; }
+.gg-more { padding: 8px 0 24px; }
 
 /* review dialog */
 .gg-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; }

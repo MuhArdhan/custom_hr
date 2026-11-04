@@ -1,6 +1,8 @@
 frappe.pages["grooming-gallery"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: __("Grooming Gallery"), single_column: true });
-	frappe.grooming_gallery = new GroomingGallery(page);
+	frappe.require("/assets/custom_hr/js/paging_area.js", () => {
+		frappe.grooming_gallery = new GroomingGallery(page);
+	});
 };
 
 const GROOMING_PILLS = { Menunggu: "orange", Sesuai: "green", "Tidak Sesuai": "red" };
@@ -11,16 +13,15 @@ class GroomingGallery {
 		this.page = page;
 		this.page.main.addClass("gg-page");
 		this.rows = [];
-		this.start = 0;
-		this.page_length = 24;
 		this.request_id = 0;
 		this.syncing_dates = false;
 
-		this.page.set_secondary_action(__("Refresh"), () => this.refresh(), "refresh");
+		this.page.set_secondary_action(__("Refresh"), () => this.load(), "refresh");
 		this.make_filters();
 		this.$summary = $('<div class="gg-summary"></div>').appendTo(this.page.main);
 		this.$grid = $('<div class="gg-grid"></div>').appendTo(this.page.main);
-		this.$more = $('<div class="gg-more"></div>').appendTo(this.page.main);
+		this.paging = new custom_hr.PagingArea({ parent: this.page.main, on_change: () => this.load() });
+		this.paging.$wrapper.addClass("gg-more");
 		this.$grid.on("click", ".gg-card", (event) => this.open(this.rows.find((row) => row.name === event.currentTarget.dataset.name)));
 		this.apply_preset("Today");
 		this.refresh();
@@ -83,23 +84,26 @@ class GroomingGallery {
 		};
 	}
 
+	// a filter change starts again at page 1; paging and Refresh keep the page
 	async refresh() {
-		this.start = 0;
-		await this.load(false);
+		if (!this.paging) return; // a filter control firing while the page is still being built
+		this.paging.page_index = 0;
+		await this.load();
 	}
 
-	async load(append) {
+	async load() {
 		const request_id = ++this.request_id;
-		if (!append) this.$grid.html(`<div class="gg-empty">${__("Loading...")}</div>`);
+		this.$grid.html(`<div class="gg-empty">${__("Loading...")}</div>`);
+		this.paging.hide();
 		try {
 			const { message } = await frappe.call({
 				method: "custom_hr.api.grooming.get_grooming_gallery",
 				type: "GET",
-				args: { ...this.args(), start: this.start, page_length: this.page_length },
+				args: { ...this.args(), start: this.paging.start, page_length: this.paging.page_length },
 			});
 			if (request_id !== this.request_id) return;
-			this.rows = append ? this.rows.concat(message.rows) : message.rows;
-			this.has_more = message.has_more;
+			this.rows = message.rows;
+			this.total = message.total;
 			this.render();
 		} catch {
 			if (request_id === this.request_id) this.$grid.html(`<div class="gg-empty">${__("Unable to load the gallery.")}</div>`);
@@ -108,10 +112,10 @@ class GroomingGallery {
 
 	render() {
 		const esc = frappe.utils.escape_html;
-		this.$summary.text(this.rows.length ? __("{0} grooming shown", [this.rows.length]) : "");
+		this.$summary.text(this.rows.length ? __("{0} grooming", [this.total || this.rows.length]) : "");
+		this.paging.render(this.total, this.rows.length > 0);
 		if (!this.rows.length) {
 			this.$grid.html(`<div class="gg-empty">${__("No grooming in this period.")}</div>`);
-			this.$more.empty();
 			return;
 		}
 		this.$grid.html(this.rows.map((row) => `
@@ -127,8 +131,6 @@ class GroomingGallery {
 					<div class="gg-line gg-muted">${esc(frappe.datetime.str_to_user(row.submitted_at))}</div>
 				</div>
 			</div>`).join(""));
-		this.$more.html(this.has_more ? `<button class="btn btn-default btn-sm">${__("Load More")}</button>` : "");
-		this.$more.find("button").on("click", () => { this.start = this.rows.length; this.load(true); });
 	}
 
 	open(row) {

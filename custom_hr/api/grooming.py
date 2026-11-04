@@ -109,7 +109,7 @@ def submit_grooming(photos) -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def get_grooming_gallery(
-	company=None, outlet=None, employee=None, review_status=None, from_date=None, to_date=None, search=None, start=0, page_length=24,
+	company=None, outlet=None, employee=None, review_status=None, from_date=None, to_date=None, search=None, start=0, page_length=20,
 ) -> dict:
 	"""Cards for the SOP team: one per grooming, with its photos in step order."""
 	require_page_access(GALLERY_PAGE)
@@ -127,15 +127,16 @@ def get_grooming_gallery(
 	if search:
 		filters["employee_name"] = ["like", f"%{search}%"]
 
-	start, page_length = cint(start) or 0, min(cint(page_length) or 24, 100)
+	start, page_length = cint(start) or 0, min(cint(page_length) or 20, 500)  # the gallery's largest page size
 	rows = frappe.get_all(
 		"Grooming Check", filters=filters, fields=CARD_FIELDS, order_by="grooming_date desc, submitted_at desc",
 		start=start, page_length=page_length + 1,
 	)
 	has_more = len(rows) > page_length
 	rows = rows[:page_length]
+	total = frappe.db.count("Grooming Check", filters)  # the page numbers; same filters as the rows
 	if not rows:
-		return {"rows": [], "has_more": False}
+		return {"rows": [], "has_more": False, "total": total}
 
 	photos = frappe.get_all(
 		"Grooming Photo", filters={"parent": ["in", [row.name for row in rows]], "parenttype": "Grooming Check"},
@@ -145,7 +146,7 @@ def get_grooming_gallery(
 		row["photos"] = [
 			{"step": item.step, "title": STEP_TITLES.get(item.step, item.step), "photo": item.photo} for item in photos if item.parent == row.name
 		]
-	return {"rows": rows, "has_more": has_more}
+	return {"rows": rows, "has_more": has_more, "total": total}
 
 
 @frappe.whitelist(methods=["POST"])

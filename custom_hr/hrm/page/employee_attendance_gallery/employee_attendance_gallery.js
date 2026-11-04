@@ -5,7 +5,9 @@ frappe.pages["employee-attendance-gallery"].on_page_load = function (wrapper) {
 		single_column: true,
 	});
 
-	frappe.employee_attendance_gallery = new EmployeeAttendanceGallery(page);
+	frappe.require("/assets/custom_hr/js/paging_area.js", () => {
+		frappe.employee_attendance_gallery = new EmployeeAttendanceGallery(page);
+	});
 };
 
 frappe.pages["employee-attendance-gallery"].on_page_show = function () {
@@ -18,8 +20,6 @@ class EmployeeAttendanceGallery {
 		this.page.main.addClass("eag-page");
 		this.view = "main";
 		this.selected_employee = null;
-		this.start = 0;
-		this.page_length = 24;
 		this.request_id = 0;
 		this.current_rows = [];
 		this.search_value = "";
@@ -157,7 +157,7 @@ class EmployeeAttendanceGallery {
 			</button>`
 		)
 			.appendTo($actions_row)
-			.on("click", () => this.refresh());
+			.on("click", () => this.refresh(true));
 
 		// wire onchange only after initial values are set, so setting up the
 		// controls does not fire a burst of pointless reloads
@@ -194,7 +194,8 @@ class EmployeeAttendanceGallery {
 	make_container() {
 		this.$status = $('<div class="eag-status"></div>').appendTo(this.page.main);
 		this.$content = $('<div class="eag-content"></div>').appendTo(this.page.main);
-		this.$more = $('<div class="eag-more"></div>').appendTo(this.page.main);
+		this.paging = new custom_hr.PagingArea({ parent: this.page.main, on_change: () => this.refresh(true) });
+		this.paging.$wrapper.addClass("eag-more");
 	}
 
 	set_status(message) {
@@ -249,8 +250,10 @@ class EmployeeAttendanceGallery {
 		return this.days_in_range() <= 2 ? "gallery" : "list";
 	}
 
-	refresh() {
+	// keep_page: paging or the Refresh button; a filter change starts again at page 1
+	refresh(keep_page = false) {
 		this.request_id += 1;
+		if (!keep_page && this.paging) this.paging.page_index = 0;
 		if (this.view === "employee") return this.load_daily_cards(this.request_id);
 		if (this.effective_mode() === "gallery") return this.load_gallery(true, this.request_id);
 		return this.load_summary(true, this.request_id);
@@ -261,10 +264,10 @@ class EmployeeAttendanceGallery {
 	async load_gallery(reset, request_id) {
 		const id = request_id || this.request_id;
 		if (reset) {
-			this.start = 0;
+			this.start = this.paging.start;
 			this.current_rows = [];
 			this.$content.empty();
-			this.$more.empty();
+			this.paging.hide();
 			this.$grid = null;
 		}
 		this.set_status(__("Loading..."));
@@ -272,14 +275,12 @@ class EmployeeAttendanceGallery {
 			const result = await frappe.xcall("custom_hr.api.get_employee_checkin_gallery", {
 				...this.get_filters(),
 				start: this.start,
-				page_length: this.page_length,
+				page_length: this.paging.page_length,
 			});
 			if (id !== this.request_id) return;
 			this.current_rows = this.current_rows.concat(result.rows || []);
 			this.render_gallery(result.rows || []);
-			this.start = this.current_rows.length;
-			this.$more.empty();
-			if (result.has_more) this.render_more(() => this.load_gallery(false));
+			this.paging.render(result.total, this.current_rows.length > 0);
 			this.set_status(
 				(result.rows || []).length || this.current_rows.length
 					? ""
@@ -359,10 +360,10 @@ class EmployeeAttendanceGallery {
 	async load_summary(reset, request_id) {
 		const id = request_id || this.request_id;
 		if (reset) {
-			this.start = 0;
+			this.start = this.paging.start;
 			this.current_rows = [];
 			this.$content.empty();
-			this.$more.empty();
+			this.paging.hide();
 			this.$list = null;
 		}
 		this.set_status(__("Loading..."));
@@ -378,14 +379,12 @@ class EmployeeAttendanceGallery {
 				missing_checkout: filters.missing_checkout,
 				attendance_status: filters.attendance_status,
 				start: this.start,
-				page_length: 20,
+				page_length: this.paging.page_length,
 			});
 			if (id !== this.request_id) return;
 			this.current_rows = this.current_rows.concat(result.rows || []);
 			this.render_summary(result.rows || []);
-			this.start = this.current_rows.length;
-			this.$more.empty();
-			if (result.has_more) this.render_more(() => this.load_summary(false));
+			this.paging.render(result.total, this.current_rows.length > 0);
 			this.set_status(
 				(result.rows || []).length || this.current_rows.length
 					? ""
@@ -459,7 +458,7 @@ class EmployeeAttendanceGallery {
 	async load_daily_cards(request_id) {
 		const id = request_id || this.request_id;
 		this.$content.empty();
-		this.$more.empty();
+		this.paging.hide();
 		this.set_status(__("Loading..."));
 		try {
 			const filters = this.get_filters();
@@ -601,13 +600,4 @@ class EmployeeAttendanceGallery {
 
 	/* -------------------------------- helpers ------------------------------ */
 
-	render_more(callback) {
-		this.$more.empty();
-		$(`<button class="btn btn-sm btn-default">${__("Load More")}</button>`)
-			.appendTo(this.$more)
-			.on("click", (event) => {
-				$(event.currentTarget).prop("disabled", true);
-				callback();
-			});
-	}
 }
