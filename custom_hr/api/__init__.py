@@ -274,7 +274,7 @@ def get_employee_checkin_gallery(
 		for row in frappe.get_all(
 			"Employee",
 			filters={"name": ["in", employee_names]},
-			fields=["name", "company", "designation"],
+			fields=["name", "company", "designation", "department"],
 		)
 	}
 
@@ -294,6 +294,7 @@ def get_employee_checkin_gallery(
 		employee_row = employees.get(checkin.employee) or {}
 		checkin["company"] = employee_row.get("company")
 		checkin["designation"] = employee_row.get("designation")
+		checkin["department"] = employee_row.get("department")
 		attendance = attendance_map.get((checkin.employee, str(getdate(checkin.time))))
 		checkin["attendance_status"] = attendance.status if attendance else None
 		checkin["late_entry"] = attendance.late_entry if attendance else 0

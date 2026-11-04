@@ -330,10 +330,23 @@ class EmployeeAttendanceGallery {
 					<div class="eag-name">${frappe.utils.escape_html(
 						row.employee_name || row.employee
 					)}</div>
-					<div class="eag-line"><b>${frappe.datetime.str_to_user(row.time)}</b></div>
+					${this.place_lines(row)}
+					<div class="eag-line eag-muted">${frappe.datetime.str_to_user(row.time)}</div>
 					${score}
 				</div>
 			</div>`;
+	}
+
+	// laid out like the grooming card: "company · outlet" (outlet staff: the outlet saved on the
+	// check-in; others: their department), then the shift on its own line
+	place_lines(row) {
+		const esc = frappe.utils.escape_html;
+		// an outlet is named after its Company: show the name once
+		const place = [...new Set([row.company, row.outlet_at_checkin || row.department].filter(Boolean))].join(" · ");
+		return (
+			(place ? `<div class="eag-line eag-muted eag-place">${esc(place)}</div>` : "") +
+			(row.shift ? `<div class="eag-line eag-shift">${esc(row.shift)}</div>` : "")
+		);
 	}
 
 	attendance_badge(row) {

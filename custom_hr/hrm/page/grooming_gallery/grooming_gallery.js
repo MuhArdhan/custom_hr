@@ -126,7 +126,7 @@ class GroomingGallery {
 				</div>
 				<div class="gg-card-body">
 					<div class="gg-name">${esc(row.employee_name || row.employee)}</div>
-					<div class="gg-line gg-muted">${esc([row.company, row.outlet].filter(Boolean).join(" · "))}</div>
+					<div class="gg-line gg-muted">${esc([...new Set([row.company, row.outlet].filter(Boolean))].join(" · "))}</div>
 					${row.shift ? `<div class="gg-line">${esc(row.shift)}</div>` : ""}
 					<div class="gg-line gg-muted">${esc(frappe.datetime.str_to_user(row.submitted_at))}</div>
 				</div>
