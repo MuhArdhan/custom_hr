@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, get_time, now_datetime
 
-from custom_hr.services.outlet_shift import ShiftConfigurationError, parse_days
+from custom_hr.services.outlet_shift import ShiftConfigurationError, parse_days, shift_mode_on
 
 # Local testing opened explicitly by the user after T11. Each outlet still
 # requires its own valid schedule, holiday list and activation timestamp.
@@ -41,10 +41,12 @@ class Outlet(Document):
 		validate_shift_rows(self.get("shifts") or [])
 
 	def validate_auto_shift_activation(self):
-		if not cint(self.get("enable_outlet_auto_shift")):
+		if cint(self.get("enable_outlet_auto_shift")) and cint(self.get("manual_shift_choice")):
+			frappe.throw(_("Pilih salah satu: Shift Otomatis Outlet atau Shift Manual."))
+		if not shift_mode_on(self):
 			return
 		if not cint(self.is_active):
-			frappe.throw(_("Mode shift otomatis hanya dapat digunakan pada outlet aktif."))
+			frappe.throw(_("Mode shift outlet hanya dapat digunakan pada outlet aktif."))
 		if not self.get("outlet_auto_shift_effective_from"):
 			self.outlet_auto_shift_effective_from = now_datetime()  # earlier logs keep the native path
 		if not OUTLET_AUTO_SHIFT_READY:
@@ -90,6 +92,9 @@ def validate_shift_rows(rows) -> None:
 			parse_days(row.get("days"))
 		except ShiftConfigurationError as exc:
 			frappe.throw(_("Baris {0}: {1}").format(row.idx, exc))
+		minutes = validate_non_negative_number(row.get("transition_minutes") or 0, _("Jeda IN baris {0}").format(row.idx), integer=True)
+		if minutes >= 1440:
+			frappe.throw(_("Baris {0}: Jeda IN harus kurang dari satu hari (1440 menit).").format(row.idx))
 
 
 def validate_non_negative_number(value, label: str, *, integer: bool = False) -> Decimal:

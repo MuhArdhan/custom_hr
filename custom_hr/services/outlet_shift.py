@@ -18,9 +18,22 @@ from zoneinfo import ZoneInfo
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, getdate, get_system_timezone, get_time, now_datetime
+from frappe.utils import cint, get_datetime, getdate, get_system_timezone, get_time, now_datetime
 
 SNAPSHOT_VERSION = 1
+# Outlet shift modes, one at a time: Otomatis (the check-in time picks the shift) or Manual (the employee does)
+SHIFT_MODE_FIELDS = ("enable_outlet_auto_shift", "manual_shift_choice")
+
+
+def shift_mode_on(values) -> bool:
+	"""Outlet shifts are in force when either mode is chosen."""
+	return bool(values) and any(cint(values.get(field)) for field in SHIFT_MODE_FIELDS)
+
+
+def outlet_shift_mode_on(outlet: str | None, *, for_update: bool = False) -> bool:
+	if not outlet:
+		return False
+	return shift_mode_on(frappe.db.get_value("Outlet", outlet, SHIFT_MODE_FIELDS, as_dict=True, for_update=for_update))
 SHIFT_FIELDS = (
 	"name",
 	"modified",
@@ -184,16 +197,25 @@ def active_shift_names(rows, day: date) -> list[str]:
 	return [row.shift_type for row in rows if row.get("enabled") and applies_on(row, day)]
 
 
-def build_shift_windows(shifts: list[dict], work_date: date, transition_minutes: int) -> list[ShiftWindow]:
+def build_shift_windows(
+	shifts: list[dict], work_date: date, transition_minutes: int, shift_transitions: dict | None = None
+) -> list[ShiftWindow]:
 	"""Build one work-date's windows from active shifts, independent of DB writes.
 
 	The first window opens at midnight; subsequent windows open before their
-	start by the outlet transition. No shift can accept IN after its own end.
+	start by their Jeda IN: the shift row's own (shift_transitions, by Shift Type),
+	else the outlet default. No shift can accept IN after its own end.
 	This also leaves a closed interval if two shifts have a real operational gap.
 	"""
 	transition = _number(transition_minutes, _("Jeda Peralihan IN"), integer=True)
 	if transition >= 1440:
 		raise ShiftConfigurationError(_("Jeda Peralihan IN harus kurang dari satu hari."))
+	own = {name: _number(minutes, _("Jeda IN"), integer=True) for name, minutes in (shift_transitions or {}).items() if minutes}
+	if any(minutes >= 1440 for minutes in own.values()):
+		raise ShiftConfigurationError(_("Jeda IN pada tabel shift harus kurang dari satu hari."))
+
+	def delta(name):
+		return timedelta(minutes=int(own.get(name, transition)))
 	if not isinstance(work_date, date) or isinstance(work_date, datetime):
 		raise ShiftConfigurationError(_("Tanggal kerja harus berupa tanggal lokal."))
 	if not shifts:
@@ -211,17 +233,17 @@ def build_shift_windows(shifts: list[dict], work_date: date, transition_minutes:
 		definitions.append((start, end, name, _policy(shift)))
 	definitions.sort(key=lambda row: (row[0], row[2]))
 	midnight = datetime.combine(work_date, time.min)
-	delta = timedelta(minutes=int(transition))
 	windows = []
 	for start, end, name, policy in definitions:
 		shift_start = datetime.combine(work_date, start)
 		shift_end = datetime.combine(work_date, end)
 		if end < start:
 			shift_end += timedelta(days=1)
-		# Shifts sharing a start time share the same opening and the same next-start transition
-		checkin_start = midnight if start == definitions[0][0] else shift_start - delta
-		later_starts = [other[0] for other in definitions if other[0] > start]
-		transition_at = datetime.combine(work_date, min(later_starts)) - delta if later_starts else None
+		# A shift opens its Jeda IN before its start (the earliest start: from midnight) and stops taking
+		# INs when the next later shift opens, by that shift's own Jeda IN
+		checkin_start = midnight if start == definitions[0][0] else shift_start - delta(name)
+		later = [datetime.combine(work_date, other[0]) - delta(other[2]) for other in definitions if other[0] > start]
+		transition_at = min(later) if later else None
 		# A cutoff after shift end never reopens an already-finished shift.
 		checkin_end = min(shift_end, transition_at) if transition_at is not None else shift_end
 		inclusive = transition_at is None or shift_end < transition_at
@@ -301,8 +323,8 @@ def _read_context(employee: str, timestamp, *, for_update: bool = False) -> tupl
 		return context, None
 	# Outlet is the operational schedule/holiday/location source, not the
 	# employing company. Its legacy Company mapping need not match Employee.
-	if not outlet.get("enable_outlet_auto_shift"):
-		context.update(mode="Native", mode_reason="mode_disabled", message=_("Mode shift otomatis outlet belum diaktifkan."))
+	if not shift_mode_on(outlet):
+		context.update(mode="Native", mode_reason="mode_disabled", message=_("Mode shift outlet (otomatis atau manual) belum diaktifkan."))
 		return context, outlet
 	if not outlet.get("outlet_auto_shift_effective_from"):
 		context.update(mode_reason="invalid_configuration", message=_("Waktu mulai mode shift otomatis belum ditentukan."))
@@ -326,6 +348,11 @@ def get_employee_attendance_mode(employee: str, timestamp=None, *, for_update: b
 	return context
 
 
+def row_transitions(rows) -> dict:
+	"""Jeda IN set on enabled shift rows, by Shift Type; an empty or 0 cell falls back to the default."""
+	return {row.shift_type: cint(row.get("transition_minutes")) for row in rows if row.get("enabled") and cint(row.get("transition_minutes"))}
+
+
 def shift_windows(rows, shifts: list[dict], local_time: datetime, transition_minutes: int) -> list[ShiftWindow]:
 	"""Windows that may accept an IN at `local_time`: today's shifts plus yesterday's overnight ones."""
 
@@ -333,19 +360,23 @@ def shift_windows(rows, shifts: list[dict], local_time: datetime, transition_min
 		names = set(active_shift_names(rows, day))
 		return [shift for shift in shifts if shift.name in names]
 
+	own = row_transitions(rows)
 	today = local_time.date()
 	todays = shifts_on(today)
-	windows = build_shift_windows(todays, today, transition_minutes) if todays else []
+	windows = build_shift_windows(todays, today, transition_minutes, own) if todays else []
 	yesterday = shifts_on(today - timedelta(days=1))
-	previous = build_shift_windows(yesterday, today - timedelta(days=1), transition_minutes) if yesterday else []
+	previous = build_shift_windows(yesterday, today - timedelta(days=1), transition_minutes, own) if yesterday else []
 	return [window for window in previous if window.checkin_end >= datetime.combine(today, time.min)] + windows
 
 
-def pick_window(windows, local_time: datetime, chosen_shift: str | None = None, *, no_match_message: str):
+def pick_window(windows, local_time: datetime, chosen_shift: str | None = None, *, no_match_message: str, manual: bool = False):
 	"""Select the window that accepts an IN at `local_time`: (window or None, outcome with code/message/candidates/choices).
 
 	Shifts sharing a start time are an employee choice; candidates with different starts are refused, never guessed.
+	manual (Outlet "Shift Manual"): every shift already open and not yet over is an employee choice.
 	"""
+	if manual:
+		return _pick_manual(windows, local_time, chosen_shift, no_match_message)
 	candidates = [window for window in windows if window.contains(local_time)]
 	outcome = {"candidates": [window.as_dict() for window in candidates], "choices": [], "code": "matched", "message": ""}
 	if not candidates:
@@ -365,6 +396,31 @@ def pick_window(windows, local_time: datetime, chosen_shift: str | None = None, 
 			return None, outcome
 		selected = next(window for window in candidates if window.shift == chosen_shift)
 	return selected, outcome
+
+
+def _pick_manual(windows, local_time: datetime, chosen_shift, no_match_message: str):
+	"""A shift is open from its IN opening until its end: a later shift's transition no longer cuts it short.
+
+	The employee always chooses, even from a single open shift, so the check-in looks the same every
+	time. A shift open both as yesterday's overnight run and as today's keeps today's.
+	"""
+	by_name = {}
+	for window in windows:  # yesterday's windows come first, so today's wins a shared name
+		if window.checkin_start <= local_time < window.shift_end:
+			by_name[window.shift] = window
+	candidates = sorted(by_name.values(), key=lambda window: (window.shift_start, window.shift))
+	outcome = {"candidates": [window.as_dict() for window in candidates], "choices": [], "code": "matched", "message": ""}
+	if not candidates:
+		outcome.update(code="outside_checkin_window", message=no_match_message)
+		return None, outcome
+	outcome["choices"] = [window.shift for window in candidates]
+	if not chosen_shift:
+		outcome.update(code="shift_choice_required", message=_("Pilih shift Anda sebelum check-in."))
+		return None, outcome
+	if chosen_shift not in by_name:
+		outcome.update(code="invalid_shift_choice", message=_("Shift yang dipilih tidak tersedia untuk waktu check-in ini."))
+		return None, outcome
+	return by_name[chosen_shift], outcome
 
 
 def resolve_outlet_shift(
@@ -425,6 +481,7 @@ def resolve_outlet_shift(
 	selected, outcome = pick_window(
 		windows, local_time, chosen_shift,
 		no_match_message=_("Tidak ada shift outlet yang menerima IN pada waktu ini. Periksa jadwal atau hubungi HR."),
+		manual=bool(outlet.get("manual_shift_choice")),
 	)
 	result.update(candidates=outcome["candidates"], choices=outcome["choices"])
 	if selected is None:
@@ -442,7 +499,7 @@ def resolve_outlet_shift(
 		"holiday_list": outlet.holiday_list,
 		"holiday_source": "Outlet",
 		"timezone": context["timezone"],
-		"shift_transition_minutes": transition_minutes,
+		"shift_transition_minutes": row_transitions(rows).get(selected.shift, transition_minutes),  # the one this shift used
 		**selected.as_dict(),
 		**deepcopy(selected.policy),
 		"standard_working_hours": (selected.shift_end - selected.shift_start).total_seconds() / 3600,

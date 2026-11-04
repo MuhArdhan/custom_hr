@@ -44,7 +44,8 @@ class TestCheckinContext(CheckinTestCase):
 		self.mock(root + "get_current_employee", return_value="EMP-TEST")
 		self.employee_read = self.mock(root + "_employee_record", side_effect=lambda *a, **k: self.employee)
 		self.mock(root + "now_datetime", return_value=NOW)
-		self.mock(root + "frappe.db.get_value", return_value=1)
+		# the Outlet's shift mode (outlet_shift.outlet_shift_mode_on): Otomatis on
+		self.mock(root + "frappe.db.get_value", return_value=frappe._dict(enable_outlet_auto_shift=1, manual_shift_choice=0))
 		self.latest = self.mock(root + "_latest_in_for_checkout", side_effect=lambda *a, **k: deepcopy(self.entry))
 		self.has_out = self.mock(root + "_has_out", side_effect=lambda *a, **k: self.closed)
 		self.resolver = self.mock(root + "resolve_outlet_shift", side_effect=lambda *a, **k: deepcopy(self.resolution))

@@ -26,6 +26,13 @@ frappe.listview_settings["Outlet"] = {
 };
 
 frappe.ui.form.on("Outlet", {
+	// one shift mode at a time: ticking one clears the other
+	enable_outlet_auto_shift(frm) {
+		if (frm.doc.enable_outlet_auto_shift && frm.doc.manual_shift_choice) frm.set_value("manual_shift_choice", 0);
+	},
+	manual_shift_choice(frm) {
+		if (frm.doc.manual_shift_choice && frm.doc.enable_outlet_auto_shift) frm.set_value("enable_outlet_auto_shift", 0);
+	},
 	async shift_location(frm) {
 		const location = frm.doc.shift_location;
 		if (!location) return;
