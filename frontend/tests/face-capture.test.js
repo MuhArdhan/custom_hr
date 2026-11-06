@@ -36,7 +36,7 @@ function mount(globals = {}, { face = {}, props = {} } = {}) {
 			"frappe-ui": { Button },
 			"@vladmandic/face-api": { detectSingleFace: () => new Promise((resolve) => pending.push(resolve)) },
 			"@/utils/face": { loadFaceModels: async () => {}, detectorOptions: () => ({}), ensureLiveBackend: async () => {}, withTimeout: (p) => p,
-				detectFace: async () => null, snapshotCanvas: () => ({ toDataURL: () => "data:image/jpeg;base64,photo" }), faceImage: async () => "", ...face },
+				detectFace: async () => null, snapshotCanvas: () => ({ toDataURL: () => "data:image/jpeg;base64,photo" }), mirroredPhoto: () => "data:image/jpeg;base64,photo", faceImage: async () => "", ...face },
 		},
 	})
 	const detach = (node) => { if (node.parent) { const i = node.parent.children.indexOf(node); if (i >= 0) node.parent.children.splice(i, 1) } }
