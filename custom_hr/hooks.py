@@ -61,6 +61,7 @@ doctype_list_js = {
 	"Overtime Request": "public/js/overtime_request.js",
 	"Payroll Entry": ["public/js/payroll_bulk.js", "public/js/payroll_entry_list.js"],
 	"Salary Slip": ["public/js/payroll_bulk.js", "public/js/salary_slip_list.js"],
+	"Salary Structure Assignment": "public/js/salary_structure_assignment_list.js",
 	"Shift Type": "public/js/shift_type_list.js",
 }
 
