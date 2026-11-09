@@ -81,6 +81,18 @@ export function snapshotCanvas(input, width = 640) {
 	return canvas
 }
 
+// Front cameras can deliver a mirrored frame: flip only the kept photo. faceImage must keep the raw frame.
+export function mirroredPhoto(source) {
+	const canvas = document.createElement("canvas")
+	canvas.width = source.width
+	canvas.height = source.height
+	const context = canvas.getContext("2d")
+	context.translate(source.width, 0)
+	context.scale(-1, 1)
+	context.drawImage(source, 0, 0)
+	return canvas.toDataURL("image/jpeg", 0.8)
+}
+
 export function capturePhoto(input, width = 480) {
 	return snapshotCanvas(input, width).toDataURL("image/jpeg", 0.8)
 }

@@ -1,7 +1,7 @@
 <template>
 	<div class="flex flex-col gap-3 w-full">
 		<div class="relative w-full aspect-[3/4] max-h-[52vh] overflow-hidden rounded-lg bg-black">
-			<video v-show="cameraActive" ref="videoEl" class="absolute inset-0 w-full h-full object-cover" autoplay muted playsinline />
+			<video v-show="cameraActive" ref="videoEl" class="absolute inset-0 w-full h-full object-cover" :class="{ '-scale-x-100': facing === 'user' }" autoplay muted playsinline />
 			<div v-if="!cameraActive" class="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-gray-300">
 				<FeatherIcon name="camera" class="h-8 w-8 text-gray-500" />
 				{{ statusText }}
@@ -27,7 +27,7 @@
 			</Button>
 			<Button variant="ghost" class="w-full" @click="startCamera">{{ __("Try Camera Again") }}</Button>
 		</template>
-		<input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="handleFile" />
+		<input ref="fileInput" type="file" accept="image/*" capture="user" class="hidden" @change="handleFile" />
 	</div>
 </template>
 
@@ -49,7 +49,7 @@ const cameraActive = ref(false)
 const fallbackNeeded = ref(false)
 const statusText = ref("")
 let stream = null
-let facing = "environment"
+const facing = ref("user")
 
 function stopCamera() {
 	stream?.getTracks().forEach((track) => track.stop())
@@ -64,7 +64,7 @@ async function startCamera() {
 	// An unanswered permission prompt never rejects: offer the device camera after a few seconds.
 	const timer = setTimeout(() => { if (!cameraActive.value) fallbackNeeded.value = true }, 6000)
 	try {
-		stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 } }, audio: false })
+		stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing.value, width: { ideal: 1280 } }, audio: false })
 		videoEl.value.srcObject = stream
 		cameraActive.value = true
 		fallbackNeeded.value = false
@@ -77,23 +77,28 @@ async function startCamera() {
 }
 
 function switchCamera() {
-	facing = facing === "environment" ? "user" : "environment"
+	facing.value = facing.value === "environment" ? "user" : "environment"
 	startCamera()
 }
 
-function toDataUrl(source, width, height) {
+function toDataUrl(source, width, height, mirror = false) {
 	const size = fitWithin(width, height, MAX_SIDE)
 	const canvas = document.createElement("canvas")
 	canvas.width = size.width
 	canvas.height = size.height
-	canvas.getContext("2d").drawImage(source, 0, 0, size.width, size.height)
+	const context = canvas.getContext("2d")
+	if (mirror) {
+		context.translate(size.width, 0)
+		context.scale(-1, 1)
+	}
+	context.drawImage(source, 0, 0, size.width, size.height)
 	return canvas.toDataURL("image/jpeg", QUALITY)
 }
 
 function capture() {
 	const video = videoEl.value
 	if (!video?.videoWidth) return
-	emit("captured", toDataUrl(video, video.videoWidth, video.videoHeight))
+	emit("captured", toDataUrl(video, video.videoWidth, video.videoHeight, facing.value === "user"))
 }
 
 function handleFile(event) {

@@ -34,7 +34,10 @@ function load(contextLost) {
 		imageToSquare: (image, size, centered) => ({ toDataURL: (type) => `${type}|${image}|${size}|${centered}` }),
 	}
 	const module = { exports: {} }
-	vm.runInNewContext(bundle.outputFiles[0].text, { module, exports: module.exports, setTimeout, clearTimeout, globalThis: { __faceapi: faceapi } })
+	const document = { createElement: () => ({ getContext: () => ({
+		translate: (x, y) => calls.push(`translate:${x}:${y}`), scale: (x, y) => calls.push(`scale:${x}:${y}`), drawImage: (s) => calls.push(`draw:${s.id}`),
+	}), toDataURL: (type) => type }) }
+	vm.runInNewContext(bundle.outputFiles[0].text, { module, exports: module.exports, setTimeout, clearTimeout, document, globalThis: { __faceapi: faceapi } })
 	return { face: module.exports, calls }
 }
 
@@ -69,4 +72,12 @@ test("withTimeout ends a detection that never answers, and passes a quick one th
 	const { face } = load(false)
 	await assert.rejects(face.withTimeout(new Promise(() => {}), 20), /timed out/)
 	assert.equal(await face.withTimeout(Promise.resolve("face"), 20), "face")
+})
+
+test("mirroredPhoto flips the kept photo around its width and leaves the source frame alone", () => {
+	const { face, calls } = load(false)
+	const source = { id: "frame", width: 640, height: 480 }
+	assert.equal(face.mirroredPhoto(source), "image/jpeg")
+	assert.deepEqual(calls, ["translate:640:0", "scale:-1:1", "draw:frame"])
+	assert.equal(source.width, 640)
 })

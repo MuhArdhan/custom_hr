@@ -6,7 +6,7 @@
 			<video
 				v-show="cameraActive"
 				ref="videoEl"
-				class="absolute inset-0 w-full h-full object-cover"
+				class="absolute inset-0 w-full h-full object-cover -scale-x-100"
 				autoplay
 				muted
 				playsinline
@@ -14,7 +14,7 @@
 			<canvas
 				v-show="cameraActive && faceDetected"
 				ref="overlayEl"
-				class="absolute inset-0 w-full h-full pointer-events-none"
+				class="absolute inset-0 w-full h-full pointer-events-none -scale-x-100"
 			/>
 			<img
 				v-if="lastSamplePhoto"
@@ -105,6 +105,7 @@ import {
 	ensureLiveBackend,
 	faceImage,
 	loadFaceModels,
+	mirroredPhoto,
 	snapshotCanvas,
 	withTimeout,
 } from "@/utils/face"
@@ -341,7 +342,7 @@ async function captureSample() {
 			return
 		}
 
-		const photo = canvas.toDataURL("image/jpeg", 0.8)
+		const photo = mirroredPhoto(canvas)
 		samples.value.push(await faceImage(canvas, detection))
 		samplesPhoto.value = samplesPhoto.value || photo
 		lastSamplePhoto.value = photo
