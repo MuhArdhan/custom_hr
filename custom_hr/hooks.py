@@ -201,6 +201,7 @@ fixtures = [
 					"Salary Slip-tarif_telat",
 					"Salary Slip-tarif_pulang_cepat",
 					"Salary Slip-tarif_tidak_out",
+					"Salary Component-show_in_period_input",
 					"Department-auto_shift_section",
 					"Department-enable_auto_shift",
 					"Department-auto_shift_transition_minutes",

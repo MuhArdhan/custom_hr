@@ -17,9 +17,9 @@ LINKS = [
 ]
 
 
-def add_links(doc):
+def add_links(doc, links=LINKS):
 	changed = False
-	for label, link_type, link_to, icon, after in LINKS:
+	for label, link_type, link_to, icon, after in links:
 		rows = doc.items
 		if any(row.link_type == link_type and row.link_to == link_to for row in rows):
 			continue

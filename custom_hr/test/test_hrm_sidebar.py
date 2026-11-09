@@ -48,3 +48,28 @@ class TestHrmSidebar(unittest.TestCase):
 		doc = self.doc([HRM_ROWS[0]])
 		add_links(doc)
 		self.assertEqual([r.label for r in doc.items][:5], ["Home", "Attendance", "Grooming", "Grooming Gallery", "Outlet"])
+
+	def test_payroll_input_page_sits_after_additional_salary(self):
+		from custom_hr.patches.add_payroll_period_input_link import LINK
+
+		doc = self.doc([
+			{"type": "Link", "label": "Payroll Entry", "link_type": "DocType", "link_to": "Payroll Entry"},
+			{"type": "Link", "label": "Additional Salary", "link_type": "DocType", "link_to": "Additional Salary"},
+			{"type": "Link", "label": "Salary Withholding", "link_type": "DocType", "link_to": "Salary Withholding"},
+		])
+		self.assertTrue(add_links(doc, LINK))
+		self.assertEqual([r.label for r in doc.items], ["Payroll Entry", "Additional Salary", "Input Payroll Periode", "Salary Withholding"])
+		self.assertFalse(add_links(doc, LINK))
+
+	def test_payroll_input_lead_rows_end_at_additional_salary(self):
+		from custom_hr.patches.add_payroll_period_input_link import rows_up_to_anchor
+
+		base = [
+			{"type": "Link", "link_type": "Workspace", "link_to": "Payroll"},
+			{"type": "Link", "link_type": "DocType", "link_to": "Additional Salary"},
+			{"type": "Link", "link_type": "DocType", "link_to": "Salary Withholding"},
+		]
+		lead = rows_up_to_anchor(base, ("type", "link_type", "link_to"))
+		self.assertEqual([r["link_to"] for r in lead], ["Payroll", "Additional Salary"])
+		self.assertEqual(rows_up_to_anchor(base[2:], ("link_to",)), [])
+
