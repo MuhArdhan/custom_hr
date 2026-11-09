@@ -1,0 +1,55 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "for_company",
+  "potongan_telat",
+  "potongan_pulang_cepat",
+  "potongan_tidak_out"
+ ],
+ "fields": [
+  {
+   "description": "Kosongkan untuk tarif default semua company yang tidak punya baris sendiri.",
+   "fieldname": "for_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "potongan_telat",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Telat per Kali",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "potongan_pulang_cepat",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Pulang Cepat per Kali",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "potongan_tidak_out",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Tidak OUT per Kali",
+   "non_negative": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM Attendance Penalty Rate",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

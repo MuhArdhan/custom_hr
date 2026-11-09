@@ -7,7 +7,9 @@ import frappe
 
 from custom_hr.services import payroll_penalties as svc
 
-RATES = frappe._dict(potongan_telat=7000, potongan_pulang_cepat=5000, potongan_tidak_out=10000)
+DEFAULT = frappe._dict(for_company=None, potongan_telat=7000, potongan_pulang_cepat=5000, potongan_tidak_out=10000)
+JURI = frappe._dict(for_company="JURI", potongan_telat=15000, potongan_pulang_cepat=0, potongan_tidak_out=10000)
+RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI])
 
 
 def day(late=0, early=0, missing=0):
@@ -15,7 +17,7 @@ def day(late=0, early=0, missing=0):
 
 
 def slip(**values):
-	return frappe._dict(dict(docstatus=0, employee="EMP", start_date="2026-09-26", end_date="2026-10-25") | values)
+	return frappe._dict(dict(docstatus=0, employee="EMP", company="Outlet A", start_date="2026-09-26", end_date="2026-10-25") | values)
 
 
 class TestPayrollPenalties(unittest.TestCase):
@@ -40,3 +42,12 @@ class TestPayrollPenalties(unittest.TestCase):
 		doc = slip(docstatus=1, jumlah_telat=3, tarif_telat=6000)
 		self.assertFalse(self.fill(doc, [day(late=1)]).called)
 		self.assertEqual((doc.jumlah_telat, doc.tarif_telat), (3, 6000))
+
+	def test_a_company_row_beats_the_default_row(self):
+		doc = slip(company="JURI")
+		self.fill(doc, [day(late=1)])
+		self.assertEqual((doc.tarif_telat, doc.tarif_pulang_cepat, doc.tarif_tidak_out), (15000, 0, 10000))
+
+	def test_without_any_matching_row_nothing_is_deducted(self):
+		self.assertEqual(svc.rate_for([JURI], "Outlet A"), {})
+		self.assertEqual(svc.rate_for([], "JURI"), {})

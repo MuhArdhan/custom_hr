@@ -20,10 +20,16 @@ def fill_attendance_penalties(doc, method=None):
 		fields=["late_entry", "early_exit", "missing_checkout"],
 		ignore_permissions=True,
 	)
-	settings = frappe.get_cached_doc("HRM Payroll Settings")
+	rate = rate_for(frappe.get_cached_doc("HRM Payroll Settings").attendance_penalty_rates, doc.company)
 	doc.jumlah_telat = sum(day.late_entry for day in days)
 	doc.jumlah_pulang_cepat = sum(day.early_exit for day in days)
 	doc.jumlah_tidak_out = sum(day.missing_checkout for day in days)
-	doc.tarif_telat = settings.potongan_telat
-	doc.tarif_pulang_cepat = settings.potongan_pulang_cepat
-	doc.tarif_tidak_out = settings.potongan_tidak_out
+	doc.tarif_telat = rate.get("potongan_telat") or 0
+	doc.tarif_pulang_cepat = rate.get("potongan_pulang_cepat") or 0
+	doc.tarif_tidak_out = rate.get("potongan_tidak_out") or 0
+
+
+def rate_for(rows, company):
+	"""The company's own row, else the row without a company, else no deduction."""
+	by_company = {row.for_company or "": row for row in rows}
+	return by_company.get(company) or by_company.get("") or {}

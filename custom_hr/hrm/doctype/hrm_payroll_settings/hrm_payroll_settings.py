@@ -17,3 +17,6 @@ class HRMPayrollSettings(Document):
 			)
 			if component_type != "Earning":
 				frappe.throw(_("Komponen upah lembur harus bertipe Earning"))
+		companies = [row.for_company or "" for row in self.attendance_penalty_rates]
+		if len(companies) != len(set(companies)):
+			frappe.throw(_("Tarif Potongan: satu company hanya boleh satu baris, dan hanya satu baris tanpa company."))
