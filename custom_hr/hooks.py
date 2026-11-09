@@ -59,6 +59,8 @@ doctype_list_js = {
 	"Holiday List Assignment": "public/js/holiday_list_assignment_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Payroll Entry": ["public/js/payroll_bulk.js", "public/js/payroll_entry_list.js"],
+	"Salary Slip": ["public/js/payroll_bulk.js", "public/js/salary_slip_list.js"],
 	"Shift Type": "public/js/shift_type_list.js",
 }
 
