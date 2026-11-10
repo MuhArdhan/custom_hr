@@ -9,6 +9,8 @@
   "column_break_wage",
   "overtime_salary_component",
   "overtime_hourly_divisor",
+  "attendance_penalty_section",
+  "attendance_penalty_rates",
   "je_section",
   "outlet_expense_account_number",
   "intercompany_receivable_account_number",
@@ -47,6 +49,19 @@
    "reqd": 1
   },
   {
+   "description": "Berlaku untuk slip draft berikutnya, pada Salary Structure yang memakai formulanya.",
+   "fieldname": "attendance_penalty_section",
+   "fieldtype": "Section Break",
+   "label": "Potongan Presensi"
+  },
+  {
+   "description": "Satu baris tanpa company menjadi tarif semua company. Tambahkan baris per company yang tarifnya beda.",
+   "fieldname": "attendance_penalty_rates",
+   "fieldtype": "Table",
+   "label": "Tarif Potongan",
+   "options": "HRM Attendance Penalty Rate"
+  },
+  {
    "collapsible": 1,
    "fieldname": "je_section",
    "fieldtype": "Section Break",
@@ -74,7 +89,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-12 00:00:00.000000",
+ "modified": "2026-11-09 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "HRM Payroll Settings",

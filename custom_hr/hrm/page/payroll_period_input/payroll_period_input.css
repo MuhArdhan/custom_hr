@@ -1,0 +1,53 @@
+.ppi-page { padding: 0 15px 32px; }
+.ppi-filters { display: flex; flex-wrap: wrap; gap: 12px; padding: 2px 0 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }
+.ppi-filter { min-width: 200px; }
+
+.ppi-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 240px)); gap: 10px; margin-bottom: 14px; }
+.ppi-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; background: var(--card-bg); }
+.ppi-card-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.ppi-card-value { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+.ppi-table-wrap { overflow: auto; max-height: calc(100vh - 300px); border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg); }
+.ppi-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; }
+.ppi-table th, .ppi-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.ppi-table .ppi-first { border-left: 1px solid var(--border-color); }
+
+.ppi-table thead th { position: sticky; z-index: 2; background: var(--subtle-fg); font-size: 12px; font-weight: 600; color: var(--text-color); }
+.ppi-table thead tr:first-child th { top: 0; height: 30px; }
+.ppi-table thead tr:last-child th { top: 30px; }
+.ppi-band th { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.ppi-band-att { color: var(--text-muted) !important; }
+.ppi-band-earn { color: var(--green-700) !important; background: var(--green-50) !important; }
+.ppi-band-ded { color: var(--red-700) !important; background: var(--red-50) !important; }
+
+.ppi-table .ppi-name { position: sticky; left: 0; z-index: 1; background: var(--card-bg); min-width: 210px; max-width: 260px; border-right: 1px solid var(--border-color); }
+.ppi-table thead .ppi-name { z-index: 3; background: var(--subtle-fg); vertical-align: bottom; }
+.ppi-emp { font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.ppi-id { font-size: 11px; color: var(--text-muted); }
+.ppi-lock { color: var(--text-muted); display: inline-flex; }
+
+.ppi-att { width: 56px; text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ppi-att-flag { color: var(--orange-600); font-weight: 600; }
+.ppi-amount { width: 112px; min-width: 112px; text-align: right; }
+.ppi-table thead .ppi-col-earn { color: var(--green-700); }
+.ppi-table thead .ppi-col-ded { color: var(--red-700); }
+
+.ppi-group td { background: var(--subtle-accent); font-weight: 600; font-size: 12px; position: sticky; left: 0; }
+.ppi-group-count { margin-left: 8px; font-weight: 400; color: var(--text-muted); }
+
+.ppi-table tbody tr:not(.ppi-group):hover td { background: var(--subtle-accent); }
+.ppi-table tbody tr:not(.ppi-group):hover .ppi-name { background: var(--subtle-accent); }
+
+input.ppi-cell { width: 100%; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-color); }
+input.ppi-cell:hover:not(:disabled) { border-color: var(--border-color); background: var(--control-bg); }
+input.ppi-cell:focus { outline: none; border-color: var(--primary); background: var(--card-bg); box-shadow: 0 0 0 2px var(--primary-light, rgba(0, 0, 0, .06)); }
+input.ppi-cell::placeholder { color: var(--gray-400); }
+input.ppi-cell.ppi-changed { background: var(--yellow-50); border-color: var(--yellow-400); font-weight: 600; }
+input.ppi-cell:disabled { color: var(--text-muted); cursor: not-allowed; }
+.ppi-locked td { color: var(--text-muted); }
+
+.ppi-table tfoot td { position: sticky; bottom: 0; z-index: 1; background: var(--subtle-fg); font-weight: 600; border-top: 1px solid var(--border-color); font-variant-numeric: tabular-nums; }
+.ppi-table tfoot .ppi-name { z-index: 3; }
+.ppi-total { padding-right: 18px !important; }
+
+.ppi-empty { padding: 40px; text-align: center; color: var(--text-muted); }

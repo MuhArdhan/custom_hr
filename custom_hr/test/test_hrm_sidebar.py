@@ -48,3 +48,35 @@ class TestHrmSidebar(unittest.TestCase):
 		doc = self.doc([HRM_ROWS[0]])
 		add_links(doc)
 		self.assertEqual([r.label for r in doc.items][:5], ["Home", "Attendance", "Grooming", "Grooming Gallery", "Outlet"])
+
+	def test_payroll_input_page_sits_after_additional_salary(self):
+		from custom_hr.patches.add_payroll_period_input_link import LINK
+
+		doc = self.doc([
+			{"type": "Link", "label": "Payroll Entry", "link_type": "DocType", "link_to": "Payroll Entry"},
+			{"type": "Link", "label": "Additional Salary", "link_type": "DocType", "link_to": "Additional Salary"},
+			{"type": "Link", "label": "Salary Withholding", "link_type": "DocType", "link_to": "Salary Withholding"},
+		])
+		self.assertTrue(add_links(doc, LINK))
+		self.assertEqual([r.label for r in doc.items], ["Payroll Entry", "Additional Salary", "Input Additional Salary", "Salary Withholding"])
+		self.assertFalse(add_links(doc, LINK))
+
+	def test_payroll_input_page_is_grouped_with_additional_salary(self):
+		from custom_hr.patches.add_payroll_period_input_link import arrangement, is_ours
+
+		base = [
+			{"type": "Link", "link_type": "Workspace", "link_to": "Payroll"},
+			{"type": "Link", "link_type": "DocType", "link_to": "Additional Salary"},
+			{"type": "Link", "link_type": "DocType", "link_to": "Salary Withholding"},
+		]
+		rows = arrangement(base, ("type", "link_type", "link_to"))
+		self.assertEqual([(r["type"], r.get("label") or r["link_to"], r["child"]) for r in rows], [
+			("Link", "Payroll", 0),
+			("Section Break", "Additional Salary", 0),
+			("Link", "Additional Salary", 1),
+			("Link", "Input Additional Salary", 1),
+		])
+		self.assertEqual(arrangement(base[2:], ("link_to",)), [])
+		self.assertTrue(all(is_ours(row) for row in rows))
+		self.assertFalse(is_ours({"type": "Link", "link_to": "Salary Slip", "hidden": 1}))
+

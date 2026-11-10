@@ -17,6 +17,7 @@ scheduler_events = {
 	"daily": [
 		"custom_hr.contract_notifications.send_contract_expiry_reminders",
 		"custom_hr.services.leave_auto_allocation.allocate",
+		"custom_hr.services.auto_absence.mark_department_absences",
 	],
 	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
 }
@@ -60,6 +61,9 @@ doctype_list_js = {
 	"Holiday List Assignment": "public/js/holiday_list_assignment_list.js",
 	"Outlet": "public/js/outlet.js",
 	"Overtime Request": "public/js/overtime_request.js",
+	"Payroll Entry": ["public/js/payroll_bulk.js", "public/js/payroll_entry_list.js"],
+	"Salary Slip": ["public/js/payroll_bulk.js", "public/js/salary_slip_list.js"],
+	"Salary Structure Assignment": "public/js/salary_structure_assignment_list.js",
 	"Shift Type": "public/js/shift_type_list.js",
 }
 
@@ -117,6 +121,9 @@ doc_events = {
 	"Leave Type": {
 		"validate": "custom_hr.services.leave_auto_allocation.validate_leave_type",
 		"on_update": "custom_hr.services.leave_auto_allocation.on_leave_type_update",
+	},
+	"Salary Slip": {
+		"before_validate": "custom_hr.services.payroll_penalties.fill_attendance_penalties",
 	},
 	"Shift Location": {
 		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
@@ -201,6 +208,19 @@ fixtures = [
 					"Attendance-working_duration",
 					"Attendance-late_entry_duration",
 					"Attendance-early_exit_duration",
+					"Salary Slip-attendance_penalty_section",
+					"Salary Slip-jumlah_telat",
+					"Salary Slip-jumlah_pulang_cepat",
+					"Salary Slip-jumlah_tidak_out",
+					"Salary Slip-jumlah_hadir",
+					"Salary Slip-jumlah_alpha",
+					"Salary Slip-jam_lembur",
+					"Salary Slip-upah_lembur",
+					"Salary Slip-attendance_penalty_column",
+					"Salary Slip-tarif_telat",
+					"Salary Slip-tarif_pulang_cepat",
+					"Salary Slip-tarif_tidak_out",
+					"Salary Component-show_in_period_input",
 					"Department-auto_shift_section",
 					"Department-enable_auto_shift",
 					"Department-auto_shift_transition_minutes",
