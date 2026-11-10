@@ -26,6 +26,11 @@ def fill_attendance_penalties(doc, method=None):
 	rate = rate_for(frappe.get_cached_doc("HRM Payroll Settings").attendance_penalty_rates, doc.company)
 	# worked days only: paid leave counts in payment_days but earns no meal or daily wage
 	doc.jumlah_hadir = sum(0.5 if day.status == HALF_DAY else 1 for day in days)
+	# recorded Absent only: unmarked days (off days with a no-holiday list) are not alpha
+	doc.jumlah_alpha = frappe.db.count(
+		"Attendance",
+		{"employee": doc.employee, "docstatus": 1, "status": "Absent", "attendance_date": ["between", [doc.start_date, doc.end_date]]},
+	)
 	overtime = paid_overtime(doc.start_date, doc.end_date, doc.employee)
 	doc.jam_lembur = sum(row.hours for row in overtime.values())
 	doc.upah_lembur = overtime_pay(doc.employee, overtime, doc.start_date, doc.end_date)

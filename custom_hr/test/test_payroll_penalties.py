@@ -21,15 +21,18 @@ def slip(**values):
 
 
 class TestPayrollPenalties(unittest.TestCase):
+	absent = 0
+
 	def fill(self, doc, days, overtime=None):
 		with (
 			patch("frappe.get_all", return_value=days) as get_all,
 			patch("frappe.get_cached_doc", return_value=RATES),
+			patch("frappe.db.count", return_value=self.absent) as count,
 			patch.object(svc, "paid_overtime", return_value=overtime or {}) as hours,
 			patch.object(svc, "overtime_pay", return_value=12345) as pay,
 		):
 			svc.fill_attendance_penalties(doc)
-		self.hours, self.pay = hours, pay
+		self.hours, self.pay, self.count = hours, pay, count
 		return get_all
 
 	def test_counts_and_rates_land_on_the_slip(self):
@@ -70,3 +73,13 @@ class TestPayrollPenalties(unittest.TestCase):
 		self.assertEqual((doc.jam_lembur, doc.upah_lembur), (3.5, 12345))
 		self.hours.assert_called_once_with("2026-09-26", "2026-10-25", "EMP")
 		self.pay.assert_called_once_with("EMP", overtime, "2026-09-26", "2026-10-25")
+
+	def test_only_recorded_absences_are_alpha(self):
+		doc = slip()
+		self.absent = 2
+		self.fill(doc, [day()])
+		self.assertEqual(doc.jumlah_alpha, 2)
+		filters = self.count.call_args.args[1]
+		self.assertEqual((filters["status"], filters["docstatus"]), ("Absent", 1))
+		self.assertEqual(filters["attendance_date"], ["between", ["2026-09-26", "2026-10-25"]])
+

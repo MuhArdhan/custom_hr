@@ -202,6 +202,7 @@ fixtures = [
 					"Salary Slip-jumlah_pulang_cepat",
 					"Salary Slip-jumlah_tidak_out",
 					"Salary Slip-jumlah_hadir",
+					"Salary Slip-jumlah_alpha",
 					"Salary Slip-jam_lembur",
 					"Salary Slip-upah_lembur",
 					"Salary Slip-attendance_penalty_column",
