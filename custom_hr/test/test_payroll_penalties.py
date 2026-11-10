@@ -12,8 +12,8 @@ JURI = frappe._dict(for_company="JURI", potongan_telat=15000, potongan_pulang_ce
 RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI])
 
 
-def day(late=0, early=0, missing=0):
-	return frappe._dict(late_entry=late, early_exit=early, missing_checkout=missing)
+def day(late=0, early=0, missing=0, status="Present"):
+	return frappe._dict(status=status, late_entry=late, early_exit=early, missing_checkout=missing)
 
 
 def slip(**values):
@@ -21,9 +21,15 @@ def slip(**values):
 
 
 class TestPayrollPenalties(unittest.TestCase):
-	def fill(self, doc, days):
-		with patch("frappe.get_all", return_value=days) as get_all, patch("frappe.get_cached_doc", return_value=RATES):
+	def fill(self, doc, days, overtime=None):
+		with (
+			patch("frappe.get_all", return_value=days) as get_all,
+			patch("frappe.get_cached_doc", return_value=RATES),
+			patch.object(svc, "paid_overtime", return_value=overtime or {}) as hours,
+			patch.object(svc, "overtime_pay", return_value=12345) as pay,
+		):
 			svc.fill_attendance_penalties(doc)
+		self.hours, self.pay = hours, pay
 		return get_all
 
 	def test_counts_and_rates_land_on_the_slip(self):
@@ -51,3 +57,16 @@ class TestPayrollPenalties(unittest.TestCase):
 	def test_without_any_matching_row_nothing_is_deducted(self):
 		self.assertEqual(svc.rate_for([JURI], "Outlet A"), {})
 		self.assertEqual(svc.rate_for([], "JURI"), {})
+
+	def test_worked_days_count_a_half_day_as_half(self):
+		doc = slip()
+		self.fill(doc, [day(), day(status="Work From Home"), day(status="Half Day")])
+		self.assertEqual(doc.jumlah_hadir, 2.5)
+
+	def test_approved_overtime_hours_of_the_slip_period_add_up(self):
+		doc = slip()
+		overtime = {("EMP", "2026-10-01"): frappe._dict(hours=2, overtime_type="A"), ("EMP", "2026-10-02"): frappe._dict(hours=1.5, overtime_type="A")}
+		self.fill(doc, [], overtime=overtime)
+		self.assertEqual((doc.jam_lembur, doc.upah_lembur), (3.5, 12345))
+		self.hours.assert_called_once_with("2026-09-26", "2026-10-25", "EMP")
+		self.pay.assert_called_once_with("EMP", overtime, "2026-09-26", "2026-10-25")

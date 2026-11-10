@@ -1,8 +1,11 @@
-"""Late, early exit and missing checkout on the Salary Slip, for Salary Structure formulas to multiply."""
+"""Attendance counts, overtime hours and HR rates on the Salary Slip, for Salary Structure formulas to multiply."""
 
 import frappe
 
+from custom_hr.api.overtime_pay import overtime_pay, paid_overtime
+
 COUNTED_STATUSES = ("Present", "Half Day", "Work From Home")
+HALF_DAY = "Half Day"
 
 
 def fill_attendance_penalties(doc, method=None):
@@ -17,10 +20,15 @@ def fill_attendance_penalties(doc, method=None):
 			"status": ["in", COUNTED_STATUSES],
 			"attendance_date": ["between", [doc.start_date, doc.end_date]],
 		},
-		fields=["late_entry", "early_exit", "missing_checkout"],
+		fields=["status", "late_entry", "early_exit", "missing_checkout"],
 		ignore_permissions=True,
 	)
 	rate = rate_for(frappe.get_cached_doc("HRM Payroll Settings").attendance_penalty_rates, doc.company)
+	# worked days only: paid leave counts in payment_days but earns no meal or daily wage
+	doc.jumlah_hadir = sum(0.5 if day.status == HALF_DAY else 1 for day in days)
+	overtime = paid_overtime(doc.start_date, doc.end_date, doc.employee)
+	doc.jam_lembur = sum(row.hours for row in overtime.values())
+	doc.upah_lembur = overtime_pay(doc.employee, overtime, doc.start_date, doc.end_date)
 	doc.jumlah_telat = sum(day.late_entry for day in days)
 	doc.jumlah_pulang_cepat = sum(day.early_exit for day in days)
 	doc.jumlah_tidak_out = sum(day.missing_checkout for day in days)

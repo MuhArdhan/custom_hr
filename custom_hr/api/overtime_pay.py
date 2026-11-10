@@ -82,24 +82,23 @@ def _wage_base(employee, on_date, settings):
 	return base
 
 
-def collect_month(bulan=None):
-	"""Satu baris per karyawan: jam lembur terutang + rincian upahnya."""
-	settings = frappe.get_cached_doc("HRM Payroll Settings")
-	from_date, to_date = _month_bounds(bulan)
-	divisor = flt(settings.overtime_hourly_divisor) or 173
-
+def paid_overtime(from_date, to_date, employee=None) -> dict:
+	"""{(employee, date): {hours, overtime_type}}; hours = min(actual overtime on the attendance, approved planned hours)."""
 	requests = frappe.get_all(
 		"Overtime Request",
 		filters={"status": ["!=", "Ditolak"], "date": ["between", [from_date, to_date]]},
-		fields=["name", "date", "planned_hours", "status"],
+		fields=["name", "date", "planned_hours", "status", "overtime_type"],
 		ignore_permissions=True,
 	)
 	planned = {}
 	if requests:
 		req_map = {r.name: r for r in requests}
+		row_filters = {"parent": ["in", list(req_map)]}
+		if employee:
+			row_filters["employee"] = employee
 		for row in frappe.get_all(
 			"Overtime Request Employee",
-			filters={"parent": ["in", list(req_map)]},
+			filters=row_filters,
 			fields=["parent", "employee", "approval_state"],
 			ignore_permissions=True,
 		):
@@ -107,18 +106,11 @@ def collect_month(bulan=None):
 			if (row.get("approval_state") or req.status) != "Disetujui":
 				continue
 			key = (row.employee, getdate(req.date))
-			previous = planned.get(key)
 			cap = flt(req.planned_hours)
-			planned[key] = cap if previous is None else min(previous, cap)
-
-	result = {
-		"from_date": from_date,
-		"to_date": to_date,
-		"rows": [],
-		"overtime_salary_component": settings.overtime_salary_component,
-	}
+			if key not in planned or cap < planned[key][0]:
+				planned[key] = (cap, req.overtime_type)
 	if not planned:
-		return result
+		return {}
 
 	attendance = frappe.get_all(
 		"Attendance",
@@ -133,12 +125,68 @@ def collect_month(bulan=None):
 	actual = {
 		(a.employee, getdate(a.attendance_date)): flt(a.actual_overtime_duration) for a in attendance
 	}
+	paid = {
+		key: frappe._dict(hours=min(actual.get(key, 0), cap), overtime_type=overtime_type)
+		for key, (cap, overtime_type) in planned.items()
+	}
+	return {key: row for key, row in paid.items() if row.hours > 0}
+
+
+def overtime_multiplier(overtime_type, holiday) -> float:
+	"""Overtime Type multiplier for the day: weekly off, public holiday, or a normal day."""
+	if holiday and holiday.weekly_off and overtime_type.applicable_for_weekend:
+		return flt(overtime_type.weekend_multiplier) or 1
+	if holiday and not holiday.weekly_off and overtime_type.applicable_for_public_holiday:
+		return flt(overtime_type.public_holiday_multiplier) or 1
+	return flt(overtime_type.standard_multiplier) or 1
+
+
+def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
+	"""Paid hours x the Overtime Type's fixed hourly rate x its day multiplier, summed."""
+	if not overtime:
+		return 0.0
+	from hrms.utils.holiday_list import get_holiday_dates_between_range
+
+	holidays = {
+		getdate(row.holiday_date): row
+		for row in get_holiday_dates_between_range(
+			employee, from_date, to_date, raise_exception_for_holiday_list=False, as_dict=True
+		)
+	}
+	total = 0.0
+	for (_employee, date), row in overtime.items():
+		overtime_type = frappe.get_cached_doc("Overtime Type", row.overtime_type)
+		rate = flt(overtime_type.hourly_rate)
+		# shortcut: Salary Component Based and the tiered PP 35 rate are not paid here yet; add them when HR adopts them
+		if overtime_type.overtime_calculation_method != "Fixed Hourly Rate" or rate <= 0:
+			frappe.throw(
+				_(
+					"Overtime Type {0} belum memakai Fixed Hourly Rate dengan Hourly Rate terisi, jadi lembur {1} tanggal {2} belum bisa dibayar."
+				).format(overtime_type.name, employee, frappe.format(date, "Date"))
+			)
+		total += row.hours * rate * overtime_multiplier(overtime_type, holidays.get(date))
+	return flt(total, 2)
+
+
+def collect_month(bulan=None):
+	"""Satu baris per karyawan: jam lembur terutang + rincian upahnya."""
+	settings = frappe.get_cached_doc("HRM Payroll Settings")
+	from_date, to_date = _month_bounds(bulan)
+	divisor = flt(settings.overtime_hourly_divisor) or 173
+
+	result = {
+		"from_date": from_date,
+		"to_date": to_date,
+		"rows": [],
+		"overtime_salary_component": settings.overtime_salary_component,
+	}
+	paid = paid_overtime(from_date, to_date)
+	if not paid:
+		return result
 
 	per_employee = {}
-	for (employee, date), cap in planned.items():
-		hours = min(actual.get((employee, date), 0), cap)
-		if hours <= 0:
-			continue
+	for (employee, date), row in paid.items():
+		hours = row.hours
 		base = _wage_base(employee, date, settings)
 		if base is None:
 			continue
