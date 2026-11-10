@@ -17,6 +17,7 @@ scheduler_events = {
 	"daily": [
 		"custom_hr.contract_notifications.send_contract_expiry_reminders",
 		"custom_hr.services.leave_auto_allocation.allocate",
+		"custom_hr.services.auto_absence.mark_department_absences",
 	],
 	"hourly": ["custom_hr.services.outlet_scheduler.run_outlet_attendance_scheduler"],
 }
