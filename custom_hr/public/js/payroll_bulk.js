@@ -2,7 +2,7 @@
 
 const BULK_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-// same periods as Input Payroll Periode: the one named after a month ends on its 25th
+// same periods as Input Additional Salary: the one named after a month ends on its 25th
 function bulk_payroll_periods() {
 	const today = frappe.datetime.str_to_obj(frappe.datetime.get_today());
 	const current = new Date(today.getFullYear(), today.getMonth() + (today.getDate() > 25 ? 1 : 0), 1);
@@ -40,7 +40,7 @@ function open_bulk_payroll(mode, list_view) {
 	const month = () => dialog.get_value("month") || periods[1].value; // the Select may not have its default yet
 	dialog.fields_dict.search.$input.on("input", filter);
 
-	// "2026-11" -> "26 Oct 2026 – 25 Nov 2026", the same cut-off as Input Payroll Periode
+	// "2026-11" -> "26 Oct 2026 – 25 Nov 2026", the same cut-off as Input Additional Salary
 	function period_text(value) {
 		const [year, mon] = value.split("-").map(Number);
 		const fmt = (d) => `${d.getDate()} ${BULK_MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;

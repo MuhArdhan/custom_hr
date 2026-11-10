@@ -1,7 +1,7 @@
 """Payroll period input: one grid for the monthly Additional Salary amounts HR decides per employee.
 
 Rows are employees with a Salary Structure Assignment, columns are the Salary Components ticked
-"Tampil di Input Payroll Periode". Saving only creates or cancels native Additional Salary.
+"Tampil di Input Additional Salary". Saving only creates or cancels native Additional Salary.
 """
 
 import json
@@ -160,7 +160,7 @@ def save_period_input(month: str, changes: str | list) -> dict:
 		employee, component = change["employee"], change["component"]
 		amount = flt(change.get("amount"))
 		if component not in allowed:
-			frappe.throw(_("Komponen {0} tidak tampil di Input Payroll Periode.").format(component))
+			frappe.throw(_("Komponen {0} tidak tampil di Input Additional Salary.").format(component))
 		if amount < 0:
 			frappe.throw(_("Nilai {0} untuk {1} tidak boleh minus.").format(component, employee))
 		if employee in paid:

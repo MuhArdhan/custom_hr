@@ -1,5 +1,5 @@
 frappe.pages["payroll-period-input"].on_page_load = function (wrapper) {
-	const page = frappe.ui.make_app_page({ parent: wrapper, title: __("Input Payroll Periode"), single_column: true });
+	const page = frappe.ui.make_app_page({ parent: wrapper, title: __("Input Additional Salary"), single_column: true });
 	frappe.payroll_period_input = new PayrollPeriodInput(page);
 };
 
@@ -77,7 +77,7 @@ class PayrollPeriodInput {
 		const { rows, components } = this.data;
 		this.$summary.empty();
 		if (!components.length) {
-			this.$table.html(`<div class="ppi-empty">${__("Belum ada Salary Component yang dicentang Tampil di Input Payroll Periode.")}</div>`);
+			this.$table.html(`<div class="ppi-empty">${__("Belum ada Salary Component yang dicentang Tampil di Input Additional Salary.")}</div>`);
 			return;
 		}
 		if (!rows.length) {

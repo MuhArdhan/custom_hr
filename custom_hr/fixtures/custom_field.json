@@ -871,8 +871,8 @@
   "name": "Salary Component-show_in_period_input",
   "fieldname": "show_in_period_input",
   "fieldtype": "Check",
-  "label": "Tampil di Input Payroll Periode",
-  "description": "Jadi kolom di halaman Input Payroll Periode, diisi per karyawan lewat Additional Salary.",
+  "label": "Tampil di Input Additional Salary",
+  "description": "Jadi kolom di halaman Input Additional Salary, diisi per karyawan lewat Additional Salary.",
   "insert_after": "depends_on_payment_days",
   "module": "HRM",
   "default": "0"
