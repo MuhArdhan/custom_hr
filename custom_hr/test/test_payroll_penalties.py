@@ -9,7 +9,8 @@ from custom_hr.services import payroll_penalties as svc
 
 DEFAULT = frappe._dict(for_company=None, potongan_telat=7000, potongan_pulang_cepat=5000, potongan_tidak_out=10000)
 JURI = frappe._dict(for_company="JURI", potongan_telat=15000, potongan_pulang_cepat=0, potongan_tidak_out=10000)
-RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI])
+SHIFTS = [frappe._dict(shift_type="Pagi", tunjangan=8000), frappe._dict(shift_type="Siang", tunjangan=12000)]
+RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI], shift_allowances=SHIFTS)
 
 
 def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=None):
@@ -18,10 +19,8 @@ def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=Non
 	)
 
 
-# desk values HR keeps: shift allowance per Shift Type, "counts as present" per Leave Type
+# desk values HR keeps: "counts as present" per Leave Type, allowances per Designation
 DESK = {
-	("Shift Type", "Pagi", "tunjangan_shift"): 8000,
-	("Shift Type", "Siang", "tunjangan_shift"): 12000,
 	("Leave Type", "Cuti", "dihitung_hadir"): 1,
 	("Designation", "SPV", "tunjangan_jabatan"): 500000,
 	("Designation", "Driver", "tunjangan_resiko"): 100000,
@@ -84,7 +83,7 @@ class TestPayrollPenalties(unittest.TestCase):
 		self.fill(doc, [day(), day(status="On Leave", leave_type="Cuti"), day(status="On Leave", leave_type="Sakit")])
 		self.assertEqual(doc.jumlah_hadir, 2)
 
-	def test_shift_allowance_adds_each_worked_day_at_its_shift_type_rate(self):
+	def test_shift_allowance_adds_each_worked_day_of_a_listed_shift(self):
 		doc = slip()
 		days = [day(shift="Pagi"), day(shift="Pagi"), day(shift="Siang"), day(shift="Kantor"), day(), day(status="On Leave", leave_type="Cuti", shift="Pagi")]
 		self.fill(doc, days)

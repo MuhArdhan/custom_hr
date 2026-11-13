@@ -1042,17 +1042,6 @@
  },
  {
   "doctype": "Custom Field",
-  "dt": "Shift Type",
-  "name": "Shift Type-tunjangan_shift",
-  "fieldname": "tunjangan_shift",
-  "fieldtype": "Currency",
-  "label": "Tunjangan Shift per Hari",
-  "description": "Dibayar per hari hadir di shift ini. Pakai di struktur gaji dengan rumus tunjangan_shift.",
-  "insert_after": "end_time",
-  "module": "HRM"
- },
- {
-  "doctype": "Custom Field",
   "dt": "Leave Type",
   "name": "Leave Type-dihitung_hadir",
   "fieldname": "dihitung_hadir",

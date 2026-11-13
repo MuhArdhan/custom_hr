@@ -221,7 +221,6 @@ fixtures = [
 					"Salary Slip-tunjangan_resiko",
 					"Designation-tunjangan_jabatan",
 					"Designation-tunjangan_resiko",
-					"Shift Type-tunjangan_shift",
 					"Leave Type-dihitung_hadir",
 					"Salary Slip-attendance_penalty_column",
 					"Salary Slip-tarif_telat",
