@@ -98,7 +98,8 @@ def mark_department_absences(until: date | None = None) -> int:
 	until = getdate(until or add_days(today(), -1))  # today is still open
 	marked = 0
 	for department in frappe.get_all(
-		"Department", filters={"enable_auto_shift": 1, "auto_shift_effective_from": ["is", "set"]},
+		"Department", filters={"auto_shift_effective_from": ["is", "set"]},
+		or_filters={"enable_auto_shift": 1, "manual_shift_choice": 1},
 		fields=["name", "auto_shift_effective_from"],
 	):
 		rows = frappe.get_all(

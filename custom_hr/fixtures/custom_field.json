@@ -1138,14 +1138,26 @@
  {
   "doctype": "Custom Field",
   "dt": "Department",
+  "name": "Department-manual_shift_choice",
+  "fieldname": "manual_shift_choice",
+  "fieldtype": "Check",
+  "label": "Shift Manual",
+  "default": "0",
+  "insert_after": "enable_auto_shift",
+  "description": "The employee picks the shift at check-in from the shifts below that are open and not yet over. Choose this or Enable Auto Shift, not both.",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Department",
   "name": "Department-auto_shift_transition_minutes",
   "fieldname": "auto_shift_transition_minutes",
   "fieldtype": "Int",
   "label": "IN Transition (Minutes)",
   "default": "30",
   "non_negative": 1,
-  "insert_after": "enable_auto_shift",
-  "depends_on": "eval:doc.enable_auto_shift",
+  "insert_after": "manual_shift_choice",
+  "depends_on": "eval:doc.enable_auto_shift || doc.manual_shift_choice",
   "description": "IN moves to the next shift this many minutes before its start. This is not a late tolerance.",
   "module": "HRM"
  },
@@ -1158,7 +1170,7 @@
   "label": "Allow check-in without a shift on days with no shift",
   "default": "0",
   "insert_after": "auto_shift_transition_minutes",
-  "depends_on": "eval:doc.enable_auto_shift",
+  "depends_on": "eval:doc.enable_auto_shift || doc.manual_shift_choice",
   "description": "Saturday work, for example: saved as off-shift, with overtime through an Overtime Request.",
   "module": "HRM"
  },
@@ -1183,7 +1195,7 @@
   "label": "Shifts",
   "options": "Outlet Shift",
   "insert_after": "auto_shift_effective_from",
-  "depends_on": "eval:doc.enable_auto_shift",
+  "depends_on": "eval:doc.enable_auto_shift || doc.manual_shift_choice",
   "module": "HRM"
  },
  {
@@ -1193,7 +1205,7 @@
   "fieldname": "auto_shift_help",
   "fieldtype": "HTML",
   "insert_after": "auto_shifts",
-  "depends_on": "eval:doc.enable_auto_shift",
+  "depends_on": "eval:doc.enable_auto_shift || doc.manual_shift_choice",
   "options": "<p class=\"text-muted small\">Shifts with the same start time are chosen by the employee at check-in. Pick the days each shift applies on in the Hari column; Setiap hari means every day. Each Shift Type needs auto attendance, working-hours thresholds and grace periods set.</p>",
   "module": "HRM"
  },

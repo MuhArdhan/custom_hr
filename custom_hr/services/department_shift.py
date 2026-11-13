@@ -1,4 +1,4 @@
-"""Department auto shift: IN-time shift detection for non-outlet employees, configured per Department.
+"""Department shift: the IN time (Otomatis) or the employee (Manual) picks the shift for non-outlet employees, per Department.
 
 Reuses the outlet window logic; the shift is written onto the Employee Checkin so the native
 Shift Type auto attendance does the rest.
@@ -25,20 +25,28 @@ from custom_hr.services.outlet_shift import (
 
 SOURCE = "Department"
 SHIFT_FIELDS_ON_CHECKIN = ("attendance_source", "shift", "shift_start", "shift_end", "shift_actual_start", "shift_actual_end")
-SETTINGS = ("enable_auto_shift", "auto_shift_transition_minutes", "auto_shift_allow_unscheduled_days", "auto_shift_effective_from")
+MODE_FIELDS = ("enable_auto_shift", "manual_shift_choice")  # one at a time, like the Outlet modes
+SETTINGS = (*MODE_FIELDS, "auto_shift_transition_minutes", "auto_shift_allow_unscheduled_days", "auto_shift_effective_from")
+
+
+def shift_mode_on(values) -> bool:
+	"""Department shifts are in force when either mode is chosen."""
+	return any(cint(values.get(field)) for field in MODE_FIELDS)
 
 
 def validate_department(doc, method=None) -> None:
 	"""Department validate: check the shift table, and when enabled require an active shift and stamp the first activation."""
 	rows = doc.get("auto_shifts") or []
 	validate_shift_rows(rows)
-	if not cint(doc.get("enable_auto_shift")):
+	if all(cint(doc.get(field)) for field in MODE_FIELDS):
+		frappe.throw(_("Pilih salah satu: Shift Otomatis atau Shift Manual."))
+	if not shift_mode_on(doc):
 		return
 	transition = validate_non_negative_number(doc.get("auto_shift_transition_minutes"), _("Jeda Peralihan IN"), integer=True)
 	if transition >= 1440:
 		frappe.throw(_("Jeda Peralihan IN harus kurang dari 1440 menit (satu hari)."))
 	if not any(cint(row.get("enabled")) for row in rows):
-		frappe.throw(_("Shift otomatis membutuhkan minimal satu shift aktif."))
+		frappe.throw(_("Shift Department membutuhkan minimal satu shift aktif."))
 	if not doc.get("auto_shift_effective_from"):
 		doc.auto_shift_effective_from = now_datetime()  # earlier logs keep the native path
 
@@ -64,7 +72,7 @@ def resolve_department_shift(employee: str, timestamp=None, chosen_shift: str | 
 	if not record or record.status != "Active" or not record.department:
 		return result
 	department = frappe.db.get_value("Department", record.department, list(SETTINGS), as_dict=True)
-	if not department or not cint(department.enable_auto_shift) or not department.auto_shift_effective_from:
+	if not department or not shift_mode_on(department) or not department.auto_shift_effective_from:
 		return result
 	try:
 		if local_time < _local_datetime(department.auto_shift_effective_from, timezone):
@@ -100,6 +108,7 @@ def resolve_department_shift(employee: str, timestamp=None, chosen_shift: str | 
 	selected, outcome = pick_window(
 		windows, local_time, chosen_shift,
 		no_match_message=_("Tidak ada shift yang menerima IN pada waktu ini. Periksa jadwal atau hubungi HR."),
+		manual=bool(cint(department.manual_shift_choice)),
 	)
 	result.update(candidates=outcome["candidates"], choices=outcome["choices"], code=outcome["code"], message=outcome["message"])
 	if selected is None:

@@ -230,6 +230,7 @@ fixtures = [
 					"Salary Component-show_in_period_input",
 					"Department-auto_shift_section",
 					"Department-enable_auto_shift",
+					"Department-manual_shift_choice",
 					"Department-auto_shift_transition_minutes",
 					"Department-auto_shift_allow_unscheduled_days",
 					"Department-auto_shift_effective_from",

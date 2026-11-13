@@ -81,4 +81,13 @@ custom_hr.pick_shift_days = function (row) {
 };
 
 frappe.ui.form.on("Outlet", { refresh: (frm) => custom_hr.setup_shift_days(frm, "shifts") });
-frappe.ui.form.on("Department", { refresh: (frm) => custom_hr.setup_shift_days(frm, "auto_shifts") });
+frappe.ui.form.on("Department", {
+	refresh: (frm) => custom_hr.setup_shift_days(frm, "auto_shifts"),
+	// one shift mode at a time, like the Outlet: ticking one clears the other
+	enable_auto_shift(frm) {
+		if (frm.doc.enable_auto_shift && frm.doc.manual_shift_choice) frm.set_value("manual_shift_choice", 0);
+	},
+	manual_shift_choice(frm) {
+		if (frm.doc.manual_shift_choice && frm.doc.enable_auto_shift) frm.set_value("enable_auto_shift", 0);
+	},
+});

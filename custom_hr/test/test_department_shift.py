@@ -138,6 +138,15 @@ class TestResolveDepartmentShift(DepartmentCase):
 		result = self.resolve(MONDAY, "07:00:00", chosen_shift="Siang Jumat")
 		self.assertEqual(result["code"], "invalid_shift_choice")
 
+	def test_manual_mode_lets_the_employee_pick_any_open_shift(self):
+		self.department.update(enable_auto_shift=0, manual_shift_choice=1)
+		result = self.resolve(MONDAY, "06:30:00")
+		self.assertEqual((result["code"], result["choices"]), ("shift_choice_required", ["Pagi Senin-Kamis"]))
+		# past the automatic split pagi is still open until 15:00, so both are offered
+		self.assertEqual(self.resolve(MONDAY, "12:10:00")["choices"], ["Pagi Senin-Kamis", "Siang Senin-Kamis"])
+		picked = self.resolve(MONDAY, "12:10:00", chosen_shift="Pagi Senin-Kamis")
+		self.assertEqual(picked["checkin_values"]["shift"], "Pagi Senin-Kamis")
+
 	def test_day_has_shift_follows_the_weekday_columns(self):
 		rows = [frappe._dict(shift_type="A", enabled=1, **MON_THU), frappe._dict(shift_type="B", enabled=0, days="Sabtu")]
 		self.assertTrue(svc.day_has_shift(rows, MONDAY))
@@ -176,6 +185,17 @@ class TestDepartmentSettings(unittest.TestCase):
 		doc = self.department([frappe._dict(shift_type="A", enabled=1)])
 		rows = self.validate(doc)
 		rows.assert_called_once_with(doc.auto_shifts)
+
+	def test_both_modes_at_once_are_rejected(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.validate(self.department([frappe._dict(shift_type="A", enabled=1)], manual_shift_choice=1))
+
+	def test_manual_mode_alone_is_validated_and_stamped(self):
+		doc = self.department([frappe._dict(shift_type="A", enabled=1)], enable_auto_shift=0, manual_shift_choice=1)
+		self.validate(doc)
+		self.assertTrue(doc.auto_shift_effective_from)
+		with self.assertRaises(frappe.ValidationError):
+			self.validate(self.department([], enable_auto_shift=0, manual_shift_choice=1))
 
 	def test_transition_must_be_below_a_day(self):
 		with self.assertRaises(frappe.ValidationError):
