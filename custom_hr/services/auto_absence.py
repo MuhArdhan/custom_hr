@@ -60,7 +60,8 @@ def covered_dates(employee: str, start: date, end: date) -> set[date]:
 		covered.add(getdate(row.shift_work_date or row.time))
 	for row in frappe.get_all(
 		"Leave Application",
-		filters={"employee": employee, "docstatus": 1, "status": "Approved", "from_date": ["<=", end], "to_date": [">=", start]},
+		# izin per jam is a working day, so it does not excuse a day without check-in
+		filters={"employee": employee, "docstatus": 1, "status": "Approved", "izin_per_jam": 0, "from_date": ["<=", end], "to_date": [">=", start]},
 		fields=["from_date", "to_date"],
 	):
 		covered.update(_each_day(max(getdate(row.from_date), start), min(getdate(row.to_date), end)))

@@ -171,6 +171,7 @@ def _approved_leaves(entry):
 		frappe.qb.from_(leave).select(leave.name, leave.leave_type, leave.half_day, leave.half_day_date)
 		.where(
 			(leave.employee == entry.employee) & (leave.docstatus == 1) & (leave.status == "Approved")
+			& (leave.izin_per_jam == 0)  # izin per jam: the employee works that day, the session stays a session
 			& (leave.from_date <= getdate(entry.shift_work_date)) & (leave.to_date >= getdate(entry.shift_work_date))
 		).orderby(leave.name).for_update().run(as_dict=True)
 	)

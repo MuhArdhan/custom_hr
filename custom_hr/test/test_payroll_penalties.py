@@ -42,9 +42,10 @@ class TestPayrollPenalties(unittest.TestCase):
 			patch("frappe.db.count", return_value=self.absent) as count,
 			patch.object(svc, "paid_overtime", return_value=overtime or {}) as hours,
 			patch.object(svc, "overtime_pay", return_value=12345) as pay,
+			patch.object(svc, "izin_hours", return_value=3.5) as izin,
 		):
 			svc.fill_attendance_penalties(doc)
-		self.hours, self.pay, self.count = hours, pay, count
+		self.hours, self.pay, self.count, self.izin = hours, pay, count, izin
 		return get_all
 
 	def test_counts_and_rates_land_on_the_slip(self):
@@ -102,6 +103,12 @@ class TestPayrollPenalties(unittest.TestCase):
 		self.assertEqual((doc.jam_lembur, doc.upah_lembur), (3.5, 12345))
 		self.hours.assert_called_once_with("2026-09-26", "2026-10-25", "EMP")
 		self.pay.assert_called_once_with("EMP", overtime, "2026-09-26", "2026-10-25")
+
+	def test_approved_hourly_leave_of_the_slip_period_lands_as_jam_izin(self):
+		doc = slip()
+		self.fill(doc, [])
+		self.assertEqual(doc.jam_izin, 3.5)
+		self.izin.assert_called_once_with("EMP", "2026-09-26", "2026-10-25")
 
 	def test_only_recorded_absences_are_alpha(self):
 		doc = slip()

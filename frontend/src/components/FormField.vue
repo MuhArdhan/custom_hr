@@ -133,7 +133,18 @@
 			:max="props.maxDate"
 		/>
 
-		<!-- Time -->
+		<!-- Time: a native input, frappe-ui's Input has no time type -->
+		<input
+			v-else-if="props.fieldtype === 'Time'"
+			type="time"
+			class="form-input block w-full"
+			:value="modelValue"
+			@input="(e) => emit('update:modelValue', e.target.value)"
+			@change="(e) => emit('change', e.target.value)"
+			v-bind="$attrs"
+			:disabled="isReadOnly"
+		/>
+
 		<!-- Datetime -->
 		<DateTimePicker
 			v-else-if="props.fieldtype === 'Datetime'"

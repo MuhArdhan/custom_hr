@@ -92,6 +92,8 @@ override_doctype_class = {
 	"Employee Checkin": "custom_hr.overrides.employee_checkin.CustomEmployeeCheckin",
 	"Shift Type": "custom_hr.overrides.shift_type.CustomShiftType",
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
+	"Leave Application": "custom_hr.overrides.leave_application.CustomLeaveApplication",
+	"Attendance": "custom_hr.overrides.attendance.CustomAttendance",
 }
 
 override_whitelisted_methods = {
@@ -108,13 +110,21 @@ doc_events = {
 		],
 	},
 	"Attendance": {
-		"validate": "custom_hr.services.attendance_duration.fill_durations",
+		"validate": [
+			"custom_hr.services.attendance_duration.fill_durations",
+			"custom_hr.services.hourly_leave.fill_attendance_izin",
+		],
 	},
 	"Employee": {
 		"validate": "custom_hr.services.employee_outlet.fill_outlet",
 	},
 	"Leave Application": {
-		"before_validate": "custom_hr.services.leave_approver.fill_leave_approver",
+		"before_validate": [
+			"custom_hr.services.leave_approver.fill_leave_approver",
+			"custom_hr.services.hourly_leave.validate_hourly_leave",
+		],
+		"on_submit": "custom_hr.services.hourly_leave.stamp_attendance_izin",
+		"on_cancel": "custom_hr.services.hourly_leave.stamp_attendance_izin",
 		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
 		"on_update": "custom_hr.services.leave_approver.hand_over_to_approver_2",
 	},
@@ -214,6 +224,7 @@ fixtures = [
 					"Salary Slip-jumlah_tidak_out",
 					"Salary Slip-jumlah_hadir",
 					"Salary Slip-jumlah_alpha",
+					"Salary Slip-jam_izin",
 					"Salary Slip-jam_lembur",
 					"Salary Slip-upah_lembur",
 					"Salary Slip-tunjangan_shift",
@@ -222,6 +233,12 @@ fixtures = [
 					"Designation-tunjangan_jabatan",
 					"Designation-tunjangan_resiko",
 					"Leave Type-dihitung_hadir",
+					"Leave Type-izin_per_jam",
+					"Leave Application-izin_per_jam",
+					"Leave Application-from_time",
+					"Leave Application-to_time",
+					"Leave Application-jam_izin",
+					"Attendance-jam_izin",
 					"Salary Slip-attendance_penalty_column",
 					"Salary Slip-tarif_telat",
 					"Salary Slip-tarif_pulang_cepat",

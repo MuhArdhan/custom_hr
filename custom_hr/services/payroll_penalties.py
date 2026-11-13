@@ -4,6 +4,7 @@ import frappe
 from frappe.utils import flt
 
 from custom_hr.api.overtime_pay import overtime_pay, paid_overtime
+from custom_hr.services.hourly_leave import izin_hours
 
 COUNTED_STATUSES = ("Present", "Half Day", "Work From Home")
 HALF_DAY = "Half Day"
@@ -48,6 +49,7 @@ def fill_attendance_penalties(doc, method=None):
 		"Attendance",
 		{"employee": doc.employee, "docstatus": 1, "status": "Absent", "attendance_date": ["between", [doc.start_date, doc.end_date]]},
 	)
+	doc.jam_izin = izin_hours(doc.employee, doc.start_date, doc.end_date)
 	overtime = paid_overtime(doc.start_date, doc.end_date, doc.employee)
 	doc.jam_lembur = sum(row.hours for row in overtime.values())
 	doc.upah_lembur = overtime_pay(doc.employee, overtime, doc.start_date, doc.end_date)

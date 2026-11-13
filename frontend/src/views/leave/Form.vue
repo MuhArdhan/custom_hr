@@ -73,15 +73,31 @@ const formFields = createResource({
 
 			if (field.fieldname === "posting_date") field.default = today
 
+			// izin per jam: its times show only once an hourly leave type is picked (setHourly)
+			if (field.fieldname === "izin_per_jam") field.hidden = true
+			if (HOURLY_FIELDS.includes(field.fieldname)) field.hidden = true
+
 			return field
 		})
 	},
 	onSuccess(_data) {
 		leaveApprovalDetails.reload()
 		leaveTypes.reload()
+		hourlyLeaveTypes.reload()
 	},
 })
 formFields.reload()
+
+const HOURLY_FIELDS = ["from_time", "to_time", "jam_izin"]
+// fields a one-day hourly leave has no use for
+const DAY_FIELDS = ["to_date", "half_day", "total_leave_days", "leave_balance"]
+
+const hourlyLeaveTypes = createResource({
+	url: "custom_hr.services.hourly_leave.get_hourly_leave_types",
+	onSuccess() {
+		setHourly()
+	},
+})
 
 const leaveApprovalDetails = createResource({
 	url: "hrms.api.get_leave_approval_details",
@@ -118,6 +134,11 @@ watch(
 watch(
 	() => leaveApplication.value.leave_type,
 	(leave_type) => setLeaveBalance(leave_type)
+)
+
+watch(
+	() => [leaveApplication.value.leave_type, leaveApplication.value.from_date, leaveApplication.value.from_time, leaveApplication.value.to_time],
+	() => setHourly()
 )
 
 watch(
@@ -296,6 +317,32 @@ function setLeaveTypes(data) {
 		label: leave_type,
 		value: leave_type,
 	}))
+}
+
+// izin per jam: one day with a start and end time; the server rounds and stores jam_izin the same way
+function setHourly() {
+	if (!formFields.data) return
+	const doc = leaveApplication.value
+	const hourly = Boolean(doc.leave_type && hourlyLeaveTypes.data?.includes(doc.leave_type))
+	formFields.data.forEach((field) => {
+		if (HOURLY_FIELDS.includes(field.fieldname)) {
+			field.hidden = !hourly
+			field.reqd = hourly && field.fieldname !== "jam_izin"
+			if (field.fieldname === "jam_izin") field.read_only = true
+		}
+		if (DAY_FIELDS.includes(field.fieldname)) field.hidden = hourly
+	})
+	if (!hourly) return
+	if (doc.from_date && doc.to_date !== doc.from_date) doc.to_date = doc.from_date
+	if (doc.half_day) doc.half_day = 0
+	doc.jam_izin = hourlyHours(doc.from_time, doc.to_time)
+}
+
+function hourlyHours(from_time, to_time) {
+	if (!(from_time && to_time)) return 0
+	const minutes = (time) => time.split(":").slice(0, 2).reduce((hours, part) => hours * 60 + Number(part), 0)
+	const hours = (minutes(to_time) - minutes(from_time)) / 60
+	return hours > 0 ? Math.floor(hours * 2 + 0.5) / 2 : 0
 }
 
 function areValuesSet() {
