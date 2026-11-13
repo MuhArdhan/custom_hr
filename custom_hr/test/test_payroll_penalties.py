@@ -12,8 +12,20 @@ JURI = frappe._dict(for_company="JURI", potongan_telat=15000, potongan_pulang_ce
 RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI])
 
 
-def day(late=0, early=0, missing=0, status="Present"):
-	return frappe._dict(status=status, late_entry=late, early_exit=early, missing_checkout=missing)
+def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=None):
+	return frappe._dict(
+		status=status, late_entry=late, early_exit=early, missing_checkout=missing, shift=shift, leave_type=leave_type
+	)
+
+
+# desk values HR keeps: shift allowance per Shift Type, "counts as present" per Leave Type
+DESK = {
+	("Shift Type", "Pagi", "tunjangan_shift"): 8000,
+	("Shift Type", "Siang", "tunjangan_shift"): 12000,
+	("Leave Type", "Cuti", "dihitung_hadir"): 1,
+	("Designation", "SPV", "tunjangan_jabatan"): 500000,
+	("Designation", "Driver", "tunjangan_resiko"): 100000,
+}
 
 
 def slip(**values):
@@ -27,6 +39,7 @@ class TestPayrollPenalties(unittest.TestCase):
 		with (
 			patch("frappe.get_all", return_value=days) as get_all,
 			patch("frappe.get_cached_doc", return_value=RATES),
+			patch("frappe.get_cached_value", side_effect=lambda dt, name, field: DESK.get((dt, name, field))),
 			patch("frappe.db.count", return_value=self.absent) as count,
 			patch.object(svc, "paid_overtime", return_value=overtime or {}) as hours,
 			patch.object(svc, "overtime_pay", return_value=12345) as pay,
@@ -44,7 +57,7 @@ class TestPayrollPenalties(unittest.TestCase):
 	def test_only_the_slip_period_and_worked_days_count(self):
 		filters = self.fill(slip(), []).call_args.kwargs["filters"]
 		self.assertEqual(filters["attendance_date"], ["between", ["2026-09-26", "2026-10-25"]])
-		self.assertEqual(filters["status"], ["in", ("Present", "Half Day", "Work From Home")])
+		self.assertEqual(filters["status"], ["in", ("Present", "Half Day", "Work From Home", "On Leave")])
 		self.assertEqual(filters["docstatus"], 1)
 
 	def test_a_submitted_slip_keeps_what_it_was_paid_on(self):
@@ -65,6 +78,23 @@ class TestPayrollPenalties(unittest.TestCase):
 		doc = slip()
 		self.fill(doc, [day(), day(status="Work From Home"), day(status="Half Day")])
 		self.assertEqual(doc.jumlah_hadir, 2.5)
+
+	def test_leave_counts_as_present_only_when_its_leave_type_is_ticked(self):
+		doc = slip()
+		self.fill(doc, [day(), day(status="On Leave", leave_type="Cuti"), day(status="On Leave", leave_type="Sakit")])
+		self.assertEqual(doc.jumlah_hadir, 2)
+
+	def test_shift_allowance_adds_each_worked_day_at_its_shift_type_rate(self):
+		doc = slip()
+		days = [day(shift="Pagi"), day(shift="Pagi"), day(shift="Siang"), day(shift="Kantor"), day(), day(status="On Leave", leave_type="Cuti", shift="Pagi")]
+		self.fill(doc, days)
+		self.assertEqual(doc.tunjangan_shift, 28000)
+
+	def test_allowances_follow_the_designation_and_are_zero_without_one(self):
+		for designation, expected in (("SPV", (500000, 0)), ("Driver", (0, 100000)), ("Staf", (0, 0)), (None, (0, 0))):
+			doc = slip(designation=designation)
+			self.fill(doc, [])
+			self.assertEqual((doc.tunjangan_jabatan, doc.tunjangan_resiko), expected, designation)
 
 	def test_approved_overtime_hours_of_the_slip_period_add_up(self):
 		doc = slip()
