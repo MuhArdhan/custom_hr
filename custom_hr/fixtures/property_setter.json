@@ -274,5 +274,17 @@
   "property": "description",
   "property_type": "Text",
   "value": "Karyawan non-outlet: baris 1 approver tahap 1, baris 2 approver tahap 2 (opsional), untuk cuti dan lembur, lalu HRD. Maksimal 2 baris; approver perlu role Leave Approver dan Overtime Approver. Kosong: cuti tetap satu tingkat, lembur langsung ke HRD."
+ },
+ {
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "doc_type": "Employee",
+  "field_name": "employee_number",
+  "module": "HRM",
+  "is_system_generated": 1,
+  "name": "Employee-employee_number-label",
+  "property": "label",
+  "property_type": "Data",
+  "value": "NIP"
  }
 ]

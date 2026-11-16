@@ -52,6 +52,7 @@ doctype_js = {
 	"Employee": "public/js/employee_face.js",
 	"Outlet": ["public/js/outlet.js", "public/js/shift_days.js"],
 	"Overtime Request": "public/js/overtime_request.js",
+	"Payroll Entry": "public/js/payroll_entry_match.js",
 	"Shift Location": "public/js/shift_location.js",
 }
 
@@ -175,6 +176,7 @@ fixtures = [
 					"Attendance-shift-in_standard_filter",
 					"Attendance-company-in_standard_filter",
 					"Attendance-department-in_standard_filter",
+					"Employee-employee_number-label",
 				],
 			]
 		],

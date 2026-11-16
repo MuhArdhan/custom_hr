@@ -20,6 +20,9 @@ class HRMPayrollSettings(Document):
 		companies = [row.for_company or "" for row in self.attendance_penalty_rates]
 		if len(companies) != len(set(companies)):
 			frappe.throw(_("Tarif Potongan: satu company hanya boleh satu baris, dan hanya satu baris tanpa company."))
+		from custom_hr.api.payroll_match import column_groups
+
+		column_groups(self.match_columns, set())  # refuses a column that is not letters
 		shifts = [row.shift_type for row in self.shift_allowances]
 		if len(shifts) != len(set(shifts)):
 			frappe.throw(_("Tunjangan Shift: satu Shift Type hanya boleh satu baris."))

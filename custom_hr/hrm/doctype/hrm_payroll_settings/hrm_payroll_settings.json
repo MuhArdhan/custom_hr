@@ -13,6 +13,8 @@
   "attendance_penalty_rates",
   "shift_allowance_section",
   "shift_allowances",
+  "match_section",
+  "match_columns",
   "je_section",
   "outlet_expense_account_number",
   "intercompany_receivable_account_number",
@@ -76,6 +78,18 @@
    "options": "HRM Shift Allowance"
   },
   {
+   "description": "Dipakai tombol Cocokkan dengan Excel di Payroll Entry. Sheet dibaca dari baris di bawah judul NIP sampai NIP kosong pertama.",
+   "fieldname": "match_section",
+   "fieldtype": "Section Break",
+   "label": "Cocokkan Gaji dengan Excel"
+  },
+  {
+   "fieldname": "match_columns",
+   "fieldtype": "Table",
+   "label": "Kolom Cocokkan Gaji",
+   "options": "HRM Payroll Match Column"
+  },
+  {
    "collapsible": 1,
    "fieldname": "je_section",
    "fieldtype": "Section Break",
@@ -103,7 +117,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-09 12:00:00.000000",
+ "modified": "2026-11-16 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "HRM",
  "name": "HRM Payroll Settings",
