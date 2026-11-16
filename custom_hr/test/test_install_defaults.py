@@ -33,7 +33,8 @@ class TestInstallDefaults(unittest.TestCase):
 			"frappe.db.set_single_value"
 		) as save:
 			install.set_default_overtime_component()
-		save.assert_called_once_with("HRM Payroll Settings", "overtime_salary_component", "Lembur")
+		save.assert_any_call("Payroll Settings", "overtime_salary_component", "Lembur")
+		save.assert_any_call("Payroll Settings", "overtime_hourly_divisor", 173)
 
 	def test_an_existing_choice_is_kept(self):
 		with patch("frappe.db.get_single_value", return_value="Lembur Khusus"), patch("frappe.db.exists", return_value=True), patch(
@@ -42,9 +43,9 @@ class TestInstallDefaults(unittest.TestCase):
 			install.set_default_overtime_component()
 		save.assert_not_called()
 
-	def test_nothing_happens_when_the_fixture_component_is_missing(self):
+	def test_no_component_is_linked_when_the_fixture_component_is_missing(self):
 		with patch("frappe.db.get_single_value", return_value=None), patch("frappe.db.exists", return_value=False), patch(
 			"frappe.db.set_single_value"
 		) as save:
 			install.set_default_overtime_component()
-		save.assert_not_called()
+		self.assertNotIn("overtime_salary_component", [c.args[1] for c in save.call_args_list])

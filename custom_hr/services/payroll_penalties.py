@@ -27,7 +27,7 @@ def fill_attendance_penalties(doc, method=None):
 		fields=["status", "late_entry", "early_exit", "missing_checkout", "shift", "leave_type"],
 		ignore_permissions=True,
 	)
-	settings = frappe.get_cached_doc("HRM Payroll Settings")
+	settings = frappe.get_cached_doc("Payroll Settings")
 	rate = rate_for(settings.attendance_penalty_rates, doc.company)
 	worked = [day for day in days if day.status in COUNTED_STATUSES]
 	# leave earns meal and daily wage only when HR ticked its Leave Type
@@ -39,7 +39,7 @@ def fill_attendance_penalties(doc, method=None):
 		and frappe.get_cached_value("Leave Type", day.leave_type, "dihitung_hadir")
 	]
 	doc.jumlah_hadir = sum(0.5 if day.status == HALF_DAY else 1 for day in worked) + len(paid_leave)
-	# only the shifts HR listed in HRM Payroll Settings earn an allowance
+	# only the shifts HR listed in Payroll Settings (tab HRM) earn an allowance
 	allowance = {row.shift_type: flt(row.tunjangan) for row in settings.shift_allowances}
 	doc.tunjangan_shift = sum(allowance.get(day.shift, 0) for day in worked)
 	# HR sets which designations earn an allowance, and how much, on the Designation itself
@@ -70,7 +70,7 @@ def bpjs_values(doc, ssa) -> dict:
 
 	doc is a slip or the assignment's formula context: both carry employee, company and department.
 	"""
-	settings = frappe.get_cached_doc("HRM Payroll Settings")
+	settings = frappe.get_cached_doc("Payroll Settings")
 	if frappe.get_cached_value("Employee", doc.employee, "tidak_ikut_bpjs"):
 		base = 0
 	else:

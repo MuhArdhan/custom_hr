@@ -3,7 +3,7 @@
 
 """Kalkulasi upah lembur PP 35/2021 (hari kerja) dari pengajuan disetujui.
 
-Basis upah sebulan = komponen di HRM Payroll Settings: yang ditandai
+Basis upah sebulan = komponen di Payroll Settings (tab HRM): yang ditandai
 "Dari Base SSA" memakai Base Salary Structure Assignment, sisanya memakai
 amount baris struktur (formula belum didukung). Upah sejam = basis / 173.
 
@@ -170,7 +170,7 @@ def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
 
 def collect_month(bulan=None):
 	"""Satu baris per karyawan: jam lembur terutang + rincian upahnya."""
-	settings = frappe.get_cached_doc("HRM Payroll Settings")
+	settings = frappe.get_cached_doc("Payroll Settings")
 	from_date, to_date = _month_bounds(bulan)
 	divisor = flt(settings.overtime_hourly_divisor) or 173
 
@@ -231,7 +231,7 @@ def generate_overtime_salary(bulan=None):
 	result = collect_month(bulan)
 	component = result["overtime_salary_component"]
 	if not component:
-		frappe.throw(_("Set komponen upah lembur di HRM Payroll Settings"))
+		frappe.throw(_("Set komponen upah lembur di Payroll Settings (tab HRM)"))
 
 	created, skipped = [], []
 	for row in result["rows"]:

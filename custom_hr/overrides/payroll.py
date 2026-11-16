@@ -7,7 +7,7 @@ from custom_hr.services.payroll_penalties import bpjs_values
 
 
 class CustomSalarySlip(SalarySlip):
-	"""BPJS percentages live in HRM Payroll Settings: their amounts join the formula variables, named by HR."""
+	"""BPJS percentages live in Payroll Settings (tab HRM): their amounts join the formula variables, named by HR."""
 
 	def get_data_for_eval(self):
 		data, default_data = super().get_data_for_eval()

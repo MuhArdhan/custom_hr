@@ -1,7 +1,7 @@
 """Cocokkan Gaji: compare HR's salary sheet with the draft slips of one Payroll Entry, cell by cell.
 
 The sheet is read in memory and never saved: it holds every employee's salary.
-Columns come from HRM Payroll Settings by letter (the PH sheet's two-row headers put labels and values in
+Columns come from Payroll Settings (tab HRM) by letter (the PH sheet's two-row headers put labels and values in
 different columns). Taking the Excel value of a cell submits an overwriting Additional Salary for that
 component, tagged with the Payroll Entry, and recalculates the slip.
 """
@@ -103,9 +103,9 @@ def _entry(name: str):
 
 
 def _groups() -> list:
-	rows = frappe.get_cached_doc("HRM Payroll Settings").match_columns
+	rows = frappe.get_cached_doc("Payroll Settings").match_columns
 	if not rows:
-		frappe.throw(_("Isi dulu tabel Kolom Cocokkan Gaji di HRM Payroll Settings."))
+		frappe.throw(_("Isi dulu tabel Kolom Cocokkan Gaji di Payroll Settings (tab HRM)."))
 	return column_groups(rows, set(frappe.get_all("Salary Component", filters={"show_in_period_input": 1}, pluck="name")))
 
 
