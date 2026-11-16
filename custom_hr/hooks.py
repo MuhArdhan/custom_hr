@@ -95,6 +95,8 @@ override_doctype_class = {
 	"Email Queue": "custom_hr.overrides.email_queue.CustomEmailQueue",
 	"Leave Application": "custom_hr.overrides.leave_application.CustomLeaveApplication",
 	"Attendance": "custom_hr.overrides.attendance.CustomAttendance",
+	"Salary Slip": "custom_hr.overrides.payroll.CustomSalarySlip",
+	"Salary Structure Assignment": "custom_hr.overrides.payroll.CustomSalaryStructureAssignment",
 }
 
 override_whitelisted_methods = {
@@ -245,6 +247,10 @@ fixtures = [
 					"Salary Slip-tarif_telat",
 					"Salary Slip-tarif_pulang_cepat",
 					"Salary Slip-tarif_tidak_out",
+					"Salary Slip-tarif_uang_makan",
+					"Salary Slip-tarif_transport",
+					"Salary Slip-dasar_bpjs",
+					"Employee-tidak_ikut_bpjs",
 					"Salary Component-show_in_period_input",
 					"Department-auto_shift_section",
 					"Department-enable_auto_shift",

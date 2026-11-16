@@ -10,7 +10,13 @@ from custom_hr.services import payroll_penalties as svc
 DEFAULT = frappe._dict(for_company=None, potongan_telat=7000, potongan_pulang_cepat=5000, potongan_tidak_out=10000)
 JURI = frappe._dict(for_company="JURI", potongan_telat=15000, potongan_pulang_cepat=0, potongan_tidak_out=10000)
 SHIFTS = [frappe._dict(shift_type="Pagi", tunjangan=8000), frappe._dict(shift_type="Siang", tunjangan=12000)]
-RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI], shift_allowances=SHIFTS)
+DAILY = [
+	frappe._dict(for_company=None, for_department=None, uang_makan=31000, transport=0),
+	frappe._dict(for_company="JURI", for_department=None, uang_makan=20000, transport=22000),
+	frappe._dict(for_company="JURI", for_department="Jakarta", uang_makan=30000, transport=22000),
+]
+PARENTS = {"Produksi Jakarta": ["Jakarta", "All Departments"], "Jakarta": ["All Departments"], "Klaten": ["All Departments"]}
+RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI], shift_allowances=SHIFTS, daily_rates=DAILY)
 
 
 def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=None):
@@ -69,6 +75,43 @@ class TestPayrollPenalties(unittest.TestCase):
 		doc = slip(company="JURI")
 		self.fill(doc, [day(late=1)])
 		self.assertEqual((doc.tarif_telat, doc.tarif_pulang_cepat, doc.tarif_tidak_out), (15000, 0, 10000))
+
+	def test_daily_rates_take_the_most_specific_row(self):
+		cases = (
+			("JURI", "Jakarta", (30000, 22000)),
+			("JURI", "Produksi Jakarta", (30000, 22000)),
+			("JURI", "Klaten", (20000, 22000)),
+			("JURI", None, (20000, 22000)),
+			("Outlet A", None, (31000, 0)),
+		)
+		for company, department, expected in cases:
+			doc = slip(company=company, department=department)
+			with patch.object(svc, "get_ancestors_of", side_effect=lambda dt, name: PARENTS[name]):
+				self.fill(doc, [])
+			self.assertEqual((doc.tarif_uang_makan, doc.tarif_transport), expected)
+		self.assertEqual(svc.daily_rate_for(DAILY[1:], "Outlet A", []), {})
+
+	def bpjs(self, ssa, out=0):
+		settings = frappe._dict(
+			daily_rates=[frappe._dict(for_company="JURI", for_department=None, uang_makan=20000, transport=22000, hari_bpjs=21)],
+			bpjs_rates=[frappe._dict(kode="iuran_ks", persen=1, batas_atas=12000000), frappe._dict(kode="iuran_tk", persen=2, batas_atas=0)],
+		)
+		doc = slip(company="JURI", department=None)
+		with patch("frappe.get_cached_doc", return_value=settings), patch("frappe.get_cached_value", return_value=out):
+			return svc.bpjs_values(doc, frappe._dict(ssa))
+
+	def test_bpjs_base_is_gp_plus_the_days_of_meal_and_transport(self):
+		self.assertEqual(self.bpjs({"base": 3000000, "variable": 0}), {"dasar_bpjs": 3882000, "iuran_ks": 38820, "iuran_tk": 77640})
+
+	def test_a_typed_variable_is_the_bpjs_base(self):
+		self.assertEqual(self.bpjs({"base": 3000000, "variable": 4000000})["dasar_bpjs"], 4000000)
+
+	def test_the_cap_limits_only_its_own_rate(self):
+		values = self.bpjs({"base": 20000000, "variable": 0})
+		self.assertEqual((values["iuran_ks"], values["iuran_tk"]), (120000, 417640))
+
+	def test_an_employee_outside_bpjs_pays_nothing(self):
+		self.assertEqual(self.bpjs({"base": 3000000, "variable": 3882000}, out=1), {"dasar_bpjs": 0, "iuran_ks": 0, "iuran_tk": 0})
 
 	def test_without_any_matching_row_nothing_is_deducted(self):
 		self.assertEqual(svc.rate_for([JURI], "Outlet A"), {})

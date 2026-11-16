@@ -9,6 +9,10 @@
   "column_break_wage",
   "overtime_salary_component",
   "overtime_hourly_divisor",
+  "daily_rate_section",
+  "daily_rates",
+  "bpjs_section",
+  "bpjs_rates",
   "attendance_penalty_section",
   "attendance_penalty_rates",
   "shift_allowance_section",
@@ -51,6 +55,31 @@
    "label": "Pembagi Upah Sejam",
    "non_negative": 1,
    "reqd": 1
+  },
+  {
+   "description": "Pakai di struktur gaji dengan rumus tarif_uang_makan dan tarif_transport, mis. tarif_uang_makan * jumlah_hadir. Berlaku untuk slip draft berikutnya.",
+   "fieldname": "daily_rate_section",
+   "fieldtype": "Section Break",
+   "label": "Tarif Harian"
+  },
+  {
+   "description": "Dipilih baris paling cocok: company + department (atau induk department-nya), lalu company, lalu baris kosong untuk semua company.",
+   "fieldname": "daily_rates",
+   "fieldtype": "Table",
+   "label": "Tarif Uang Makan & Transport",
+   "options": "HRM Daily Rate"
+  },
+  {
+   "description": "Dasar BPJS = Variable di SSA kalau diisi, kalau kosong gaji pokok + Hari Dasar BPJS × (uang makan + transport). Karyawan dengan centang Tidak Ikut BPJS dasarnya 0. Pakai di rumus dengan Nama di Rumus, mis. iuran_bpjs_kesehatan.",
+   "fieldname": "bpjs_section",
+   "fieldtype": "Section Break",
+   "label": "Iuran BPJS"
+  },
+  {
+   "fieldname": "bpjs_rates",
+   "fieldtype": "Table",
+   "label": "Persen Iuran BPJS",
+   "options": "HRM BPJS Rate"
   },
   {
    "description": "Berlaku untuk slip draft berikutnya, pada Salary Structure yang memakai formulanya.",

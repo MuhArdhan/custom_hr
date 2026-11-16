@@ -1,0 +1,49 @@
+{
+ "actions": [],
+ "creation": "2026-11-16 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "kode",
+  "persen",
+  "batas_atas"
+ ],
+ "fields": [
+  {
+   "description": "Nama yang dipakai di rumus struktur gaji, mis. iuran_bpjs_kesehatan.",
+   "fieldname": "kode",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nama di Rumus",
+   "reqd": 1
+  },
+  {
+   "fieldname": "persen",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Persen",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Dasar BPJS paling tinggi untuk iuran ini. 0 = tanpa batas.",
+   "fieldname": "batas_atas",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Batas Atas Dasar",
+   "non_negative": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-16 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM BPJS Rate",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
