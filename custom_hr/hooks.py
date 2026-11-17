@@ -121,6 +121,9 @@ doc_events = {
 	"Employee": {
 		"validate": "custom_hr.services.employee_outlet.fill_outlet",
 	},
+	"HR Settings": {
+		"on_update": "custom_hr.services.employee_nip.keep_visible",
+	},
 	"Leave Application": {
 		"before_validate": [
 			"custom_hr.services.leave_approver.fill_leave_approver",
