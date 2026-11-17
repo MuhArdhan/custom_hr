@@ -233,6 +233,7 @@ fixtures = [
 					"Salary Slip-jumlah_pulang_cepat",
 					"Salary Slip-jumlah_tidak_out",
 					"Salary Slip-jumlah_hadir",
+					"Salary Slip-hari_kerja",
 					"Salary Slip-jumlah_alpha",
 					"Salary Slip-jam_izin",
 					"Salary Slip-jam_lembur",

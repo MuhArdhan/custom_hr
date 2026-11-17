@@ -1,7 +1,7 @@
 """Attendance counts, overtime hours, allowances and HR rates on the Salary Slip, for Salary Structure formulas to use."""
 
 import frappe
-from frappe.utils import cint, flt
+from frappe.utils import add_days, cint, flt, getdate
 from frappe.utils.nestedset import get_ancestors_of
 
 from custom_hr.api.overtime_pay import overtime_pay, paid_overtime
@@ -39,6 +39,7 @@ def fill_attendance_penalties(doc, method=None):
 		and frappe.get_cached_value("Leave Type", day.leave_type, "dihitung_hadir")
 	]
 	doc.jumlah_hadir = sum(0.5 if day.status == HALF_DAY else 1 for day in worked) + len(paid_leave)
+	doc.hari_kerja = working_days(doc.start_date, doc.end_date)
 	# only the shifts HR listed in Payroll Settings (tab HRM) earn an allowance
 	allowance = {row.shift_type: flt(row.tunjangan) for row in settings.shift_allowances}
 	doc.tunjangan_shift = sum(allowance.get(day.shift, 0) for day in worked)
@@ -89,6 +90,15 @@ def daily_rate(doc, settings):
 	# a sub-department takes its parent's rate, e.g. a Jakarta team under Jakarta
 	departments = [doc.department, *get_ancestors_of("Department", doc.department)] if doc.department else []
 	return daily_rate_for(settings.daily_rates, doc.company, departments)
+
+
+def working_days(start, end) -> int:
+	"""Divisor of a prorated Gaji Pokok: the period's Mondays to Fridays (23 for 26 Aug-25 Sep, 20 for 26 Sep-25 Oct).
+
+	shortcut: public holidays are not taken out, HR keeps no holiday list; read the Holiday List once they keep one.
+	"""
+	start, end = getdate(start), getdate(end)
+	return sum(add_days(start, i).weekday() < 5 for i in range((end - start).days + 1))
 
 
 def rate_for(rows, company):

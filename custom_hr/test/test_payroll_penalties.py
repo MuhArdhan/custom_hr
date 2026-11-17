@@ -113,6 +113,13 @@ class TestPayrollPenalties(unittest.TestCase):
 	def test_an_employee_outside_bpjs_pays_nothing(self):
 		self.assertEqual(self.bpjs({"base": 3000000, "variable": 3882000}, out=1), {"dasar_bpjs": 0, "iuran_ks": 0, "iuran_tk": 0})
 
+	def test_working_days_are_the_mondays_to_fridays_of_the_period(self):
+		self.assertEqual(svc.working_days("2026-08-26", "2026-09-25"), 23)
+		self.assertEqual(svc.working_days("2026-09-26", "2026-10-25"), 20)
+		doc = slip()
+		self.fill(doc, [])
+		self.assertEqual(doc.hari_kerja, 20)
+
 	def test_without_any_matching_row_nothing_is_deducted(self):
 		self.assertEqual(svc.rate_for([JURI], "Outlet A"), {})
 		self.assertEqual(svc.rate_for([], "JURI"), {})
