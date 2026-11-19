@@ -23,6 +23,16 @@
 						<Button variant="solid" class="w-full py-5" @click="goBack">{{ __("Go to Home") }}</Button>
 					</div>
 
+					<!-- Past the deadline after check-in -->
+					<div v-else-if="view === 'expired'" class="bg-white rounded-lg p-6 shadow-sm flex flex-col items-center text-center gap-3">
+						<div class="h-14 w-14 rounded-full bg-red-50 flex items-center justify-center">
+							<FeatherIcon name="x-circle" class="h-7 w-7 text-red-600" />
+						</div>
+						<h3 class="text-lg font-semibold text-gray-900">{{ __("Grooming closed") }}</h3>
+						<p class="text-sm text-gray-600">{{ __("Today's grooming had to be sent by {0}.", [dayjs(status.deadline).format("HH:mm")]) }}</p>
+						<Button variant="solid" class="w-full py-5" @click="goBack">{{ __("Go to Home") }}</Button>
+					</div>
+
 					<!-- Review all photos, then send -->
 					<div v-else-if="view === 'capture' && reviewing" class="bg-white rounded-lg p-4 shadow-sm flex flex-col gap-4">
 						<div>
@@ -46,6 +56,7 @@
 							<div v-for="(item, position) in steps" :key="item.key" class="h-1.5 flex-1 rounded-full" :class="position === index ? 'bg-gray-800' : photos[item.key] ? 'bg-green-500' : 'bg-gray-200'" />
 						</div>
 						<p v-if="status.shift" class="text-xs text-gray-500">{{ __("Shift") }}: {{ shiftLabel(status.shift) }}</p>
+						<p v-if="status.deadline" class="text-xs font-medium text-orange-600">{{ __("Send before {0}", [dayjs(status.deadline).format("HH:mm")]) }}</p>
 						<div>
 							<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ __("Step {0} of {1}", [index + 1, steps.length]) }}</p>
 							<h3 class="text-xl font-semibold text-gray-900 mt-1">{{ step.title }}</h3>
@@ -66,7 +77,7 @@
 					</div>
 
 					<!-- History, laid out like the attendance (Employee Checkin) history -->
-					<div v-if="view === 'history' || (view === 'needs_checkin' && history.length)" class="flex flex-col w-full">
+					<div v-if="view === 'history' || (['needs_checkin', 'expired'].includes(view) && history.length)" class="flex flex-col w-full">
 						<p v-if="view === 'history'" class="text-sm text-gray-600 text-center">{{ __("Today's grooming has been sent") }}</p>
 						<div class="flex flex-col bg-white rounded mt-5">
 							<router-link

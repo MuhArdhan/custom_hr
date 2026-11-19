@@ -621,6 +621,18 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "HR Settings",
+  "name": "HR Settings-grooming_deadline_minutes",
+  "fieldname": "grooming_deadline_minutes",
+  "fieldtype": "Int",
+  "label": "Batas Waktu Grooming (menit setelah check in)",
+  "insert_after": "face_enroll_samples",
+  "module": "HRM",
+  "non_negative": 1,
+  "description": "Grooming harus dikirim paling lambat sekian menit setelah check in pertama hari itu. 0 atau kosong berarti tanpa batas."
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Employee Checkin",
   "name": "Employee Checkin-outlet_shift_section",
   "fieldname": "outlet_shift_section",

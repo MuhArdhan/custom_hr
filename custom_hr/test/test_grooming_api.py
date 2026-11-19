@@ -50,8 +50,18 @@ class TestGroomingApi(unittest.TestCase):
 		self.save = self.patch("_save_photo_data_url", side_effect=lambda data, doctype, name, filename: f"/private/files/{filename}.jpg")
 		self.exists = self.patch("frappe.db.exists", return_value=None)
 		self.set_value = self.patch("frappe.db.set_value")
-		self.get_value = self.patch("frappe.db.get_value", side_effect=lambda doctype, *a, **k: self.checkin if doctype == "Employee Checkin" else self.record)
+		self.first_in = datetime(2026, 10, 26, 8, 0)
+		self.deadline_minutes = 0
+		self.patch("frappe.db.get_single_value", side_effect=lambda *a: self.deadline_minutes)
+		self.get_value = self.patch("frappe.db.get_value", side_effect=self.fake_get_value)
 		self.patch("frappe.get_all", side_effect=lambda doctype, *a, **k: self.photos if doctype == "Grooming Photo" else self.history)
+
+	def fake_get_value(self, doctype, *args, **kwargs):
+		if doctype != "Employee Checkin":
+			return self.record
+		if kwargs.get("order_by") == "time asc":  # the deadline's first IN of the day
+			return self.first_in if self.checkin else None
+		return self.checkin
 
 	def patch(self, name, **kwargs):
 		target = name if name.startswith("frappe.") else f"custom_hr.api.grooming.{name}"
@@ -111,6 +121,28 @@ class TestGroomingApi(unittest.TestCase):
 		grooming.submit_grooming([JPEG] * len(KEYS))
 		values = self.writer.call_args.args[0]
 		self.assertEqual((values["shift"], values["checkin"]), ("Shift Pagi", "IN-1"))
+
+	def test_the_deadline_counts_from_the_first_checkin_and_comes_from_hr_settings(self):
+		self.deadline_minutes = 30  # first IN 08:00, now 08:30: the last allowed minute
+		status = grooming.get_grooming_status()
+		self.assertEqual((status["deadline"], status["expired"]), ("2026-10-26 08:30:00", False))
+		grooming.submit_grooming([JPEG] * len(KEYS))
+		self.writer.assert_called_once()
+
+	def test_a_late_grooming_is_refused_and_writes_nothing(self):
+		self.deadline_minutes = 29
+		self.assertTrue(grooming.get_grooming_status()["expired"])
+		with self.assertRaisesRegex(frappe.ValidationError, "08:29"):
+			grooming.submit_grooming([JPEG] * len(KEYS))
+		self.writer.assert_not_called()
+		self.save.assert_not_called()
+
+	def test_zero_minutes_means_no_deadline(self):
+		self.first_in = datetime(2026, 10, 26, 1, 0)
+		status = grooming.get_grooming_status()
+		self.assertEqual((status["deadline"], status["expired"]), (None, False))
+		grooming.submit_grooming([JPEG] * len(KEYS))
+		self.writer.assert_called_once()
 
 	def test_an_off_shift_checkin_still_allows_grooming_without_a_shift(self):
 		self.checkin = frappe._dict(name="IN-2", shift=None)

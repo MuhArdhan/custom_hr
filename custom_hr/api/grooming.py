@@ -3,9 +3,11 @@
 
 """Grooming SOP photos: the employee and the date come from the server, never from the payload."""
 
+from datetime import timedelta
+
 import frappe
 from frappe import _
-from frappe.utils import cint, getdate, now_datetime, nowdate
+from frappe.utils import cint, get_datetime, getdate, now_datetime, nowdate
 from hrms.api import get_current_employee
 
 from custom_hr.api import require_page_access
@@ -27,12 +29,27 @@ def _checkin_today(employee, today):
 	)
 
 
+def grooming_deadline(employee, today):
+	"""Grooming closes N minutes (HR Settings) after the first IN of the day, so checking in again does not
+	extend it. 0 or blank: no limit."""
+	minutes = cint(frappe.db.get_single_value("HR Settings", "grooming_deadline_minutes"))
+	if minutes <= 0:
+		return None
+	first_in = frappe.db.get_value(
+		"Employee Checkin",
+		{"employee": employee, "log_type": "IN", "time": ["between", [f"{today} 00:00:00", f"{today} 23:59:59"]]},
+		"time", order_by="time asc",
+	)
+	return get_datetime(first_in) + timedelta(minutes=minutes) if first_in else None
+
+
 @frappe.whitelist(methods=["GET"])
 def get_grooming_status() -> dict:
 	"""Today's grooming for the logged-in employee: the steps, check-in state, and the recent history."""
 	employee = get_current_employee()
 	today = nowdate()
 	checkin = _checkin_today(employee, today)
+	deadline = grooming_deadline(employee, today) if checkin else None
 	history = frappe.get_all(
 		"Grooming Check", filters={"employee": employee}, fields=["name", "grooming_date", "shift", "review_status", "review_note"],
 		order_by="grooming_date desc", page_length=HISTORY_LIMIT,
@@ -45,6 +62,8 @@ def get_grooming_status() -> dict:
 		"steps": [dict(step) for step in GROOMING_STEPS],
 		"checked_in": bool(checkin),
 		"shift": checkin.shift if checkin else None,
+		"deadline": str(deadline) if deadline else None,
+		"expired": bool(deadline and now_datetime() > deadline),
 		"history": [
 			{"name": row.name, "date": str(row.grooming_date), "shift": row.shift, "review_status": row.review_status, "review_note": row.review_note}
 			for row in history
@@ -88,6 +107,9 @@ def submit_grooming(photos) -> dict:
 	checkin = _checkin_today(employee, today)
 	if not checkin:
 		frappe.throw(_("Lakukan check in terlebih dahulu sebelum grooming."))
+	deadline = grooming_deadline(employee, today)
+	if deadline and now_datetime() > deadline:
+		frappe.throw(_("Batas waktu grooming sudah lewat (sampai jam {0}).").format(deadline.strftime("%H:%M")))
 	if frappe.db.exists("Grooming Check", {"employee": employee, "grooming_date": today}):
 		frappe.throw(_("Grooming hari ini sudah dikirim."))
 	now = now_datetime()

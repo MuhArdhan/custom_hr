@@ -300,6 +300,7 @@ fixtures = [
 					"HR Settings-require_face_checkin",
 					"HR Settings-face_match_threshold",
 					"HR Settings-face_enroll_samples",
+					"HR Settings-grooming_deadline_minutes",
 				],
 			]
 		],

@@ -51,6 +51,8 @@ test("the screen is history once sent, a check-in prompt before check-in, and th
 	assert.equal(viewState({ submitted: true, checked_in: false }), "history")
 	assert.equal(viewState({ submitted: false, checked_in: false }), "needs_checkin")
 	assert.equal(viewState({ submitted: false, checked_in: true }), "capture")
+	assert.equal(viewState({ submitted: false, checked_in: true, expired: true }), "expired")
+	assert.equal(viewState({ submitted: true, checked_in: true, expired: true }), "history")
 })
 
 const HISTORY = [

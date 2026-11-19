@@ -21,11 +21,12 @@ export function toPayload(photos, steps) {
 }
 
 // What the Grooming screen shows: the history once today's grooming is sent, a prompt until the employee
-// has checked in, and the camera flow otherwise.
+// has checked in, a closed notice after the deadline, and the camera flow otherwise.
 export function viewState(status) {
 	if (!status) return "loading"
 	if (status.submitted) return "history"
-	return status.checked_in ? "capture" : "needs_checkin"
+	if (!status.checked_in) return "needs_checkin"
+	return status.expired ? "expired" : "capture"
 }
 
 // History is newest first; keep that order and start a new group when the month changes.
