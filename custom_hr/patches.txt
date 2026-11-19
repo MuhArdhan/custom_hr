@@ -30,3 +30,4 @@ custom_hr.patches.add_department_approval
 custom_hr.patches.fill_shift_overtime_marker
 custom_hr.patches.move_hrm_payroll_settings
 custom_hr.patches.move_designation_allowances
+custom_hr.patches.seed_component_accounts

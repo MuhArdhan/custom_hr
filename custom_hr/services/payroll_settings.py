@@ -37,3 +37,6 @@ def validate(doc, method=None):
 	jobs = [row.designation for row in doc.designation_allowances]
 	if len(jobs) != len(set(jobs)):
 		frappe.throw(_("Tunjangan per Jabatan: satu jabatan hanya boleh satu baris."))
+	places = [(row.salary_component, row.for_company or "") for row in doc.component_accounts]
+	if len(places) != len(set(places)):
+		frappe.throw(_("Akun Komponen Gaji: satu komponen hanya boleh satu baris per company, dan satu baris tanpa company."))

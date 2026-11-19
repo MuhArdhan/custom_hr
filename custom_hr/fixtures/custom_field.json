@@ -1964,11 +1964,33 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Settings",
+  "name": "Payroll Settings-component_account_section",
+  "fieldname": "component_account_section",
+  "fieldtype": "Section Break",
+  "label": "Akun Komponen Gaji",
+  "insert_after": "designation_allowances",
+  "module": "HRM",
+  "description": "Saat disimpan, akun di tiap Salary Component diisi untuk semua company yang punya nomor akun ini, menimpa isian lama. Company baru ikut terisi otomatis. Komponen yang tidak ada di tabel tidak disentuh."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-component_accounts",
+  "fieldname": "component_accounts",
+  "fieldtype": "Table",
+  "label": "Akun Komponen Gaji",
+  "insert_after": "component_account_section",
+  "module": "HRM",
+  "options": "HRM Component Account"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
   "name": "Payroll Settings-match_section",
   "fieldname": "match_section",
   "fieldtype": "Section Break",
   "label": "Cocokkan Gaji dengan Excel",
-  "insert_after": "designation_allowances",
+  "insert_after": "component_accounts",
   "module": "HRM",
   "description": "Dipakai tombol Cocokkan dengan Excel di Payroll Entry. Sheet dibaca dari baris di bawah judul NIP sampai NIP kosong pertama."
  },

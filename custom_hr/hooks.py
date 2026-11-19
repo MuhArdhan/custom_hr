@@ -106,6 +106,9 @@ override_whitelisted_methods = {
 }
 
 doc_events = {
+	"Company": {
+		"on_update": "custom_hr.services.component_accounts.on_company_update",
+	},
 	"Department": {
 		"validate": [
 			"custom_hr.services.department_shift.validate_department",
@@ -143,6 +146,7 @@ doc_events = {
 	},
 	"Payroll Settings": {
 		"validate": "custom_hr.services.payroll_settings.validate",
+		"on_update": "custom_hr.services.component_accounts.on_settings_update",
 	},
 	"Shift Location": {
 		"on_update": "custom_hr.services.outlet_location.sync_location_radius_to_outlet",
@@ -243,6 +247,8 @@ fixtures = [
 					"Salary Slip-tunjangan_resiko",
 					"Payroll Settings-designation_allowance_section",
 					"Payroll Settings-designation_allowances",
+					"Payroll Settings-component_account_section",
+					"Payroll Settings-component_accounts",
 					"Leave Type-dihitung_hadir",
 					"Leave Type-izin_per_jam",
 					"Leave Application-izin_per_jam",
