@@ -1,0 +1,47 @@
+{
+ "actions": [],
+ "creation": "2026-11-17 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "designation",
+  "tunjangan_jabatan",
+  "tunjangan_resiko"
+ ],
+ "fields": [
+  {
+   "fieldname": "designation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Jabatan",
+   "options": "Designation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tunjangan_jabatan",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Tunjangan Jabatan",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "tunjangan_resiko",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Tunjangan Resiko",
+   "non_negative": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM Designation Allowance",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

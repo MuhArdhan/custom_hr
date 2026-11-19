@@ -16,7 +16,11 @@ DAILY = [
 	frappe._dict(for_company="JURI", for_department="Jakarta", uang_makan=30000, transport=22000),
 ]
 PARENTS = {"Produksi Jakarta": ["Jakarta", "All Departments"], "Jakarta": ["All Departments"], "Klaten": ["All Departments"]}
-RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI], shift_allowances=SHIFTS, daily_rates=DAILY)
+JOBS = [
+	frappe._dict(designation="SPV", tunjangan_jabatan=500000, tunjangan_resiko=0),
+	frappe._dict(designation="Driver", tunjangan_jabatan=0, tunjangan_resiko=100000),
+]
+RATES = frappe._dict(attendance_penalty_rates=[DEFAULT, JURI], shift_allowances=SHIFTS, daily_rates=DAILY, designation_allowances=JOBS)
 
 
 def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=None):
@@ -25,12 +29,8 @@ def day(late=0, early=0, missing=0, status="Present", shift=None, leave_type=Non
 	)
 
 
-# desk values HR keeps: "counts as present" per Leave Type, allowances per Designation
-DESK = {
-	("Leave Type", "Cuti", "dihitung_hadir"): 1,
-	("Designation", "SPV", "tunjangan_jabatan"): 500000,
-	("Designation", "Driver", "tunjangan_resiko"): 100000,
-}
+# desk value HR keeps: "counts as present" per Leave Type
+DESK = {("Leave Type", "Cuti", "dihitung_hadir"): 1}
 
 
 def slip(**values):

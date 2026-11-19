@@ -34,3 +34,6 @@ def validate(doc, method=None):
 	shifts = [row.shift_type for row in doc.shift_allowances]
 	if len(shifts) != len(set(shifts)):
 		frappe.throw(_("Tunjangan Shift: satu Shift Type hanya boleh satu baris."))
+	jobs = [row.designation for row in doc.designation_allowances]
+	if len(jobs) != len(set(jobs)):
+		frappe.throw(_("Tunjangan per Jabatan: satu jabatan hanya boleh satu baris."))

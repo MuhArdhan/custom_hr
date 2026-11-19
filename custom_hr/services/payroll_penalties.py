@@ -43,9 +43,10 @@ def fill_attendance_penalties(doc, method=None):
 	# only the shifts HR listed in Payroll Settings (tab HRM) earn an allowance
 	allowance = {row.shift_type: flt(row.tunjangan) for row in settings.shift_allowances}
 	doc.tunjangan_shift = sum(allowance.get(day.shift, 0) for day in worked)
-	# HR sets which designations earn an allowance, and how much, on the Designation itself
+	# HR lists which designations earn an allowance, and how much, in Payroll Settings (tab HRM)
+	by_designation = {row.designation: row for row in settings.designation_allowances}
 	for field in ("tunjangan_jabatan", "tunjangan_resiko"):
-		setattr(doc, field, flt(frappe.get_cached_value("Designation", doc.designation, field)) if doc.designation else 0)
+		setattr(doc, field, flt(by_designation.get(doc.designation, {}).get(field)))
 	# recorded Absent only: unmarked days (off days with a no-holiday list) are not alpha
 	doc.jumlah_alpha = frappe.db.count(
 		"Attendance",

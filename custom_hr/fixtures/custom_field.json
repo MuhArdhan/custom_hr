@@ -1047,28 +1047,6 @@
  },
  {
   "doctype": "Custom Field",
-  "dt": "Designation",
-  "name": "Designation-tunjangan_jabatan",
-  "fieldname": "tunjangan_jabatan",
-  "fieldtype": "Currency",
-  "label": "Tunjangan Jabatan",
-  "description": "Per bulan untuk karyawan dengan jabatan ini. Kosongkan jika tidak dapat. Pakai di struktur gaji dengan rumus tunjangan_jabatan.",
-  "insert_after": "designation_name",
-  "module": "HRM"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Designation",
-  "name": "Designation-tunjangan_resiko",
-  "fieldname": "tunjangan_resiko",
-  "fieldtype": "Currency",
-  "label": "Tunjangan Resiko",
-  "description": "Per bulan untuk karyawan dengan jabatan ini. Kosongkan jika tidak dapat. Pakai di struktur gaji dengan rumus tunjangan_resiko.",
-  "insert_after": "tunjangan_jabatan",
-  "module": "HRM"
- },
- {
-  "doctype": "Custom Field",
   "dt": "Leave Type",
   "name": "Leave Type-dihitung_hadir",
   "fieldname": "dihitung_hadir",
@@ -1964,11 +1942,33 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Settings",
+  "name": "Payroll Settings-designation_allowance_section",
+  "fieldname": "designation_allowance_section",
+  "fieldtype": "Section Break",
+  "label": "Tunjangan per Jabatan",
+  "insert_after": "shift_allowances",
+  "module": "HRM",
+  "description": "Per bulan untuk karyawan dengan jabatan itu; jabatan yang tidak ada di tabel tidak dapat. Pakai di struktur gaji dengan rumus tunjangan_jabatan dan tunjangan_resiko."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-designation_allowances",
+  "fieldname": "designation_allowances",
+  "fieldtype": "Table",
+  "label": "Tunjangan Jabatan & Resiko",
+  "insert_after": "designation_allowance_section",
+  "module": "HRM",
+  "options": "HRM Designation Allowance"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
   "name": "Payroll Settings-match_section",
   "fieldname": "match_section",
   "fieldtype": "Section Break",
   "label": "Cocokkan Gaji dengan Excel",
-  "insert_after": "shift_allowances",
+  "insert_after": "designation_allowances",
   "module": "HRM",
   "description": "Dipakai tombol Cocokkan dengan Excel di Payroll Entry. Sheet dibaca dari baris di bawah judul NIP sampai NIP kosong pertama."
  },
