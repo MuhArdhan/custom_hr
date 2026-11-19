@@ -1,0 +1,33 @@
+/* Galeri Posisi Driver — desk page, same look as the Grooming Gallery */
+
+.dpg-page { padding: 0 15px 32px; }
+
+.dpg-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 2px 0 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }
+.dpg-filters .dpg-filter { flex: 1 1 auto; min-width: 130px; }
+.dpg-filters .dpg-f-company, .dpg-filters .dpg-f-search { min-width: 150px; }
+.dpg-filters .dpg-f-from_date, .dpg-filters .dpg-f-to_date { min-width: 115px; }
+.dpg-filters .frappe-control, .dpg-filters .form-group { margin-bottom: 0; }
+.dpg-summary { color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px; }
+.dpg-summary:empty { display: none; }
+
+.dpg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.dpg-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.dpg-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.dpg-cover-wrap { position: relative; aspect-ratio: 4 / 5; background: var(--gray-100); }
+.dpg-cover { width: 100%; height: 100%; object-fit: cover; }
+.dpg-pill { position: absolute; top: 8px; right: 8px; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
+.dpg-pill-orange { background: #ea580c; }
+.dpg-pill-green { background: #16a34a; }
+.dpg-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.dpg-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dpg-line { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dpg-muted { color: var(--text-muted); font-size: 12px; }
+
+.dpg-empty { text-align: center; color: var(--text-muted); padding: 60px 0; grid-column: 1 / -1; }
+.dpg-more { padding: 8px 0 24px; }
+
+.dpg-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; margin-bottom: 8px; }
+.dpg-photo { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); }
+.dpg-map-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.dpg-map { width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--border-color); border-radius: 8px; }
+@media (max-width: 640px) { .dpg-detail { grid-template-columns: 1fr; } }

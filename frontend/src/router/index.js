@@ -5,6 +5,7 @@ import attendanceRoutes from "./attendance"
 import leaveRoutes from "./leaves"
 import claimRoutes from "./claims"
 import employeeAdvanceRoutes from "./advances"
+import driverReportRoutes from "./driver_report"
 import groomingRoutes from "./grooming"
 import overtimeRoutes from "./overtime"
 import salarySlipRoutes from "./salary_slips"
@@ -88,6 +89,7 @@ const routes = [
 	...leaveRoutes,
 	...claimRoutes,
 	...employeeAdvanceRoutes,
+	...driverReportRoutes,
 	...groomingRoutes,
 	...overtimeRoutes,
 	...salarySlipRoutes,

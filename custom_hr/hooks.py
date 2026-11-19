@@ -270,6 +270,7 @@ fixtures = [
 					"Payroll Settings-column_break_wage",
 					"Payroll Settings-overtime_salary_component",
 					"Payroll Settings-overtime_hourly_divisor",
+					"Payroll Settings-driver_report_opens_at",
 					"Payroll Settings-daily_rate_section",
 					"Payroll Settings-daily_rates",
 					"Payroll Settings-bpjs_section",

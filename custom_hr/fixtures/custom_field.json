@@ -1852,6 +1852,18 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Settings",
+  "name": "Payroll Settings-driver_report_opens_at",
+  "fieldname": "driver_report_opens_at",
+  "fieldtype": "Time",
+  "label": "Laporan Posisi Driver Dibuka Jam",
+  "insert_after": "overtime_hourly_divisor",
+  "module": "HRM",
+  "default": "16:30:00",
+  "description": "Mulai jam ini driver bisa mengirim foto dan lokasi dari aplikasi HRMS, sampai tengah malam. Kosong berarti 16:30."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
   "name": "Payroll Settings-daily_rate_section",
   "fieldname": "daily_rate_section",
   "fieldtype": "Section Break",

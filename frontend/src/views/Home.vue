@@ -3,6 +3,7 @@
 		<template #body>
 			<div class="flex flex-col items-center my-7 p-4 gap-7">
 				<CheckInPanel />
+				<DriverReportCard v-if="isDriver" />
 				<QuickLinks :items="quickLinks" :title="__('Quick Links')" />
 				<RequestPanel />
 			</div>
@@ -14,6 +15,7 @@
 import { computed, inject, markRaw } from "vue"
 
 import CheckInPanel from "@/components/CheckInPanel.vue"
+import DriverReportCard from "@/components/DriverReportCard.vue"
 import QuickLinks from "@/components/QuickLinks.vue"
 import BaseLayout from "@/components/BaseLayout.vue"
 import RequestPanel from "@/components/RequestPanel.vue"
@@ -67,4 +69,6 @@ const links = [
 ]
 // the SOP Grooming button is for outlet employees only
 const quickLinks = computed(() => links.filter((link) => link.route !== "GroomingView" || employee.data?.outlet))
+// same rule as the server (custom_hr.api.driver_report.is_driver)
+const isDriver = computed(() => (employee.data?.designation || "").toUpperCase().includes("DRIVER"))
 </script>
