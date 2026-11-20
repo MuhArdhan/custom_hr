@@ -27,6 +27,7 @@ from custom_hr.services.outlet_checkin import (
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime
 from custom_hr.services.checkin_submission import apply_verified_face
+from custom_hr.services.checkout_window import validate_checkout_open
 from custom_hr.services.department_shift import apply_department_shift
 from custom_hr.services.outlet_geofence import coordinates, validate_department_geofence, validate_outlet_geofence
 
@@ -184,7 +185,7 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 		if self.name:
 			condition &= log.name != self.name
 		last_log = (
-			frappe.qb.from_(log).select(log.name, log.log_type, log.time, log.shift_actual_end)
+			frappe.qb.from_(log).select(log.name, log.log_type, log.time, log.shift_actual_end, log.shift, log.shift_end)
 			.where(condition).orderby(log.time, log.name, order=frappe.qb.desc)
 			.limit(1).for_update().run(as_dict=True)
 		)
@@ -200,6 +201,7 @@ class CustomEmployeeCheckin(BaseEmployeeCheckin):
 					"Please raise an Attendance Request to regularize your attendance."
 				),
 			)
+		validate_checkout_open(last_log[0], self.time)
 
 	def after_insert(self):
 		self.queue_realtime_attendance()

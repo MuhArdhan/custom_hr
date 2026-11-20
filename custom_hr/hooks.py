@@ -250,6 +250,8 @@ fixtures = [
 					"Payroll Settings-component_account_section",
 					"Payroll Settings-component_accounts",
 					"Leave Type-dihitung_hadir",
+					"HR Settings-batasi_checkout_awal",
+					"HR Settings-checkout_dibuka_menit",
 					"Leave Type-izin_per_jam",
 					"Leave Application-izin_per_jam",
 					"Leave Application-from_time",

@@ -11,6 +11,7 @@ from hrms.api import get_current_employee
 from hrms.hr.doctype.shift_assignment.shift_assignment import get_employee_shift
 
 from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
+from custom_hr.services.checkout_window import checkout_closed_message, checkout_opens_at
 from custom_hr.services.checkin_submission import (
 	RESPONSE_FIELDS, checkin_response, request_log_name, submit_self_checkin,
 )
@@ -21,6 +22,7 @@ from custom_hr.services.outlet_checkin import (
 	_employee_record,
 	_has_out,
 	_latest_in_for_checkout,
+	is_hr_operator,
 	validate_new_in_session,
 )
 from custom_hr.services.outlet_shift import normalize_checkin_datetime, outlet_shift_mode_on, resolve_outlet_shift
@@ -110,7 +112,7 @@ def get_checkin_context():
 		"employee": employee, "server_time": str(now), "outlet": record.outlet,
 		"mode": "Native", "next_action": "IN", "allowed": True, "reason": None,
 		"message": "", "candidate_shift": None, "shift_choices": [], "shift_work_date": str(now.date()),
-		"checkout_deadline": None, "paired_checkin": None,
+		"checkout_deadline": None, "checkout_opens_at": None, "paired_checkin": None,
 		"incomplete_session": None,
 	}
 
@@ -148,6 +150,12 @@ def get_checkin_context():
 		if is_open and get_datetime(latest.time) <= now <= _cutoff(latest):
 			use_session(latest)
 			context["next_action"] = "OUT"
+			opens = checkout_opens_at(latest)
+			if opens:
+				context["checkout_opens_at"] = str(opens)
+				# the server refuses an earlier self-service OUT; HR is exempt there, so here too
+				if now < opens and not is_hr_operator():
+					return block("checkout_not_open", checkout_closed_message(opens))
 			return context
 		configured = outlet_shift_mode_on(record.outlet)
 		resolution = resolve_outlet_shift(employee, now) if configured else {

@@ -60,6 +60,7 @@ class TestOutletCheckout(unittest.TestCase):
 		self.mode = self.mock("get_employee_attendance_mode", return_value={"mode": "Outlet", "mode_applies": True, "message": ""})
 		self.mock("is_hr_operator", side_effect=lambda: self.hr)
 		self.mock("_has_out", side_effect=lambda row: self.native_closed)
+		self.open_check = self.mock("validate_checkout_open")  # services/checkout_window.py, tested on its own
 		self.original_time_check = CustomEmployeeCheckin.validate_self_service_time
 		self.time_check = self.method_patch("validate_self_service_time")
 		self.face_check = self.method_patch("validate_face_verification")
@@ -114,6 +115,14 @@ class TestOutletCheckout(unittest.TestCase):
 		self.assertEqual(str(self.doc.time), "2026-10-15 18:30:00")
 		self.resolver.assert_not_called()
 		self.mode.assert_not_called()
+
+	def test_early_checkout_window_holds_employees_not_hr(self):
+		prepare_or_protect_checkin(self.doc)
+		self.open_check.assert_not_called()
+		self.hr = False
+		prepare_or_protect_checkin(self.doc)
+		row, timestamp = self.open_check.call_args.args
+		self.assertEqual((row.name, str(timestamp)), ("IN-ORIGINAL", "2026-10-15 18:30:00"))
 
 	def test_employee_lock_precedes_pair_and_duplicate_reads(self):
 		prepare_or_protect_checkin(self.doc)

@@ -57,6 +57,10 @@ class TestCheckinContext(CheckinTestCase):
 		}
 		self.dept_resolver = self.mock(root + "resolve_department_shift", side_effect=lambda *a, **k: dict(self.dept_resolution))
 		self.mock("custom_hr.hrm.doctype.outlet.outlet.OUTLET_AUTO_SHIFT_READY", new=True)
+		# early check-out window of the Shift Type (services/checkout_window.py): none unless a test sets one
+		self.opens_at, self.hr = None, False
+		self.mock(root + "checkout_opens_at", side_effect=lambda row: self.opens_at)
+		self.mock(root + "is_hr_operator", side_effect=lambda: self.hr)
 
 	def test_native_employee_sees_the_assigned_shift_before_checking_in(self):
 		self.resolution = {"mode": "Native", "mode_applies": False, "matched": False}
@@ -223,6 +227,25 @@ class TestCheckinContext(CheckinTestCase):
 		self.entry.attendance_source = None
 		self.assertEqual(checkin.get_checkin_context()["next_action"], "OUT")
 		self.resolver.assert_not_called()
+
+	def test_checkout_stays_closed_until_the_shift_type_opens_it(self):
+		self.entry = locked_in()
+		self.opens_at = datetime(2026, 10, 15, 12, 45)  # NOW is 10:00
+		result = checkin.get_checkin_context()
+		self.assertEqual((result["next_action"], result["allowed"], result["reason"]), ("OUT", False, "checkout_not_open"))
+		self.assertIn("12:45", result["message"])
+		self.assertEqual(result["checkout_opens_at"], "2026-10-15 12:45:00")
+
+	def test_checkout_opens_from_the_opening_time(self):
+		self.entry = locked_in()
+		self.opens_at = NOW
+		result = checkin.get_checkin_context()
+		self.assertEqual((result["next_action"], result["allowed"]), ("OUT", True))
+
+	def test_hr_is_not_held_by_the_checkout_window(self):
+		self.entry = locked_in()
+		self.opens_at, self.hr = datetime(2026, 10, 15, 12, 45), True
+		self.assertTrue(checkin.get_checkin_context()["allowed"])
 
 	def test_invalid_mode_returns_failure(self):
 		self.resolution.update(mode="Unavailable", code="outlet_inactive", message="Outlet nonaktif")

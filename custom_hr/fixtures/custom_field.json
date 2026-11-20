@@ -1059,6 +1059,32 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "HR Settings",
+  "name": "HR Settings-batasi_checkout_awal",
+  "fieldname": "batasi_checkout_awal",
+  "fieldtype": "Check",
+  "label": "Batasi Check-out Sebelum Shift Selesai",
+  "description": "Berlaku untuk semua shift: tombol Check Out di aplikasi karyawan baru terbuka beberapa menit sebelum shift selesai. Tidak dicentang = bisa check-out kapan saja setelah check-in. HR tidak terkena batas ini.",
+  "insert_after": "face_enroll_samples",
+  "module": "HRM",
+  "default": "0"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "HR Settings",
+  "name": "HR Settings-checkout_dibuka_menit",
+  "fieldname": "checkout_dibuka_menit",
+  "fieldtype": "Int",
+  "label": "Check-out Dibuka (menit sebelum shift selesai)",
+  "description": "Contoh: shift selesai 16:30 dan diisi 15, check-out terbuka mulai 16:15. Isi 0 agar check-out baru terbuka tepat saat shift selesai.",
+  "insert_after": "batasi_checkout_awal",
+  "depends_on": "eval:doc.batasi_checkout_awal",
+  "non_negative": 1,
+  "module": "HRM",
+  "default": "0"
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Leave Type",
   "name": "Leave Type-dihitung_hadir",
   "fieldname": "dihitung_hadir",

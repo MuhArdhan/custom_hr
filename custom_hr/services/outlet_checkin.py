@@ -17,6 +17,7 @@ from frappe import _
 from frappe.utils import cint, get_datetime, getdate
 
 from custom_hr.hrm.doctype.outlet import outlet as outlet_configuration
+from custom_hr.services.checkout_window import validate_checkout_open
 from custom_hr.services.outlet_shift import (
 	get_employee_attendance_mode,
 	normalize_checkin_datetime,
@@ -226,6 +227,8 @@ def prepare_outlet_checkout(doc, row: dict) -> bool:
 		frappe.throw(_("Waktu OUT tidak boleh lebih awal daripada waktu IN."))
 	if timestamp > get_datetime(row.checkout_deadline):
 		frappe.throw(_("Batas check-out sesi sudah lewat. OUT sesi tersebut tetap kosong; hubungi HR untuk koreksi Attendance."), title=_("Batas OUT Terlewat"))
+	if not is_hr_operator():
+		validate_checkout_open(row, timestamp)
 	if _linked_checkout(row):
 		frappe.throw(_("Sesi check-in ini sudah memiliki OUT. Check-out kedua tidak diperbolehkan."), title=_("Sudah Check-out"))
 	if doc.get("attendance"):
