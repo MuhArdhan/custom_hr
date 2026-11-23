@@ -19,6 +19,13 @@
 					</header>
 
 					<div class="flex flex-col gap-5 my-4 w-full p-4">
+						<div class="flex flex-col gap-2 bg-white rounded p-4">
+							<label for="app-language" class="text-base text-gray-800">{{ __("Language") }}</label>
+							<select id="app-language" :value="getLanguage()" class="border rounded p-2" @change="setLanguage($event.target.value)">
+								<option value="id">Bahasa Indonesia</option>
+								<option value="en">English</option>
+							</select>
+						</div>
 						<div class="flex flex-col bg-white rounded">
 							<div
 								class="flex flex-row cursor-pointer flex-start p-4 items-center justify-between border-b"
@@ -97,6 +104,7 @@ import { computed, inject, ref } from "vue"
 
 import { arePushNotificationsEnabled } from "@/data/notifications"
 import { canInstall, requestInstall } from "@/utils/installPrompt"
+import { getLanguage, setLanguage } from "@/plugins/translationsPlugin"
 
 const __ = inject("$translate")
 const router = useRouter()

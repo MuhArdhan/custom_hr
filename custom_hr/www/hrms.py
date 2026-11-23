@@ -1,5 +1,5 @@
 import frappe
-from frappe.boot import load_translations
+from frappe.translate import get_all_translations
 
 no_cache = 1
 
@@ -31,20 +31,11 @@ def get_boot():
 		}
 	)
 
-	# resolve language from the user / system settings (not the browser accept-language)
-	# so the app language stays consistent between nav and content
-	frappe.local.lang = get_user_language()
-	load_translations(bootinfo)
+	# Supply Indonesian UI text without changing the request/user's Desk language.
+	bootinfo["lang"] = "id"
+	bootinfo["__messages"] = get_all_translations("id")
 
 	return bootinfo
-
-
-def get_user_language():
-	lang = None
-	if frappe.session.user and frappe.session.user != "Guest":
-		lang = frappe.db.get_value("User", frappe.session.user, "language")
-
-	return lang or frappe.db.get_single_value("System Settings", "language") or "en"
 
 
 def get_default_route():

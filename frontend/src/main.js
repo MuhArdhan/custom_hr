@@ -4,7 +4,7 @@ import router from "./router"
 import { initSocket } from "./socket"
 
 import { Button, Input, setConfig, frappeRequest, resourcesPlugin, FormControl } from "frappe-ui"
-import { translationsPlugin } from "./plugins/translationsPlugin.js"
+import { getLanguage, translationsPlugin } from "./plugins/translationsPlugin.js"
 import EmptyState from "@/components/EmptyState.vue"
 
 import { IonicVue } from "@ionic/vue"
@@ -110,6 +110,7 @@ router.isReady().then(async () => {
 	}
 
 	await translationsPlugin.isReady()
+	document.documentElement.lang = getLanguage()
 	registerServiceWorker()
 	app.mount("#app")
 })

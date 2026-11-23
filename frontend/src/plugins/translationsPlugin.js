@@ -1,3 +1,20 @@
+import { indonesianMessages } from "./indonesianMessages.js"
+
+export const LANGUAGE_KEY = "custom_hr:language"
+export function getLanguage() {
+	try {
+		return localStorage.getItem(LANGUAGE_KEY) === "en" ? "en" : "id"
+	} catch {
+		return "id"
+	}
+}
+
+export function setLanguage(value) {
+	if (value !== "id" && value !== "en") return
+	localStorage.setItem(LANGUAGE_KEY, value)
+	window.location.reload()
+}
+
 function makeTranslationFunction() {
 	let messages = {};
 	return {
@@ -13,32 +30,19 @@ function makeTranslationFunction() {
 			messages = window.frappe?.boot?.__messages;
 			return;
 		}
-
-		const url = new URL("/api/method/frappe.translate.load_all_translations", location.origin);
-		// keep the app language consistent (default: English) instead of following navigator.language,
-		// which produced a mix of Indonesian and English labels
-		url.searchParams.append("lang", window.frappe?.boot?.lang ?? "en");
-		url.searchParams.append("hash", window.frappe?.boot?.translations_hash || window._version_number || Math.random()); // for cache busting
-		// url.searchParams.append("app", "hrms");
-
-		try {
-			const response = await fetch(url);
-			messages = await response.json() || {}
-		} catch (error) {
-			console.error("Failed to fetch translations:", error)
-		}
 	}
 
 	function translate(txt, replace, context = null) {
 		if (!txt || typeof txt != "string") return txt;
+		if (getLanguage() === "en") return replace && typeof replace === "object" ? format(txt, replace) : txt;
 
 		let translated_text = "";
 		let key = txt;
 		if (context) {
-			translated_text = messages[`${key}:${context}`];
+			translated_text = indonesianMessages[`${key}:${context}`] || messages[`${key}:${context}`];
 		}
 		if (!translated_text) {
-			translated_text = messages[key] || txt;
+			translated_text = indonesianMessages[key] || messages[key] || txt;
 		}
 		if (replace && typeof replace === "object") {
 			translated_text = format(translated_text, replace);
@@ -61,6 +65,7 @@ function makeTranslationFunction() {
 				if (key == +key) {
 					return args[key] !== undefined ? args[key] : match;
 				}
+				return args[key] !== undefined ? args[key] : match;
 			}
 		);
 	}
