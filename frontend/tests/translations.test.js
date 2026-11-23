@@ -18,6 +18,11 @@ test("Indonesian is the app default with local terms and Frappe fallback", () =>
 	assert.equal(__("Upcoming Shifts"), "Shift Mendatang")
 	assert.equal(__("Employee"), "Karyawan")
 	assert.equal(__("Maximum {0} hours for {1}.", [2, "Lembur"]), "Maksimal 2 jam untuk Lembur.")
+	assert.equal(__("SOP Grooming"), "SOP Grooming")
+	assert.equal(__("Grooming closed"), "Grooming ditutup")
+	assert.equal(__("Leaves"), "Izin")
+	assert.equal(__("Request Leave"), "Ajukan Izin")
+	assert.equal(__("On Leave"), "Sedang Izin")
 })
 
 test("English preference keeps source strings and their placeholders", () => {
