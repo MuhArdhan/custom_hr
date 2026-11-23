@@ -1,0 +1,222 @@
+{% set employee = frappe.db.get_value("Employee", doc.employee,
+	["employee_number", "department", "designation", "outlet"], as_dict=True) or {} %}
+{% set logo = frappe.db.get_value("Company", doc.company, "company_logo") %}
+{% set periode = frappe.utils.getdate(doc.end_date or doc.start_date) %}
+{% set tanggal_cetak = frappe.utils.getdate(doc.posting_date or doc.end_date) %}
+{% set bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+	"Juli", "Agustus", "September", "Oktober", "November", "Desember"] %}
+{% set dept_name = doc.department or employee.department or "" %}
+{% set outlet_name = employee.outlet or "" %}
+{% set is_jakarta = "jakarta" in (dept_name | lower) or "jakarta" in (outlet_name | lower) %}
+{% set lokasi = "Jakarta" if is_jakarta else "Klaten" %}
+{% set penyerah = "HRD" %}
+{% set disable_rounding = frappe.utils.cint(frappe.db.get_single_value("Payroll Settings", "disable_rounded_total")) %}
+{% set payable_field = "net_pay" if disable_rounding or not doc.rounded_total else "rounded_total" %}
+{% set hari_kerja = doc.jumlah_hadir if doc.jumlah_hadir is not none else doc.payment_days %}
+
+{% set deduction_qty_map = {
+	"alpha": (doc.jumlah_alpha or 0, "HARI", true),
+	"potongan izin": (doc.jam_izin or 0, "JAM", true),
+	"izin": (doc.jam_izin or 0, "JAM", false),
+	"terlambat": (doc.jumlah_telat or 0, "HARI", true),
+	"pulang cepat": (doc.jumlah_pulang_cepat or 0, "HARI", true),
+	"tidak absen out": (doc.jumlah_tidak_out or 0, "HARI", true),
+} %}
+
+<style>
+	.print-format {
+		font-family: Arial, sans-serif;
+		font-size: 10px;
+		color: #111;
+		padding: 0;
+		min-height: 0;
+		page-size: A4;
+		orientation: landscape;
+		margin: 10mm;
+	}
+	@page { size: A4 landscape; }
+	.juri-slip { border: 1.5px solid #222; width: 100%; }
+	.juri-slip table { width: 100%; border-collapse: collapse; margin: 0; }
+	.print-format .juri-slip td, .print-format .juri-slip th {
+		padding: 2.5px 0 !important;
+		vertical-align: top;
+	}
+	.juri-slip .section { padding: 10px 18px; }
+	.juri-slip .divider { border-bottom: 1.5px solid #222; }
+	.juri-slip .company { font-size: 14px; font-weight: bold; }
+	.juri-slip .confidential { color: #d71920; font-size: 17px; font-weight: bold; margin-top: 6px; letter-spacing: 0.3px; }
+	.juri-slip .title { text-align: center; font-size: 14px; font-weight: bold; }
+	.juri-slip .logo { max-width: 100px; max-height: 45px; }
+	.juri-slip .field-label { font-weight: bold; }
+	.juri-slip .colon { width: 14px; text-align: center; }
+	.juri-slip .heading { font-weight: bold; text-decoration: underline; margin-bottom: 6px; }
+	.juri-slip .qty { text-align: right; white-space: nowrap; padding-right: 10px !important; color: #333; width: 65px; }
+	.juri-slip .amount { text-align: right; white-space: nowrap; }
+	.juri-slip .spacer { width: 6%; }
+	.juri-slip .total { border-top: 1px solid #444; font-weight: bold; }
+	.juri-slip .total td { padding-top: 5px !important; }
+	.juri-slip .take-home-box {
+		border: 1.5px solid #222;
+		margin-top: 8px;
+		padding: 6px 10px;
+	}
+	.juri-slip .take-home-box table td {
+		padding: 0 !important;
+		font-size: 14px;
+		font-weight: bold;
+		vertical-align: middle;
+	}
+	.juri-slip .signature { text-align: center; }
+	.juri-slip .signature-space { height: 42px; }
+	.juri-slip tr { page-break-inside: avoid; }
+</style>
+
+<div class="juri-slip">
+	<div class="section divider">
+		<table style="table-layout: fixed;">
+			<tr>
+				<td style="width: 33%;">
+					<div class="company">{{ doc.company | e }}</div>
+					<div class="confidential">PRIBADI &amp; RAHASIA</div>
+				</td>
+				<td style="width: 34%; vertical-align: middle; text-align: center;">
+					<div class="title">
+						SALARY SLIP<br>
+						<span style="font-size: 11px;">
+							PERIODE : {{ bulan[periode.month - 1] | upper }} {{ periode.year }}
+						</span>
+					</div>
+				</td>
+				<td style="width: 33%; text-align: right; vertical-align: middle;">
+					{% if logo %}<img src="{{ logo | e }}" class="logo">{% endif %}
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<div class="section divider">
+		<table>
+			<tr>
+				<td class="field-label" style="width: 15%;">NPK / NAMA</td>
+				<td class="colon">:</td>
+				<td style="width: 35%;">{{ (doc.employee_name or doc.employee) | upper | e }}</td>
+				<td class="field-label" style="width: 15%;">{{ "OUTLET" if outlet_name else "DIVISI / DEPT" }}</td>
+				<td class="colon">:</td>
+				<td>{{ (outlet_name or dept_name or "-") | e }}</td>
+			</tr>
+			<tr>
+				<td class="field-label">NIP</td>
+				<td class="colon">:</td>
+				<td>{{ (employee.employee_number or doc.employee) | e }}</td>
+				<td class="field-label">JABATAN</td>
+				<td class="colon">:</td>
+				<td>{{ (doc.designation or employee.designation or "-") | e }}</td>
+			</tr>
+		</table>
+	</div>
+
+	<div class="section divider">
+		<table style="margin-bottom: 10px;">
+			<tr>
+				<td class="field-label" style="width: 15%;">Hari Kerja</td>
+				<td class="colon">:</td>
+				<td style="width: 82%;">{{ frappe.format(hari_kerja or 0, {"fieldtype": "Float", "precision": 1}) }}</td>
+			</tr>
+		</table>
+		<table>
+			<tr>
+				<td style="width: 47%;">
+					<div class="heading">PENDAPATAN</div>
+					<table>
+						{% for row in doc.earnings %}
+						<tr>
+							<td>{{ row.salary_component | e }}</td>
+							<td class="colon">:</td>
+							<td class="qty">
+								{% if row.salary_component | lower == "upah lembur" and doc.jam_lembur %}
+									{% set ot_hrs = doc.jam_lembur | float %}
+									{{ (ot_hrs | int) if ot_hrs == (ot_hrs | int) else frappe.format(ot_hrs, {"fieldtype": "Float", "precision": 2}) }} JAM
+								{% endif %}
+							</td>
+							<td class="amount">{{ row.get_formatted("amount", doc) }}</td>
+						</tr>
+						{% endfor %}
+					</table>
+				</td>
+				<td class="spacer"></td>
+				<td style="width: 47%;">
+					<div class="heading">POTONGAN</div>
+					<table>
+						{% for row in doc.deductions %}
+						{% set comp_key = (row.salary_component or "") | lower %}
+						{% set qty_info = deduction_qty_map.get(comp_key) %}
+						<tr>
+							<td>{{ row.salary_component | e }}</td>
+							<td class="colon">:</td>
+							<td class="qty">
+								{% if qty_info and (qty_info[2] or qty_info[0]) %}
+									{% set qty_val = qty_info[0] | float %}
+									{{ (qty_val | int) if qty_val == (qty_val | int) else frappe.format(qty_val, {"fieldtype": "Float", "precision": 2}) }} {{ qty_info[1] }}
+								{% endif %}
+							</td>
+							<td class="amount">{{ row.get_formatted("amount", doc) }}</td>
+						</tr>
+						{% endfor %}
+					</table>
+				</td>
+			</tr>
+			<tr><td colspan="3" style="height: 10px;"></td></tr>
+			<tr>
+				<td>
+					<table class="total">
+						<tr>
+							<td>Jumlah Pendapatan</td>
+							<td class="colon">:</td>
+							<td class="amount">{{ doc.get_formatted("gross_pay") }}</td>
+						</tr>
+					</table>
+				</td>
+				<td class="spacer"></td>
+				<td>
+					<table class="total">
+						<tr>
+							<td>Jumlah Potongan</td>
+							<td class="colon">:</td>
+							<td class="amount">{{ doc.get_formatted("total_deduction") }}</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<div class="section">
+		<table>
+			<tr>
+				<td style="width: 40%; vertical-align: middle;">
+					<div class="heading">JUMLAH YANG DITERIMA</div>
+					<div class="take-home-box">
+						<table>
+							<tr>
+								<td style="width: 30px;">Rp</td>
+								<td style="text-align: right;">{{ frappe.format_value(doc.get(payable_field) or 0, {"fieldtype": "Float", "precision": 2}) }}</td>
+							</tr>
+						</table>
+					</div>
+				</td>
+				<td class="signature" style="width: 30%;">
+					&nbsp;<br>
+					Diterima,
+					<div class="signature-space"></div>
+					<b>{{ (doc.employee_name or doc.employee) | upper | e }}</b>
+				</td>
+				<td class="signature" style="width: 30%;">
+					{{ lokasi | e }}, {{ tanggal_cetak.day }} {{ bulan[tanggal_cetak.month - 1] }} {{ tanggal_cetak.year }}<br>
+					Diserahkan,
+					<div class="signature-space"></div>
+					<b>{{ penyerah | e }}</b>
+				</td>
+			</tr>
+		</table>
+	</div>
+</div>
