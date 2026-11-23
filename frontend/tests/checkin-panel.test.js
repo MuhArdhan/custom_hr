@@ -393,3 +393,21 @@ test("definitive validation error remains visible after the modal closes", async
 		assert.match(ui.text(), /GPS missing/); assert.equal(ui.nodes("modal").length, 0)
 	} finally { ui.unmount() }
 })
+
+test("early check-out lock keeps Check Out disabled without showing the opening time warning", async () => {
+	const ui = mount({
+		context: {
+			next_action: "OUT",
+			allowed: false,
+			reason: "checkout_not_open",
+			checkout_opens_at: "2026-10-15 16:15:00",
+			message: "Check-out baru bisa dilakukan mulai pukul 16:15.",
+		},
+	})
+	try {
+		await flush()
+		assert.doesNotMatch(ui.text(), /baru bisa dilakukan/)
+		await ui.click("Check Out")
+		assert.equal(ui.nodes("modal").length, 0)
+	} finally { ui.unmount() }
+})

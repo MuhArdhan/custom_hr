@@ -24,7 +24,7 @@
 				{{ __("The previous request is not confirmed. Check its status or retry the same action; do not start a new session.") }}
 				<span v-if="submission.pending.work_date" class="block">{{ __("Original attempt work date") }}: {{ submission.pending.work_date }}</span>
 			</p>
-			<p v-if="contextError || (!context?.allowed && context?.message && !(context.next_action === 'DONE' && context.reason === 'session_complete_or_expired'))" class="mt-3 text-sm text-orange-700" role="status">{{ contextError || context.message }}</p>
+			<p v-if="contextWarning" class="mt-3 text-sm text-orange-700" role="status">{{ contextWarning }}</p>
 			<p v-if="submitError" class="mt-2 text-sm text-red-600" role="alert">{{ submitError }}</p>
 			<Button class="mt-4 mb-1 py-5 text-base" :theme="action === 'OUT' ? 'red' : 'green'" variant="solid" :loading="opening || submission.busy" :disabled="!canOpen" @click="openCheckin">
 				<template #prefix><FeatherIcon :name="action === 'OUT' ? 'arrow-left-circle' : 'arrow-right-circle'" class="w-4" /></template>
@@ -132,6 +132,13 @@ const gpsAvailable = computed(() => hasCoordinates(latitude.value, longitude.val
 const mapUrl = computed(() => `https://maps.google.com/maps?q=${latitude.value},${longitude.value}&hl=en&z=15&output=embed`)
 const sameEmployee = computed(() => employee.data?.name === employeeName)
 const canOpen = computed(() => sameEmployee.value && online.value && !syncing.value && !opening.value && !submission.busy && choiceMade.value && (submission.pending?.uncertain || (context.value?.allowed && ["IN", "OUT"].includes(context.value.next_action))))
+const contextWarning = computed(() => {
+	if (contextError.value) return contextError.value
+	const c = context.value
+	if (!c || c.allowed || !c.message) return ""
+	if ((c.next_action === "DONE" && c.reason === "session_complete_or_expired") || (c.next_action === "OUT" && c.reason === "checkout_not_open")) return ""
+	return c.message
+})
 const canSubmit = computed(() => settings.data?.allow_employee_checkin_from_mobile_app && sameEmployee.value && online.value && !syncing.value && !!submission.pending && choiceMade.value && (submission.pending.uncertain || (context.value?.allowed && context.value.next_action === submission.pending.log_type)) && (!settings.data?.allow_geolocation_tracking || (gpsAvailable.value && locationValid.value && !locationChecking.value)) && (!useFace.value || !!capturedFace.value))
 
 const showRetry = computed(() => !submission.busy && !!(verifyError.value || submitError.value) && canSubmit.value)
