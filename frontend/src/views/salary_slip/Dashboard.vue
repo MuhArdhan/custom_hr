@@ -2,7 +2,7 @@
 	<BaseLayout :pageTitle="__('Salary Slips')">
 		<template #body>
 			<div class="flex flex-col items-center my-7 p-4">
-				<div class="flex flex-col w-full bg-white rounded py-5 px-3.5 gap-5">
+				<div v-if="(lastSalarySlip && lastSalarySlip.year_to_date) || payrollPeriods.data?.length" class="flex flex-col w-full bg-white rounded py-5 px-3.5 gap-5">
 					<div v-if="lastSalarySlip && lastSalarySlip.year_to_date" class="flex flex-col w-full gap-1.5">
 						<span class="text-gray-600 text-sm font-medium leading-5">
 							{{ __("Year To Date") }}
@@ -18,6 +18,7 @@
 					</div>
 
 					<Autocomplete
+						v-if="payrollPeriods.data?.length"
 						:label="__('Payroll Period')"
 						class="w-full"
 						:placeholder="__('Select Payroll Period')"
@@ -64,7 +65,7 @@ import SalarySlipItem from "@/components/SalarySlipItem.vue"
 
 import { formatCurrency } from "@/utils/formatters"
 
-let selectedPeriod = ref({})
+let selectedPeriod = ref(null)
 let periodsByName = ref({})
 
 const employee = inject("$employee")
@@ -90,7 +91,17 @@ const payrollPeriods = createListResource({
 		})
 	},
 	onSuccess: (data) => {
-		selectedPeriod.value = data[0]
+		if (data?.length) {
+			selectedPeriod.value = data[0]
+		} else {
+			selectedPeriod.value = null
+			delete documents.filters.start_date
+			documents.reload()
+		}
+	},
+	onError: () => {
+		delete documents.filters.start_date
+		documents.reload()
 	},
 })
 
@@ -124,10 +135,14 @@ watch(
 	() => selectedPeriod.value,
 	(value) => {
 		let period = periodsByName.value[value?.value]
-		documents.filters.start_date = [
-			"between",
-			[period?.start_date, period?.end_date],
-		]
+		if (period?.start_date && period?.end_date) {
+			documents.filters.start_date = [
+				"between",
+				[period.start_date, period.end_date],
+			]
+		} else {
+			delete documents.filters.start_date
+		}
 		documents.reload()
 	}
 )
