@@ -6,7 +6,7 @@ The dialog sends one company per request and shows the progress, including HRMS 
 
 import frappe
 from frappe import _
-from frappe.utils import strip_html
+from frappe.utils import cint, strip_html
 
 from custom_hr.api.payroll_input import period_bounds
 
@@ -106,6 +106,156 @@ def get_bulk_targets(month: str, mode: str) -> list[dict]:
 		return _create_targets(start, end)
 	_require("submit")
 	return _submit_targets(start, end)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_preflight(month: str) -> dict:
+	"""Audit period readiness before running bulk payroll: SSA coverage, accounts, pending approvals, queue state."""
+	_require("read")
+	start, end = period_bounds(month)
+	params = {"start": start, "end": end}
+
+	missing_ssa = frappe.db.sql(
+		"""
+		SELECT e.name, e.employee_name, e.company, e.department, e.date_of_joining
+		FROM `tabEmployee` e
+		WHERE (e.status = 'Active' OR e.relieving_date >= %(start)s)
+			AND (e.date_of_joining IS NULL OR e.date_of_joining <= %(end)s)
+			AND NOT EXISTS (
+				SELECT 1 FROM `tabSalary Structure Assignment` ssa
+				WHERE ssa.employee = e.name AND ssa.docstatus = 1 AND ssa.from_date <= %(end)s
+			)
+		ORDER BY e.company, e.employee_name
+		""",
+		params,
+		as_dict=True,
+	)
+
+	missing_payable = frappe.db.sql(
+		"""
+		SELECT ssa.name, ssa.employee, e.employee_name, ssa.company
+		FROM `tabSalary Structure Assignment` ssa
+		JOIN `tabEmployee` e ON e.name = ssa.employee
+		WHERE ssa.docstatus = 1 AND ssa.from_date <= %(end)s
+			AND (e.status = 'Active' OR e.relieving_date >= %(start)s)
+			AND (ssa.payroll_payable_account IS NULL OR ssa.payroll_payable_account = '')
+		ORDER BY ssa.company, e.employee_name
+		""",
+		params,
+		as_dict=True,
+	)
+
+	active_companies = sorted(
+		{
+			c
+			for c in frappe.db.sql_list(
+				"""
+				SELECT DISTINCT company FROM `tabEmployee`
+				WHERE company IS NOT NULL AND company != ''
+					AND (status = 'Active' OR relieving_date >= %(start)s)
+					AND (date_of_joining IS NULL OR date_of_joining <= %(end)s)
+				""",
+				params,
+			)
+		}
+	)
+	default_payable_num = (
+		frappe.db.get_single_value("Payroll Settings", "default_payroll_payable_account_number") or ""
+	).strip()
+	payable_companies = (
+		set(
+			frappe.get_all(
+				"Account",
+				filters={"account_number": default_payable_num, "company": ["in", active_companies or [""]], "is_group": 0},
+				pluck="company",
+			)
+		)
+		if default_payable_num and active_companies
+		else set(active_companies)
+	)
+	cost_center_by_company = {
+		c.name: c.cost_cente
+		for c in frappe.get_all("Company", filters={"name": ["in", active_companies or [""]]}, fields=["name", "cost_center"])
+	}
+	company_issues = []
+	for company in active_companies:
+		no_cc = not cost_center_by_company.get(company)
+		no_acc = bool(default_payable_num) and company not in payable_companies
+		if no_cc or no_acc:
+			company_issues.append(
+				{
+					"company": company,
+					"missing_cost_center": no_cc,
+					"missing_default_payable": no_acc,
+					"default_payable_number": default_payable_num,
+				}
+			)
+
+	pending_overtime = frappe.get_all(
+		"Overtime Request",
+		filters={"date": ["between", [start, end]], "status": ["not in", ["Disetujui", "Ditolak"]]},
+		fields=["name", "company", "date", "status", "planned_hours"],
+		order_by="date asc, company asc",
+	)
+	pending_leave = frappe.get_all(
+		"Leave Application",
+		filters={"docstatus": 0, "status": "Open", "from_date": ["<=", end], "to_date": [">=", start]},
+		fields=["name", "employee", "employee_name", "company", "leave_type", "from_date", "to_date"],
+		order_by="from_date asc, company asc",
+	)
+
+	ter_enabled = bool(cint(frappe.db.get_single_value("Payroll Settings", "enable_pph21_ter")))
+	ter_companies = (
+		frappe.get_all("HRM TER Company", filters={"parent": "Payroll Settings"}, pluck="company")
+		if ter_enabled
+		else []
+	)
+	ter_filter_sql = "AND e.company IN %(ter_companies)s" if (ter_enabled and ter_companies) else ""
+	ter_params = {**params, "ter_companies": tuple(ter_companies) or ("",)}
+	ter_gaps = frappe.db.sql(
+		f"""
+		SELECT e.name, e.employee_name, e.company,
+			(e.nik IS NULL OR e.nik = '') AS missing_nik,
+			(e.marital_status IS NULL OR e.marital_status = '') AS missing_marital
+		FROM `tabEmployee` e
+		WHERE (e.status = 'Active' OR e.relieving_date >= %(start)s)
+			AND (e.date_of_joining IS NULL OR e.date_of_joining <= %(end)s)
+			{ter_filter_sql}
+			AND ((e.nik IS NULL OR e.nik = '') OR (e.marital_status IS NULL OR e.marital_status = ''))
+		ORDER BY e.company, e.employee_name
+		""",
+		ter_params,
+		as_dict=True,
+	)
+
+	entry_issues = frappe.get_all(
+		"Payroll Entry",
+		filters={"start_date": start, "end_date": end, "docstatus": 1, "status": ["in", ["Queued", "Failed"]]},
+		fields=["name", "company", "status", "error_message"],
+		order_by="company asc",
+	)
+	for entry in entry_issues:
+		entry.error_message = strip_html(entry.error_message or "")
+
+	blockers_count = len(missing_ssa) + len(missing_payable) + len(company_issues) + sum(1 for e in entry_issues if e.status == "Failed")
+	warnings_count = len(pending_overtime) + len(pending_leave) + (len(ter_gaps) if ter_enabled else 0) + sum(1 for e in entry_issues if e.status == "Queued")
+
+	return {
+		"start_date": str(start),
+		"end_date": str(end),
+		"ready": blockers_count == 0,
+		"blockers_count": blockers_count,
+		"warnings_count": warnings_count,
+		"missing_ssa": missing_ssa,
+		"missing_payable": missing_payable,
+		"company_issues": company_issues,
+		"pending_overtime": pending_overtime,
+		"pending_leave": pending_leave,
+		"ter_enabled": ter_enabled,
+		"ter_gaps": ter_gaps if ter_enabled else [],
+		"ter_gaps_count": len(ter_gaps),
+		"entry_issues": entry_issues,
+	}
 
 
 @frappe.whitelist(methods=["POST"])

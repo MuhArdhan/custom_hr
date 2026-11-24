@@ -229,6 +229,220 @@ function open_bulk_payroll(mode, list_view) {
 	load(false);
 }
 
+function open_payroll_preflight() {
+	const esc = frappe.utils.escape_html;
+	const periods = bulk_payroll_periods();
+	bulk_payroll_style();
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("Preflight"),
+		size: "large",
+		fields: [
+			{ fieldname: "month", fieldtype: "Select", label: __("Period"), options: periods, default: periods[1].value, change: () => load() },
+			{ fieldname: "col", fieldtype: "Column Break" },
+			{ fieldname: "search", fieldtype: "Data", label: __("Filter"), placeholder: __("Filter nama / company...") },
+			{ fieldname: "sec", fieldtype: "Section Break", hide_border: 1 },
+			{ fieldname: "body", fieldtype: "HTML" },
+		],
+		primary_action_label: __("Refresh"),
+		primary_action: () => load(),
+	});
+	const $body = dialog.fields_dict.body.$wrapper;
+	const month = () => dialog.get_value("month") || periods[1].value;
+	dialog.fields_dict.search.$input.on("input", () => apply_filter());
+
+	function pill(color, text) {
+		return `<span class="es-badge" data-theme="${esc(color)}">${esc(text)}</span>`;
+	}
+
+	function section(title, color, rows, headers, render_cells, open_default) {
+		if (!rows.length) return "";
+		const head = headers.map((h) => `<th>${esc(h)}</th>`).join("");
+		const body = rows
+			.map((r) => {
+				const cells = render_cells(r);
+				return `<tr class="pf-row" data-search="${esc(cells.text_key || "")}">${cells.html}</tr>`;
+			})
+			.join("");
+		const icon = frappe.utils.icon ? frappe.utils.icon("small-down", "xs") : "";
+		return `
+			<details class="pf-sec"${open_default ? " open" : ""}>
+				<summary>
+					<span class="pf-sec-title"><span class="pf-caret">${icon}</span>${esc(title)}</span>
+					${pill(color, String(rows.length))}
+				</summary>
+				<div class="pf-wrap">
+					<table class="table table-bordered table-condensed pf-tbl">
+						<thead><tr>${head}</tr></thead>
+						<tbody>${body}</tbody>
+					</table>
+				</div>
+			</details>`;
+	}
+
+	function apply_filter() {
+		const q = (dialog.get_value("search") || "").trim().toLowerCase();
+		$body.find(".pf-row").each((_, tr) => {
+			$(tr).toggle(!q || (tr.dataset.search || "").includes(q));
+		});
+	}
+
+	async function load() {
+		const period = month();
+		$body.html(`<div class="text-muted text-center" style="padding:20px;">${__("Loading...")}</div>`);
+		const { message: d } = await frappe.call({
+			method: "custom_hr.api.payroll_bulk.get_preflight",
+			type: "GET",
+			args: { month: period },
+		});
+		if (month() !== period || !d) return;
+		dialog.set_df_property(
+			"month",
+			"description",
+			`${frappe.datetime.str_to_user(d.start_date)} – ${frappe.datetime.str_to_user(d.end_date)}`
+		);
+
+		const failed_entries = d.entry_issues.filter((e) => e.status === "Failed").length;
+		const pending_count = d.pending_overtime.length + d.pending_leave.length;
+		const state_color = !d.ready ? "red" : d.warnings_count ? "orange" : "green";
+		const state_label = !d.ready ? __("Belum Siap") : d.warnings_count ? __("Siap dengan Catatan") : __("Siap");
+
+		const passed = [
+			!d.missing_ssa.length ? __("SSA Karyawan") : "",
+			!d.missing_payable.length ? __("Payable Account SSA") : "",
+			!d.company_issues.length ? __("Company & CoA") : "",
+			!d.entry_issues.length ? __("Payroll Entry") : "",
+			!d.pending_overtime.length ? __("Lembur") : "",
+			!d.pending_leave.length ? __("Cuti/Izin") : "",
+		].filter(Boolean);
+
+		const html = [
+			`<div class="pf-head-line">
+				${pill(state_color, state_label)}
+				<span>${__("Blocker: {0} · Pending Approval: {1} · PPh 21 TER: {2}", [
+					d.blockers_count,
+					pending_count,
+					d.ter_enabled ? __("Aktif") : __("Off ({0} belum lengkap NIK/Marital)", [d.ter_gaps_count]),
+				])}</span>
+			</div>`,
+
+			section(
+				__("Karyawan Aktif Belum Punya SSA"),
+				"red",
+				d.missing_ssa,
+				[__("Karyawan"), __("Company"), __("Department")],
+				(r) => ({
+					text_key: `${r.name} ${r.employee_name || ""} ${r.company || ""} ${r.department || ""}`.toLowerCase(),
+					html: `<td><a href="/app/employee/${encodeURIComponent(r.name)}" target="_blank">${esc(r.employee_name || r.name)}</a> <span class="text-muted">(${esc(r.name)})</span></td>
+						<td>${esc(r.company || "-")}</td>
+						<td>${esc(r.department || "-")}</td>`,
+				}),
+				true
+			),
+
+			section(
+				__("SSA Belum Punya Payroll Payable Account"),
+				"red",
+				d.missing_payable,
+				[__("SSA"), __("Karyawan"), __("Company")],
+				(r) => ({
+					text_key: `${r.name} ${r.employee || ""} ${r.employee_name || ""} ${r.company || ""}`.toLowerCase(),
+					html: `<td><a href="/app/salary-structure-assignment/${encodeURIComponent(r.name)}" target="_blank">${esc(r.name)}</a></td>
+						<td>${esc(r.employee_name || r.employee)}</td>
+						<td>${esc(r.company || "-")}</td>`,
+				}),
+				true
+			),
+
+			section(
+				__("Company Belum Lengkap Cost Center / Akun Default"),
+				"red",
+				d.company_issues,
+				[__("Company"), __("Kendala")],
+				(r) => ({
+					text_key: `${r.company}`.toLowerCase(),
+					html: `<td><a href="/app/company/${encodeURIComponent(r.company)}" target="_blank">${esc(r.company)}</a></td>
+						<td>${esc([
+							r.missing_cost_center ? __("Cost Center kosong") : "",
+							r.missing_default_payable ? __("Akun {0} tidak ada", [r.default_payable_number]) : "",
+						].filter(Boolean).join(", "))}</td>`,
+				}),
+				true
+			),
+
+			section(
+				__("Payroll Entry Queued / Failed"),
+				failed_entries ? "red" : "blue",
+				d.entry_issues,
+				[__("Payroll Entry"), __("Company"), __("Status"), __("Keterangan")],
+				(r) => ({
+					text_key: `${r.name} ${r.company || ""} ${r.status || ""}`.toLowerCase(),
+					html: `<td><a href="/app/payroll-entry/${encodeURIComponent(r.name)}" target="_blank">${esc(r.name)}</a></td>
+						<td>${esc(r.company || "-")}</td>
+						<td>${pill(r.status === "Queued" ? "blue" : "red", r.status)}</td>
+						<td class="text-muted">${esc(r.error_message || "-")}</td>`,
+				}),
+				true
+			),
+
+			section(
+				__("Overtime Request Belum Final"),
+				"orange",
+				d.pending_overtime,
+				[__("Dokumen"), __("Company"), __("Tanggal"), __("Status")],
+				(r) => ({
+					text_key: `${r.name} ${r.company || ""} ${r.status || ""}`.toLowerCase(),
+					html: `<td><a href="/app/overtime-request/${encodeURIComponent(r.name)}" target="_blank">${esc(r.name)}</a></td>
+						<td>${esc(r.company || "-")}</td>
+						<td>${esc(r.date ? frappe.datetime.str_to_user(r.date) : "-")}</td>
+						<td>${esc(r.status)}</td>`,
+				}),
+				false
+			),
+
+			section(
+				__("Leave Application Masih Open"),
+				"orange",
+				d.pending_leave,
+				[__("Karyawan"), __("Company"), __("Jenis"), __("Periode")],
+				(r) => ({
+					text_key: `${r.name} ${r.employee || ""} ${r.employee_name || ""} ${r.company || ""}`.toLowerCase(),
+					html: `<td><a href="/app/leave-application/${encodeURIComponent(r.name)}" target="_blank">${esc(r.employee_name || r.employee)}</a></td>
+						<td>${esc(r.company || "-")}</td>
+						<td>${esc(r.leave_type || "-")}</td>
+						<td>${esc(`${frappe.datetime.str_to_user(r.from_date)} – ${frappe.datetime.str_to_user(r.to_date)}`)}</td>`,
+				}),
+				false
+			),
+
+			d.ter_enabled
+				? section(
+					__("Data PPh 21 TER Belum Lengkap (NIK / Marital Status)"),
+					"orange",
+					d.ter_gaps,
+					[__("Karyawan"), __("Company"), __("Kosong")],
+					(r) => ({
+						text_key: `${r.name} ${r.employee_name || ""} ${r.company || ""}`.toLowerCase(),
+						html: `<td><a href="/app/employee/${encodeURIComponent(r.name)}" target="_blank">${esc(r.employee_name || r.name)}</a></td>
+							<td>${esc(r.company || "-")}</td>
+							<td>${esc([r.missing_nik ? "NIK" : "", r.missing_marital ? "Marital Status" : ""].filter(Boolean).join(", "))}</td>`,
+					}),
+					false
+				)
+				: "",
+
+			passed.length
+				? `<div class="pf-ok-line text-muted small">&#10003; ${__("Sudah aman")}: ${esc(passed.join(" · "))}</div>`
+				: "",
+		];
+		$body.html(html.join(""));
+		apply_filter();
+	}
+
+	dialog.show();
+	load();
+}
+
 function bulk_payroll_style() {
 	if (document.getElementById("bulk-payroll-style")) return;
 	$("<style id='bulk-payroll-style'>").text(`
@@ -255,5 +469,18 @@ function bulk_payroll_style() {
 		.bp-blocked .bp-row { cursor: default; padding-left: 12px; }
 		.bp-summary { margin-top: 12px; font-weight: 600; }
 		.bp-empty { padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: var(--border-radius-md, 8px); }
+		.pf-head-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+		.pf-sec { margin-bottom: 10px; }
+		.pf-sec summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 8px; border-radius: var(--border-radius-sm, 6px); display: flex; align-items: center; justify-content: space-between; gap: 10px; list-style: none; }
+		.pf-sec summary::-webkit-details-marker { display: none; }
+		.pf-sec summary:hover { background: var(--subtle-fg); }
+		.pf-sec-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+		.pf-caret { display: inline-flex; color: var(--text-muted); transition: transform 0.15s ease; }
+		.pf-sec:not([open]) .pf-caret { transform: rotate(-90deg); }
+		.pf-wrap { max-height: 220px; overflow: auto; margin-top: 4px; }
+		.pf-tbl { margin: 0; font-size: 12.5px; }
+		.pf-tbl thead th { background: var(--subtle-fg); color: var(--text-muted); font-size: 11px; font-weight: 600; position: sticky; top: 0; }
+		.pf-tbl td, .pf-tbl th { padding: 6px 10px; vertical-align: middle; }
+		.pf-ok-line { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
 	`).appendTo("head");
 }
