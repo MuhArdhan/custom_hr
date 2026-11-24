@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "marital_status",
+  "dependents",
+  "ptkp_code",
+  "ter_category"
+ ],
+ "fields": [
+  {
+   "fieldname": "marital_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Marital Status",
+   "options": "\nSingle\nMarried\nDivorced\nWidowed",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "dependents",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Dependents",
+   "options": "0\n1\n2\n3",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ptkp_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Kode PTKP",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ter_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kategori TER",
+   "options": "TER A\nTER B\nTER C",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM PTKP TER Map",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

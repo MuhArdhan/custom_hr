@@ -31,3 +31,5 @@ custom_hr.patches.fill_shift_overtime_marker
 custom_hr.patches.move_hrm_payroll_settings
 custom_hr.patches.move_designation_allowances
 custom_hr.patches.seed_component_accounts
+custom_hr.patches.enable_tax_applicable_on_earnings
+custom_hr.patches.add_payroll_pph21_report_link

@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "kode",
+  "persen",
+  "batas_atas"
+ ],
+ "fields": [
+  {
+   "description": "Contoh: jkk, jkm, bpjs_kesehatan_perusahaan.",
+   "fieldname": "kode",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Komponen",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "persen",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Persen (%)",
+   "precision": "4",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Isi 0 jika tanpa batas atas dasar perhitungan.",
+   "fieldname": "batas_atas",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Batas Atas Gaji"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM TER Employer BPJS",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "ter_category",
+  "min_bruto",
+  "max_bruto",
+  "rate_percent"
+ ],
+ "fields": [
+  {
+   "fieldname": "ter_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kategori TER",
+   "options": "TER A\nTER B\nTER C",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "min_bruto",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Bruto Minimum",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Isi 0 untuk lapisan teratas (tanpa batas atas).",
+   "fieldname": "max_bruto",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Bruto Maksimum"
+  },
+  {
+   "default": "0",
+   "fieldname": "rate_percent",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Tarif (%)",
+   "precision": "4",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "HRM TER Rate",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

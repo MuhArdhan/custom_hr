@@ -10,8 +10,15 @@ after_install = [
 	"custom_hr.patches.remove_legacy_leave_approval_fields.execute",
 	"custom_hr.patches.add_leave_calendar_sidebar.execute",
 ]
-after_migrate = "custom_hr.patches.add_leave_calendar_sidebar.execute"
-after_sync = "custom_hr.install.set_default_overtime_component"
+after_migrate = [
+	"custom_hr.patches.add_leave_calendar_sidebar.execute",
+	"custom_hr.services.pph21_ter_seed.seed_defaults",
+	"custom_hr.services.attendance_overtime.sync_existing_attendances",
+]
+after_sync = [
+	"custom_hr.install.set_default_overtime_component",
+	"custom_hr.services.pph21_ter_seed.seed_defaults",
+]
 
 scheduler_events = {
 	"daily": [
@@ -120,7 +127,13 @@ doc_events = {
 		"validate": [
 			"custom_hr.services.attendance_duration.fill_durations",
 			"custom_hr.services.hourly_leave.fill_attendance_izin",
+			"custom_hr.services.attendance_overtime.fill_attendance_overtime",
 		],
+		"on_update_after_submit": "custom_hr.services.attendance_overtime.fill_attendance_overtime",
+	},
+	"Overtime Request": {
+		"on_update": "custom_hr.services.attendance_overtime.stamp_request_attendances",
+		"on_trash": "custom_hr.services.attendance_overtime.clear_request_attendances",
 	},
 	"Employee": {
 		"validate": "custom_hr.services.employee_outlet.fill_outlet",
@@ -146,7 +159,10 @@ doc_events = {
 		"before_validate": "custom_hr.services.payroll_penalties.fill_attendance_penalties",
 	},
 	"Payroll Settings": {
-		"validate": "custom_hr.services.payroll_settings.validate",
+		"validate": [
+			"custom_hr.services.payroll_settings.validate",
+			"custom_hr.services.pph21_ter.validate_settings",
+		],
 		"on_update": "custom_hr.services.component_accounts.on_settings_update",
 	},
 	"Shift Location": {
@@ -260,6 +276,9 @@ fixtures = [
 					"Leave Application-to_time",
 					"Leave Application-jam_izin",
 					"Attendance-jam_izin",
+					"Attendance-overtime_request",
+					"Attendance-approved_overtime_hours",
+					"Attendance-paid_overtime_hours",
 					"Salary Slip-attendance_penalty_column",
 					"Salary Slip-tarif_telat",
 					"Salary Slip-tarif_pulang_cepat",
@@ -305,6 +324,16 @@ fixtures = [
 					"HR Settings-face_match_threshold",
 					"HR Settings-face_enroll_samples",
 					"HR Settings-grooming_deadline_minutes",
+					"Employee-dependents",
+					"Employee-nik",
+					"Payroll Settings-pph21_ter_section",
+					"Payroll Settings-enable_pph21_ter",
+					"Payroll Settings-pph21_ter_companies",
+					"Payroll Settings-pph21_ptkp_map",
+					"Payroll Settings-pph21_employer_bpjs",
+					"Payroll Settings-pph21_ter_rates",
+					"Salary Slip-dasar_bruto_pph21",
+					"Salary Slip-tarif_ter_pph21",
 				],
 			]
 		],
