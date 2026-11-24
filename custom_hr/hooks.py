@@ -163,6 +163,13 @@ doc_events = {
 	"Salary Structure Assignment": {
 		"before_validate": "custom_hr.services.payroll_payable.fill_payable_account",
 	},
+	"Salary Structure": {
+		"validate": "custom_hr.services.salary_structure_template.validate_template",
+		"on_update_after_submit": "custom_hr.services.salary_structure_template.validate_template",
+	},
+	"Outlet": {
+		"after_insert": "custom_hr.services.salary_structure_template.on_outlet_insert",
+	},
 	"Payroll Settings": {
 		"validate": [
 			"custom_hr.services.payroll_settings.validate",
@@ -342,6 +349,9 @@ fixtures = [
 					"Payroll Settings-pph21_ter_rates",
 					"Salary Slip-dasar_bruto_pph21",
 					"Salary Slip-tarif_ter_pph21",
+					"Salary Structure-is_master_template",
+					"Salary Structure-template_prefix",
+					"Salary Structure-source_template",
 					"Overtime Type-disabled",
 				],
 			]

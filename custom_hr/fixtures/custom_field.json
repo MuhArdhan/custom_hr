@@ -2311,5 +2311,48 @@
   "in_list_view": 1,
   "in_standard_filter": 1,
   "description": "Jika dicentang, jenis lembur ini disembunyikan dari aplikasi kru dan Overtime Request baru tanpa menghapus riwayat transaksi lama."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure",
+  "name": "Salary Structure-is_master_template",
+  "fieldname": "is_master_template",
+  "fieldtype": "Check",
+  "label": "Template Master",
+  "default": "0",
+  "insert_after": "is_default",
+  "allow_on_submit": 1,
+  "in_list_view": 1,
+  "in_standard_filter": 1,
+  "module": "HRM",
+  "description": "Tandai sebagai struktur gaji master. Otomatis dibuatkan saat outlet baru ditambahkan dan bisa disinkronkan ke struktur cabang."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure",
+  "name": "Salary Structure-template_prefix",
+  "fieldname": "template_prefix",
+  "fieldtype": "Data",
+  "label": "Awalan Nama per Company",
+  "insert_after": "is_master_template",
+  "allow_on_submit": 1,
+  "depends_on": "eval:doc.is_master_template",
+  "module": "HRM",
+  "description": "Contoh: 'Gaji Outlet' akan menjadi 'Gaji Outlet - <Nama Company>'. Kosongkan untuk memakai teks sebelum ' - ' pada nama struktur ini."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure",
+  "name": "Salary Structure-source_template",
+  "fieldname": "source_template",
+  "fieldtype": "Link",
+  "label": "Dari Template Master",
+  "options": "Salary Structure",
+  "insert_after": "template_prefix",
+  "allow_on_submit": 1,
+  "read_only": 1,
+  "no_copy": 1,
+  "module": "HRM",
+  "description": "Template master asal struktur gaji ini."
  }
 ]
