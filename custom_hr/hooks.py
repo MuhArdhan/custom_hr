@@ -334,6 +334,7 @@ fixtures = [
 					"Payroll Settings-pph21_ter_rates",
 					"Salary Slip-dasar_bruto_pph21",
 					"Salary Slip-tarif_ter_pph21",
+					"Overtime Type-disabled",
 				],
 			]
 		],

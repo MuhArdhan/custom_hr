@@ -16,10 +16,11 @@ PREFERRED_OVERTIME_TYPE = "Lembur"
 
 
 def overtime_marker() -> str | None:
-	"""The Overtime Type stamped on an overtime-allowing shift: Lembur, else the first one there is."""
-	if frappe.db.exists("Overtime Type", PREFERRED_OVERTIME_TYPE):
+	"""The Overtime Type stamped on an overtime-allowing shift: Lembur, else the first active one there is."""
+	names = frappe.get_all("Overtime Type", filters={"disabled": 0}, pluck="name", order_by="name asc")
+	if PREFERRED_OVERTIME_TYPE in names:
 		return PREFERRED_OVERTIME_TYPE
-	return (frappe.get_all("Overtime Type", pluck="name", order_by="name asc", limit=1) or [None])[0]
+	return names[0] if names else None
 
 
 class CustomShiftType(BaseShiftType):

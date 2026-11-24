@@ -67,6 +67,7 @@ class OvertimeRequest(Document):
 		self.fetch_outlet_details()
 		self.keep_recorded_approvers()
 		self.validate_editable()
+		self.validate_overtime_type()
 		self.validate_times()
 		self.validate_employees()
 		self.validate_no_duplicate()
@@ -176,6 +177,14 @@ class OvertimeRequest(Document):
 			roles = frappe.get_roles()
 			if "System Manager" not in roles:
 				frappe.throw(_("Pengajuan {0} sudah {1} dan tidak dapat diubah").format(self.name, db_status))
+
+	def validate_overtime_type(self):
+		if not self.overtime_type:
+			return
+		if not (self.is_new() or self.has_value_changed("overtime_type")):
+			return
+		if frappe.db.get_value("Overtime Type", self.overtime_type, "disabled") == 1:
+			frappe.throw(_("Jenis lembur {0} sedang nonaktif dan tidak dapat dipilih lagi.").format(self.overtime_type))
 
 	def validate_times(self):
 		if not self.start_time or not self.end_time:

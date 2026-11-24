@@ -190,3 +190,39 @@ class TestCheckinShift(unittest.TestCase):
 			("Overtime List", {"overtime_request": "OT-SAME-DAY", "employee": "EMP-1"}, "shift", "Pagi"),  # an approved row follows
 		])
 		self.assertEqual(listing.call_args_list[0].kwargs["filters"]["shift"], ["is", "not set"])  # a shift already set is kept
+
+
+class TestOvertimeTypeDisabled(unittest.TestCase):
+	def test_get_my_overtime_filters_out_disabled_types(self):
+		types = [frappe._dict(name="Lembur Outlet", max_hours=8.0)]
+		with (
+			patch("custom_hr.api.my_overtime.get_current_employee", return_value="EMP-1"),
+			patch("custom_hr.api.my_overtime.nowdate", return_value="2026-10-26"),
+			patch("frappe.get_all", side_effect=lambda doctype, **k: types if doctype == "Overtime Type" else []) as listing,
+		):
+			state = my_overtime.get_my_overtime()
+		ot_call = next(c for c in listing.call_args_list if c.args[0] == "Overtime Type")
+		self.assertEqual(ot_call.kwargs["filters"], {"disabled": 0})
+		self.assertEqual(state["default_overtime_type"], "Lembur Outlet")
+
+	def test_submit_my_overtime_blocks_disabled_type(self):
+		with (
+			patch("custom_hr.api.my_overtime.get_current_employee", return_value="EMP-1"),
+			patch("frappe.db.exists", return_value=True),
+			patch("frappe.db.get_value", return_value=1),
+		):
+			with self.assertRaisesRegex(frappe.ValidationError, "nonaktif"):
+				my_overtime.submit_my_overtime("17:00", "19:00", "stok opname", overtime_type="Lembur JKT")
+
+	def test_overtime_request_blocks_newly_chosen_disabled_type_only(self):
+		doc = frappe.new_doc("Overtime Request")
+		doc.overtime_type = "Lembur JKT"
+		with patch("frappe.db.get_value", return_value=1):
+			with self.assertRaisesRegex(frappe.ValidationError, "nonaktif"):
+				doc.validate_overtime_type()
+		existing = frappe.new_doc("Overtime Request")
+		existing.name = "OT-OLD"
+		existing.flags.in_insert = False
+		existing.overtime_type = "Lembur JKT"
+		with patch.object(existing, "is_new", return_value=False), patch.object(existing, "has_value_changed", return_value=False):
+			existing.validate_overtime_type()  # historical request keeps its old type without error

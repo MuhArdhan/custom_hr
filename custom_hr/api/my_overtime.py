@@ -47,7 +47,12 @@ def get_my_overtime() -> dict:
 			"doctype": "Overtime Request", "name": doc.name, "creation": str(doc.creation), "date": str(doc.date), "overtime_type": doc.overtime_type, "start_time": str(doc.start_time), "end_time": str(doc.end_time),
 			"planned_hours": doc.planned_hours, "reason": doc.reason, "status": status, "waiting_for": waiting_for(doc, status), "can_cancel": _can_cancel(doc, employee),
 		})
-	types = frappe.get_all("Overtime Type", fields=["name", "maximum_overtime_hours_allowed as max_hours"], order_by="name asc")
+	types = frappe.get_all(
+		"Overtime Type",
+		filters={"disabled": 0},
+		fields=["name", "maximum_overtime_hours_allowed as max_hours"],
+		order_by="name asc",
+	)
 	names = [row.name for row in types]
 	return {
 		"date": nowdate(), "history": history,
@@ -65,6 +70,8 @@ def submit_my_overtime(start_time, end_time, reason, overtime_type=None) -> dict
 	overtime_type = overtime_type or DEFAULT_OVERTIME_TYPE
 	if not isinstance(overtime_type, str) or not frappe.db.exists("Overtime Type", overtime_type):
 		frappe.throw(_("Jenis lembur tidak ditemukan. Pilih jenis lembur yang tersedia."))
+	if frappe.db.get_value("Overtime Type", overtime_type, "disabled") == 1:
+		frappe.throw(_("Jenis lembur {0} sedang nonaktif. Pilih jenis lembur yang tersedia.").format(overtime_type))
 
 	info = frappe.db.get_value("Employee", employee, ["outlet", "company"], as_dict=True)
 	doc = frappe.get_doc({

@@ -22,6 +22,7 @@ frappe.ui.form.on("Overtime Request", {
 			if (frappe.user.has_role(["HR Manager", "HR User", "System Manager"])) return {};
 			return { filters: { name: ["in", frm._allowed_outlets] } };
 		});
+		frm.set_query("overtime_type", () => ({ filters: { disabled: 0 } }));
 		frm.set_query("employee", "employees", () => {
 			const filters = { status: "Active" };
 			if (frm.doc.company) {
@@ -32,7 +33,11 @@ frappe.ui.form.on("Overtime Request", {
 	},
 	onload(frm) {
 		if (frm.is_new() && !frm.doc.overtime_type) {
-			frm.set_value("overtime_type", "Lembur");
+			frappe.db.get_value("Overtime Type", "Lembur", ["name", "disabled"], (r) => {
+				if (r && !r.disabled && !frm.doc.overtime_type) {
+					frm.set_value("overtime_type", "Lembur");
+				}
+			});
 		}
 	},
 	refresh(frm) {

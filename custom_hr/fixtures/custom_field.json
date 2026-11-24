@@ -2263,5 +2263,19 @@
   "read_only": 1,
   "no_copy": 1,
   "print_hide": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Overtime Type",
+  "name": "Overtime Type-disabled",
+  "fieldname": "disabled",
+  "fieldtype": "Check",
+  "label": "Nonaktif",
+  "default": "0",
+  "insert_after": "maximum_overtime_hours_allowed",
+  "module": "HRM",
+  "in_list_view": 1,
+  "in_standard_filter": 1,
+  "description": "Jika dicentang, jenis lembur ini disembunyikan dari aplikasi kru dan Overtime Request baru tanpa menghapus riwayat transaksi lama."
  }
 ]
