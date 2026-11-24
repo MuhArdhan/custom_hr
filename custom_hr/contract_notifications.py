@@ -341,3 +341,59 @@ def send_contract_expiry_reminders():
 		else:
 			result["queued"] += 1
 	return result
+
+
+def collect_expiring_contracts(employees, today=None, max_days=30):
+	"""Return active employees whose contract ended or ends within max_days, sorted most urgent first."""
+	today = getdate(today)
+	rows = []
+	overdue_count = 0
+	expiring_count = 0
+	for emp in employees or ():
+		end_date = emp.get("contract_end_date")
+		if not end_date:
+			continue
+		end_date = getdate(end_date)
+		days_left = date_diff(end_date, today)
+		if days_left > max_days:
+			continue
+		if days_left < 0:
+			overdue_count += 1
+		else:
+			expiring_count += 1
+		rows.append(
+			{
+				"employee": emp.get("name"),
+				"employee_name": emp.get("employee_name"),
+				"company": emp.get("company"),
+				"department": emp.get("department"),
+				"contract_end_date": end_date.isoformat(),
+				"days_left": days_left,
+				"overdue": days_left < 0,
+			}
+		)
+	rows.sort(key=lambda r: (r["days_left"], r["company"] or "", r["employee_name"] or "", r["employee"] or ""))
+	return {"overdue_count": overdue_count, "expiring_count": expiring_count, "rows": rows}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_expiring_contracts_popup():
+	"""Contracts overdue or ending soon for the HR Desk workspace popup."""
+	if not set(frappe.get_roles()) & {"HR Manager", "HR User"}:
+		return {"rows": [], "overdue_count": 0, "expiring_count": 0, "max_days": 0}
+	settings = frappe.get_single(SETTINGS)
+	try:
+		reminder_days = parse_reminder_days(settings.reminder_days)
+		max_days = max(reminder_days) if reminder_days else 30
+	except Exception:
+		max_days = 30
+	today = getdate()
+	cutoff = frappe.utils.add_days(today, max_days)
+	employees = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "contract_end_date": ["between", ["1900-01-01", cutoff]]},
+		fields=["name", "employee_name", "company", "department", "contract_end_date"],
+		ignore_permissions=True,
+	)
+	summary = collect_expiring_contracts(employees, today=today, max_days=max_days)
+	return {"today": today.isoformat(), "max_days": max_days, **summary}

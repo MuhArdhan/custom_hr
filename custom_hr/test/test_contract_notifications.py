@@ -409,3 +409,25 @@ class TestContractNotifications(unittest.TestCase):
 					return_value="https://hr.company.com/desk/employee/EMP-1"):
 					self.assertEqual(notifications.get_employee_email_url("EMP-1"),
 						"https://hr.company.com/desk/employee/EMP-1")
+
+
+class TestContractExpiryPopup(unittest.TestCase):
+	def test_collect_expiring_contracts_sorts_overdue_first_and_respects_max_days(self):
+		employees = [
+			{"name": "EMP-SOON", "employee_name": "Budi", "company": "ROPI", "contract_end_date": "2026-12-05"},
+			{"name": "EMP-LATE", "employee_name": "Andi", "company": "ROPI", "contract_end_date": "2026-11-20"},
+			{"name": "EMP-TODAY", "employee_name": "Cici", "company": "ROPI", "contract_end_date": "2026-11-24"},
+			{"name": "EMP-FAR", "employee_name": "Dedi", "company": "ROPI", "contract_end_date": "2027-01-10"},
+			{"name": "EMP-NONE", "employee_name": "Eka", "company": "ROPI", "contract_end_date": None},
+		]
+		res = notifications.collect_expiring_contracts(employees, today="2026-11-24", max_days=30)
+		self.assertEqual((res["overdue_count"], res["expiring_count"]), (1, 2))
+		self.assertEqual([r["employee"] for r in res["rows"]], ["EMP-LATE", "EMP-TODAY", "EMP-SOON"])
+		self.assertEqual([r["days_left"] for r in res["rows"]], [-4, 0, 11])
+		self.assertTrue(res["rows"][0]["overdue"])
+		self.assertFalse(res["rows"][1]["overdue"])
+
+	def test_get_expiring_contracts_popup_requires_hr_role(self):
+		with patch.object(frappe, "get_roles", return_value=["Employee"]):
+			res = notifications.get_expiring_contracts_popup()
+		self.assertEqual(res["rows"], [])
