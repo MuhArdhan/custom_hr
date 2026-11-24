@@ -13,6 +13,7 @@ after_install = [
 after_migrate = [
 	"custom_hr.patches.add_leave_calendar_sidebar.execute",
 	"custom_hr.services.pph21_ter_seed.seed_defaults",
+	"custom_hr.services.payroll_payable.seed_default_payable_account_number",
 	"custom_hr.services.attendance_overtime.sync_existing_attendances",
 ]
 after_sync = [
@@ -61,6 +62,7 @@ doctype_js = {
 	"Overtime Request": "public/js/overtime_request.js",
 	"Payroll Entry": "public/js/payroll_entry_match.js",
 	"Salary Structure": "public/js/salary_structure.js",
+	"Salary Structure Assignment": "public/js/salary_structure_assignment.js",
 	"Shift Location": "public/js/shift_location.js",
 }
 
@@ -157,6 +159,9 @@ doc_events = {
 	},
 	"Salary Slip": {
 		"before_validate": "custom_hr.services.payroll_penalties.fill_attendance_penalties",
+	},
+	"Salary Structure Assignment": {
+		"before_validate": "custom_hr.services.payroll_payable.fill_payable_account",
 	},
 	"Payroll Settings": {
 		"validate": [
@@ -326,6 +331,7 @@ fixtures = [
 					"HR Settings-grooming_deadline_minutes",
 					"Employee-dependents",
 					"Employee-nik",
+					"Payroll Settings-default_payroll_payable_account_number",
 					"Payroll Settings-pph21_ter_section",
 					"Payroll Settings-enable_pph21_ter",
 					"Payroll Settings-pph21_ter_companies",
