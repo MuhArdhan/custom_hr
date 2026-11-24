@@ -11,5 +11,7 @@ class TestPayrollBulkBlocker(unittest.TestCase):
 
 	def test_each_reason_in_order(self):
 		self.assertEqual(blocker(KEY, {KEY}, None, None), "Already created")
+		self.assertEqual(blocker(KEY, {KEY: "Queued"}, None, None), "Queued in background")
+		self.assertEqual(blocker(KEY, {KEY: "Failed"}, None, None), "Last run failed")
 		self.assertEqual(blocker(("Company A", None), set(), None, "Main - OA"), "No payroll payable account on the Salary Structure Assignment")
 		self.assertEqual(blocker(KEY, set(), KEY[1], None), "The company has no default Cost Center")

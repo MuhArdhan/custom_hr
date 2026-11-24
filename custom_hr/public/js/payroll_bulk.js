@@ -21,13 +21,21 @@ function open_bulk_payroll(mode, list_view) {
 	const money = (value) => format_currency(value || 0, frappe.boot.sysdefaults.currency, 0);
 	let selected = new Set();
 	let rows = [];
+	let poll_timer = null;
+
+	function clear_poll() {
+		if (poll_timer) {
+			clearTimeout(poll_timer);
+			poll_timer = null;
+		}
+	}
 
 	bulk_payroll_style();
 	const dialog = new frappe.ui.Dialog({
 		title: create ? __("Bulk Create Payroll Entry") : __("Bulk Submit Salary Slip"),
 		size: "large",
 		fields: [
-			{ fieldname: "month", fieldtype: "Select", label: __("Period"), options: periods, default: periods[1].value, change: () => load() },
+			{ fieldname: "month", fieldtype: "Select", label: __("Period"), options: periods, default: periods[1].value, change: () => load(false) },
 			{ fieldname: "col", fieldtype: "Column Break" },
 			{ fieldname: "search", fieldtype: "Data", label: __("Search Company"), placeholder: __("Type a company name") },
 			{ fieldname: "sec", fieldtype: "Section Break" },
@@ -36,6 +44,7 @@ function open_bulk_payroll(mode, list_view) {
 		primary_action_label: action,
 		primary_action: run,
 	});
+	dialog.$wrapper.on("hidden.bs.modal", clear_poll);
 	const $box = dialog.fields_dict.targets.$wrapper;
 	const month = () => dialog.get_value("month") || periods[1].value; // the Select may not have its default yet
 	dialog.fields_dict.search.$input.on("input", filter);
@@ -79,27 +88,34 @@ function open_bulk_payroll(mode, list_view) {
 	function row_html(row, blocked, twice) {
 		// the payable account only matters when one company has two entries
 		const sub = twice.has(row.company) && row.account ? `<div class="bp-sub">${esc(row.account.replace(/ - [^-]+$/, ""))}</div>` : "";
+		const badge_cls = row.queued ? " bp-queued" : row.done ? " bp-done" : "";
 		const right = blocked
-			? `<span class="bp-reason${row.done ? " bp-done" : ""}">${esc(row.reason)}</span>`
+			? `<span class="bp-reason${badge_cls}">${esc(row.reason)}</span>`
 			: create
 				? `<span class="bp-num">${row.employees}</span>`
 				: `<span class="bp-num">${row.slips}</span><span class="bp-num bp-money">${money(row.net_pay)}</span>`;
+		const checked = !blocked && selected.has(row.name) ? " checked" : "";
 		return `<label class="bp-row" data-label="${esc(row.company.toLowerCase())}">
-			${blocked ? "" : `<input type="checkbox" data-name="${esc(row.name)}">`}
+			${blocked ? "" : `<input type="checkbox" data-name="${esc(row.name)}"${checked}>`}
 			<div class="bp-name"><div>${esc(row.company)}</div>${sub}</div>${right}
 		</label>`;
 	}
 
-	async function load() {
+	async function load(silent = false) {
+		clear_poll();
 		const period = month();
 		dialog.set_df_property("month", "description", period_text(period));
-		selected = new Set();
-		rows = [];
-		$box.html(`<div class="bp-empty">${__("Loading...")}</div>`);
-		summarize();
+		if (!silent) {
+			selected = new Set();
+			rows = [];
+			$box.html(`<div class="bp-empty">${__("Loading...")}</div>`);
+			summarize();
+		}
 		const { message } = await frappe.call({ method: "custom_hr.api.payroll_bulk.get_bulk_targets", type: "GET", args: { month: period, mode } });
 		if (month() !== period) return; // a newer period superseded this one
 		rows = message;
+		const ready_names = new Set(rows.filter((row) => !row.reason && !row.queued).map((row) => row.name));
+		selected = new Set([...selected].filter((name) => ready_names.has(name)));
 		if (!rows.length) {
 			$box.html(`<div class="bp-empty">${create ? __("No employees with a Salary Structure Assignment in this period.") : __("No draft salary slips in this period. Create them first with Bulk Create Payroll Entry in the Payroll Entry list.")}</div>`);
 			return summarize();
@@ -107,8 +123,9 @@ function open_bulk_payroll(mode, list_view) {
 		const counts = {};
 		rows.forEach((row) => (counts[row.company] = (counts[row.company] || 0) + 1));
 		const twice = new Set(Object.keys(counts).filter((company) => counts[company] > 1));
-		const ready = rows.filter((row) => !(create && row.reason));
-		const blocked = rows.filter((row) => create && row.reason);
+		const ready = rows.filter((row) => !row.reason && !row.queued);
+		const queued = rows.filter((row) => row.queued);
+		const blocked = rows.filter((row) => row.reason && !row.queued);
 		const head = create
 			? `<span class="bp-num">${__("Employees")}</span>`
 			: `<span class="bp-num">${__("Slips")}</span><span class="bp-num bp-money">${__("Net Pay")}</span>`;
@@ -118,9 +135,15 @@ function open_bulk_payroll(mode, list_view) {
 					<label class="bp-head"><input type="checkbox" class="bp-all"><div class="bp-name">${__("Select all ({0})", [ready.length])}</div>${head}</label>
 					<div class="bp-list">${ready.map((row) => row_html(row, false, twice)).join("")}</div>
 				</div>`
-				: `<div class="bp-empty">${__("Every company in this period is already created or not ready.")}</div>`}
+				: `<div class="bp-empty">${queued.length ? __("Remaining companies are currently queued in background.") : __("Every company in this period is already processed or not ready.")}</div>`}
+			${queued.length
+				? `<div class="bp-queued-box">
+					<div class="bp-queued-title">${__("Sedang diproses antrean background ({0}) — diperbarui otomatis...", [queued.length])}</div>
+					<div class="bp-table"><div class="bp-list">${queued.map((row) => row_html(row, true, twice)).join("")}</div></div>
+				</div>`
+				: ""}
 			${blocked.length
-				? `<details class="bp-blocked"${ready.length ? "" : " open"}>
+				? `<details class="bp-blocked"${ready.length || queued.length ? "" : " open"}>
 					<summary>${__("Not available ({0})", [blocked.length])}</summary>
 					<div class="bp-table"><div class="bp-list">${blocked.map((row) => row_html(row, true, twice)).join("")}</div></div>
 				</details>`
@@ -139,6 +162,9 @@ function open_bulk_payroll(mode, list_view) {
 		});
 		filter();
 		summarize();
+		if (queued.length && dialog.$wrapper.is(":visible")) {
+			poll_timer = setTimeout(() => load(true), 4000);
+		}
 	}
 
 	function run() {
@@ -148,9 +174,11 @@ function open_bulk_payroll(mode, list_view) {
 			? __("Create a Payroll Entry with draft salary slips for each of the {0} selected?", [count])
 			: __("Submit every draft salary slip of the {0} selected? The payroll payable journal is booked and the slips can no longer be edited.", [count]);
 		frappe.confirm(question, async () => {
+			clear_poll();
 			const period = month();
 			const companies = Object.fromEntries(rows.map((row) => [row.name, `${row.company} · ${row.account || "-"}`]));
 			const targets = [...selected];
+			const target_set = new Set(targets);
 			const failed = [];
 			dialog.hide();
 			// one company per request, so the progress is real and one failure does not stop the rest
@@ -168,24 +196,43 @@ function open_bulk_payroll(mode, list_view) {
 				}
 				if (error) failed.push(`<li><b>${esc(companies[target] || target)}</b>: ${esc(error)}</li>`);
 			}
+			let queued = [];
+			try {
+				const { message: latest } = await frappe.call({
+					method: "custom_hr.api.payroll_bulk.get_bulk_targets",
+					type: "GET",
+					args: { month: period, mode },
+				});
+				queued = (latest || []).filter((r) => r.queued && (target_set.has(r.name) || target_set.has(`${r.company}\n${r.account || ""}`)));
+			} catch {
+				queued = [];
+			}
 			frappe.hide_progress();
+			const succeeded = targets.length - failed.length - queued.length;
+			const parts = [__("Succeeded: {0} · Queued (>30 slips): {1} · Failed: {2}", [Math.max(0, succeeded), queued.length, failed.length])];
+			if (queued.length) {
+				parts.push(`<div class="mt-2"><b>${__("Sedang diproses di antrean background:")}</b><ul>${queued.map((r) => `<li>${esc(r.company)}</li>`).join("")}</ul></div>`);
+			}
+			if (failed.length) {
+				parts.push(`<div class="mt-2"><ul>${failed.join("")}</ul></div>`);
+			}
 			frappe.msgprint({
 				title: dialog.title,
-				indicator: failed.length ? "orange" : "green",
-				message: __("Succeeded: {0} · Failed: {1}", [targets.length - failed.length, failed.length]) + (failed.length ? `<ul>${failed.join("")}</ul>` : ""),
+				indicator: failed.length ? "orange" : queued.length ? "blue" : "green",
+				message: parts.join(""),
 			});
 			list_view.refresh();
 		});
 	}
 
 	dialog.show();
-	load();
+	load(false);
 }
 
 function bulk_payroll_style() {
 	if (document.getElementById("bulk-payroll-style")) return;
 	$("<style id='bulk-payroll-style'>").text(`
-		.bp-table { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+		.bp-table { border: 1px solid var(--border-color); border-radius: var(--border-radius-md, 8px); overflow: hidden; }
 		.bp-list { max-height: 45vh; overflow: auto; }
 		.bp-head, .bp-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0; font-weight: normal; }
 		.bp-head { background: var(--subtle-fg); font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); cursor: pointer; }
@@ -199,10 +246,14 @@ function bulk_payroll_style() {
 		.bp-money { width: 130px; }
 		.bp-reason { color: var(--red-600); font-size: 12px; text-align: right; }
 		.bp-reason.bp-done { color: var(--green-600); }
+		.bp-reason.bp-queued { color: var(--blue-600); font-weight: 600; }
+		.bp-queued-box { margin-top: 12px; }
+		.bp-queued-title { font-size: 12px; font-weight: 600; color: var(--blue-600); margin-bottom: 6px; }
+		.bp-queued-box .bp-row { cursor: default; }
 		.bp-blocked { margin-top: 12px; }
 		.bp-blocked summary { cursor: pointer; color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
 		.bp-blocked .bp-row { cursor: default; padding-left: 12px; }
 		.bp-summary { margin-top: 12px; font-weight: 600; }
-		.bp-empty { padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 8px; }
+		.bp-empty { padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: var(--border-radius-md, 8px); }
 	`).appendTo("head");
 }
