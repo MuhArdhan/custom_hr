@@ -1950,7 +1950,7 @@
   "fieldname": "daily_rate_section",
   "fieldtype": "Section Break",
   "label": "Tarif Harian",
-  "insert_after": "overtime_hourly_divisor",
+  "insert_after": "driver_report_opens_at",
   "module": "HRM",
   "description": "Pakai di struktur gaji dengan rumus tarif_uang_makan dan tarif_transport, mis. tarif_uang_makan * jumlah_hadir. Berlaku untuk slip draft berikutnya."
  },
@@ -2058,46 +2058,12 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Settings",
-  "name": "Payroll Settings-component_account_section",
-  "fieldname": "component_account_section",
-  "fieldtype": "Section Break",
-  "label": "Akun Komponen Gaji",
+  "name": "Payroll Settings-hrm_accounting_tax_tab",
+  "fieldname": "hrm_accounting_tax_tab",
+  "fieldtype": "Tab Break",
+  "label": "Akun, Pajak & Rekap",
   "insert_after": "designation_allowances",
-  "module": "HRM",
-  "description": "Saat disimpan, akun di tiap Salary Component diisi untuk semua company yang punya nomor akun ini, menimpa isian lama. Company baru ikut terisi otomatis. Komponen yang tidak ada di tabel tidak disentuh."
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Payroll Settings",
-  "name": "Payroll Settings-component_accounts",
-  "fieldname": "component_accounts",
-  "fieldtype": "Table",
-  "label": "Akun Komponen Gaji",
-  "insert_after": "component_account_section",
-  "module": "HRM",
-  "options": "HRM Component Account"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Payroll Settings",
-  "name": "Payroll Settings-match_section",
-  "fieldname": "match_section",
-  "fieldtype": "Section Break",
-  "label": "Cocokkan Gaji dengan Excel",
-  "insert_after": "component_accounts",
-  "module": "HRM",
-  "description": "Dipakai tombol Cocokkan dengan Excel di Payroll Entry. Sheet dibaca dari baris di bawah judul NIP sampai NIP kosong pertama."
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Payroll Settings",
-  "name": "Payroll Settings-match_columns",
-  "fieldname": "match_columns",
-  "fieldtype": "Table",
-  "label": "Kolom Cocokkan Gaji",
-  "insert_after": "match_section",
-  "module": "HRM",
-  "options": "HRM Payroll Match Column"
+  "module": "HRM"
  },
  {
   "doctype": "Custom Field",
@@ -2105,10 +2071,9 @@
   "name": "Payroll Settings-je_section",
   "fieldname": "je_section",
   "fieldtype": "Section Break",
-  "label": "Akun Alokasi (JE Inter-Company)",
-  "insert_after": "match_columns",
-  "module": "HRM",
-  "collapsible": 1
+  "label": "Akun Default CoA & Alokasi JE",
+  "insert_after": "hrm_accounting_tax_tab",
+  "module": "HRM"
  },
  {
   "doctype": "Custom Field",
@@ -2158,6 +2123,52 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-component_account_section",
+  "fieldname": "component_account_section",
+  "fieldtype": "Section Break",
+  "label": "Akun Komponen Gaji",
+  "insert_after": "intercompany_payable_account_name",
+  "module": "HRM",
+  "description": "Saat disimpan, akun di tiap Salary Component diisi untuk semua company yang punya nomor akun ini, menimpa isian lama. Company baru ikut terisi otomatis. Komponen yang tidak ada di tabel tidak disentuh.",
+  "collapsible": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-component_accounts",
+  "fieldname": "component_accounts",
+  "fieldtype": "Table",
+  "label": "Akun Komponen Gaji",
+  "insert_after": "component_account_section",
+  "module": "HRM",
+  "options": "HRM Component Account"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-match_section",
+  "fieldname": "match_section",
+  "fieldtype": "Section Break",
+  "label": "Cocokkan Gaji dengan Excel",
+  "insert_after": "component_accounts",
+  "module": "HRM",
+  "description": "Dipakai tombol Cocokkan dengan Excel di Payroll Entry. Sheet dibaca dari baris di bawah judul NIP sampai NIP kosong pertama.",
+  "collapsible": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
+  "name": "Payroll Settings-match_columns",
+  "fieldname": "match_columns",
+  "fieldtype": "Table",
+  "label": "Kolom Cocokkan Gaji",
+  "insert_after": "match_section",
+  "module": "HRM",
+  "options": "HRM Payroll Match Column"
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Employee",
   "name": "Employee-dependents",
   "fieldname": "dependents",
@@ -2187,7 +2198,7 @@
   "fieldname": "pph21_ter_section",
   "fieldtype": "Section Break",
   "label": "PPh 21 TER (PP 58/2023)",
-  "insert_after": "intercompany_payable_account_name",
+  "insert_after": "match_columns",
   "module": "HRM",
   "collapsible": 1
  },
@@ -2219,12 +2230,23 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Settings",
+  "name": "Payroll Settings-pph21_ter_tables_section",
+  "fieldname": "pph21_ter_tables_section",
+  "fieldtype": "Section Break",
+  "label": "Tabel Tarif & Mapping PPh 21 TER",
+  "insert_after": "pph21_ter_companies",
+  "module": "HRM",
+  "collapsible": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Settings",
   "name": "Payroll Settings-pph21_ptkp_map",
   "fieldname": "pph21_ptkp_map",
   "fieldtype": "Table",
   "label": "Mapping PTKP ke Kategori TER",
   "options": "HRM PTKP TER Map",
-  "insert_after": "pph21_ter_companies",
+  "insert_after": "pph21_ter_tables_section",
   "module": "HRM"
  },
  {
