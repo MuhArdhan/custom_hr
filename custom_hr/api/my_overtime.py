@@ -13,6 +13,11 @@ from frappe import _
 from frappe.utils import nowdate
 from hrms.api import get_current_employee
 
+from custom_hr.services.employee_scope import (
+	allowed_overtime_types,
+	employee_scope_info,
+	validate_overtime_type_scope,
+)
 from custom_hr.services.overtime_approval import PENDING_STATES, SELF_REQUEST_TOKEN, employee_state, waiting_for
 
 HISTORY_LIMIT = 30
@@ -47,16 +52,12 @@ def get_my_overtime() -> dict:
 			"doctype": "Overtime Request", "name": doc.name, "creation": str(doc.creation), "date": str(doc.date), "overtime_type": doc.overtime_type, "start_time": str(doc.start_time), "end_time": str(doc.end_time),
 			"planned_hours": doc.planned_hours, "reason": doc.reason, "status": status, "waiting_for": waiting_for(doc, status), "can_cancel": _can_cancel(doc, employee),
 		})
-	types = frappe.get_all(
-		"Overtime Type",
-		filters={"disabled": 0},
-		fields=["name", "maximum_overtime_hours_allowed as max_hours"],
-		order_by="name asc",
-	)
-	names = [row.name for row in types]
+	info = employee_scope_info(employee)
+	overtime_types = allowed_overtime_types(outlet=info.get("outlet"), department=info.get("department"))
+	names = [row["name"] for row in overtime_types]
 	return {
 		"date": nowdate(), "history": history,
-		"overtime_types": [{"name": row.name, "max_hours": row.max_hours or 0} for row in types],  # 0 = no cap
+		"overtime_types": overtime_types,  # 0 = no cap
 		"default_overtime_type": DEFAULT_OVERTIME_TYPE if DEFAULT_OVERTIME_TYPE in names else (names[0] if names else None),
 	}
 
@@ -73,7 +74,12 @@ def submit_my_overtime(start_time, end_time, reason, overtime_type=None) -> dict
 	if frappe.db.get_value("Overtime Type", overtime_type, "disabled") == 1:
 		frappe.throw(_("Jenis lembur {0} sedang nonaktif. Pilih jenis lembur yang tersedia.").format(overtime_type))
 
-	info = frappe.db.get_value("Employee", employee, ["outlet", "company"], as_dict=True)
+	info = frappe.db.get_value("Employee", employee, ["outlet", "department", "company"], as_dict=True)
+	validate_overtime_type_scope(
+		overtime_type,
+		outlet=info.get("outlet"),
+		departments=[info.get("department")],
+	)
 	doc = frappe.get_doc({
 		"doctype": "Overtime Request", "outlet": info.outlet, "company": info.company, "date": nowdate(),
 		"overtime_type": overtime_type, "start_time": start_time, "end_time": end_time, "reason": reason.strip(),

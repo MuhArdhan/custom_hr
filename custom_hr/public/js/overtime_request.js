@@ -22,7 +22,10 @@ frappe.ui.form.on("Overtime Request", {
 			if (frappe.user.has_role(["HR Manager", "HR User", "System Manager"])) return {};
 			return { filters: { name: ["in", frm._allowed_outlets] } };
 		});
-		frm.set_query("overtime_type", () => ({ filters: { disabled: 0 } }));
+		frm.set_query("overtime_type", () => ({
+			query: "custom_hr.services.employee_scope.overtime_type_query",
+			filters: { company: frm.doc.company || "" },
+		}));
 		frm.set_query("employee", "employees", () => {
 			const filters = { status: "Active" };
 			if (frm.doc.company) {

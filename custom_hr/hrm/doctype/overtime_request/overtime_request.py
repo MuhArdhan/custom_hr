@@ -24,6 +24,7 @@ from frappe.utils import add_days, flt, getdate, time_diff_in_hours
 
 from custom_hr.api.roster import HR_ROLES
 from custom_hr.services.department_approvers import department_approvers
+from custom_hr.services.employee_scope import validate_overtime_type_scope
 from custom_hr.services.overtime_approval import DECISION_TOKEN, SELF_REQUEST_TOKEN, employee_state, protect_employee_decisions
 
 FINAL_STATES = ("Disetujui", "Ditolak")
@@ -185,6 +186,16 @@ class OvertimeRequest(Document):
 			return
 		if frappe.db.get_value("Overtime Type", self.overtime_type, "disabled") == 1:
 			frappe.throw(_("Jenis lembur {0} sedang nonaktif dan tidak dapat dipilih lagi.").format(self.overtime_type))
+		departments = (
+			[frappe.db.get_value("Employee", row.employee, "department") for row in self.employees if row.employee]
+			if self.employees
+			else [None]
+		)
+		validate_overtime_type_scope(
+			self.overtime_type,
+			outlet=self.outlet,
+			departments=departments or [None],
+		)
 
 	def validate_times(self):
 		if not self.start_time or not self.end_time:

@@ -353,6 +353,8 @@ fixtures = [
 					"Salary Structure-template_prefix",
 					"Salary Structure-source_template",
 					"Overtime Type-disabled",
+					"Overtime Type-berlaku_untuk",
+					"Overtime Type-hanya_department",
 				],
 			]
 		],

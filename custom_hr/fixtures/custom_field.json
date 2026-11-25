@@ -2354,5 +2354,33 @@
   "no_copy": 1,
   "module": "HRM",
   "description": "Template master asal struktur gaji ini."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Overtime Type",
+  "name": "Overtime Type-berlaku_untuk",
+  "fieldname": "berlaku_untuk",
+  "fieldtype": "Select",
+  "label": "Berlaku Untuk",
+  "options": "Semua\nKhusus Outlet\nKhusus Non-Outlet",
+  "default": "Semua",
+  "insert_after": "disabled",
+  "in_list_view": 1,
+  "in_standard_filter": 1,
+  "module": "HRM",
+  "description": "Batasi jenis lembur ini agar hanya muncul untuk Outlet atau Non-Outlet (Kantor/Pabrik)."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Overtime Type",
+  "name": "Overtime Type-hanya_department",
+  "fieldname": "hanya_department",
+  "fieldtype": "Link",
+  "label": "Khusus Department (Opsional)",
+  "options": "Department",
+  "insert_after": "berlaku_untuk",
+  "depends_on": "eval:doc.berlaku_untuk !== 'Khusus Outlet'",
+  "module": "HRM",
+  "description": "Jika diisi, jenis lembur ini hanya muncul untuk karyawan pada Department tersebut."
  }
 ]
