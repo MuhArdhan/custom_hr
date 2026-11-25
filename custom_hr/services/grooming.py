@@ -1,8 +1,8 @@
 """Grooming SOP photo check: the steps, in the order the employee photographs them."""
 
 GROOMING_STEPS = (
-	{"key": "right_hand", "title": "Tangan kanan", "hint": "Selfie sambil menunjukkan jari tangan kanan (kuku pendek dan bersih), serta memperlihatkan topi dan celemek yang dipakai."},
-	{"key": "left_hand", "title": "Tangan kiri", "hint": "Selfie sambil menunjukkan jari tangan kiri (kuku pendek dan bersih), serta memperlihatkan topi dan celemek yang dipakai."},
+	{"key": "right_hand", "title": "Jari tangan kanan, celemek dan topi", "hint": ""},
+	{"key": "left_hand", "title": "Jari tangan kiri, celemek dan topi", "hint": ""},
 	{"key": "trousers", "title": "Celana", "hint": "Foto celana yang dipakai. Tidak boleh jeans."},
 	{"key": "footwear", "title": "Alas kaki", "hint": "Foto sepatu yang dipakai. Tidak boleh sandal."},
 )

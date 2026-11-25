@@ -55,6 +55,9 @@ class TestGroomingApi(unittest.TestCase):
 		self.patch("frappe.db.get_single_value", side_effect=lambda *a: self.deadline_minutes)
 		self.get_value = self.patch("frappe.db.get_value", side_effect=self.fake_get_value)
 		self.patch("frappe.get_all", side_effect=lambda doctype, *a, **k: self.photos if doctype == "Grooming Photo" else self.history)
+		self.settings = {"enable_auto_review": False, "enable_box": True, "hat_threshold": 0.3, "apron_threshold": 0.5, "shoes_threshold": 0.4, "jeans_threshold": 0.5, "reject_crocs": False, "crocs_threshold": 0.5}
+		self.patch("get_grooming_settings", side_effect=lambda: dict(self.settings))
+		self.classifier = self.patch("classify_grooming_photos", return_value={"review_status": "Sesuai", "review_note": "Auto-review: Sesuai", "boxes_by_step": {"right_hand": [{"label": "Topi", "score": 0.84, "ok": True, "x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}]}})
 
 	def fake_get_value(self, doctype, *args, **kwargs):
 		if doctype != "Employee Checkin":
@@ -98,7 +101,7 @@ class TestGroomingApi(unittest.TestCase):
 		self.photos = [frappe._dict(step=key, photo=f"/private/files/{key}.jpg") for key in KEYS]
 		detail = grooming.get_grooming_detail("G1")
 		self.assertEqual((detail["name"], detail["shift"], detail["review_status"], detail["review_note"]), ("G1", "Shift Pagi", "Tidak Sesuai", "kuku panjang"))
-		self.assertEqual([(p["step"], p["title"]) for p in detail["photos"]][:2], [("right_hand", "Tangan kanan"), ("left_hand", "Tangan kiri")])
+		self.assertEqual([(p["step"], p["title"]) for p in detail["photos"]][:2], [("right_hand", "Jari tangan kanan, celemek dan topi"), ("left_hand", "Jari tangan kiri, celemek dan topi")])
 		self.assertEqual(len(detail["photos"]), len(KEYS))
 
 	def test_detail_refuses_another_employees_or_a_missing_record_with_the_same_message(self):
@@ -160,7 +163,27 @@ class TestGroomingApi(unittest.TestCase):
 		self.assertEqual((values["doctype"], values["employee"], values["grooming_date"], values["submitted_at"]), ("Grooming Check", "EMP-1", "2026-10-26", NOW))
 		self.assertEqual([row["step"] for row in values["photos"]], KEYS)
 		self.doc.insert.assert_called_once_with(ignore_permissions=True)
-		self.assertEqual(result, {"name": "GRM-EMP-1-2026-10-26", "review_status": "Menunggu"})
+		self.assertEqual(result, {"name": "GRM-EMP-1-2026-10-26", "review_status": "Menunggu", "review_note": None})
+
+	def test_submit_runs_auto_review_when_enabled(self):
+		self.settings["enable_auto_review"] = True
+		result = grooming.submit_grooming([JPEG] * len(KEYS))
+		self.classifier.assert_called_once()
+		self.assertTrue(self.doc.flags.auto_review)
+		self.doc.save.assert_called_once_with(ignore_permissions=True)
+		box_calls = [c for c in self.set_value.call_args_list if c.args[2] == "detection_boxes"]
+		self.assertEqual(len(box_calls), len(KEYS))
+		self.assertIn('"Topi"', box_calls[0].args[3])
+		self.assertEqual(result, {"name": "GRM-EMP-1-2026-10-26", "review_status": "Sesuai", "review_note": "Auto-review: Sesuai"})
+
+	def test_submit_falls_back_to_menunggu_when_classifier_fails(self):
+		self.settings["enable_auto_review"] = True
+		self.classifier.side_effect = RuntimeError("onnx failed")
+		with patch("frappe.log_error") as log_error:
+			result = grooming.submit_grooming([JPEG] * len(KEYS))
+		log_error.assert_called_once()
+		self.doc.save.assert_not_called()
+		self.assertEqual(result, {"name": "GRM-EMP-1-2026-10-26", "review_status": "Menunggu", "review_note": None})
 
 	def test_payload_cannot_name_another_employee(self):
 		with self.assertRaises(TypeError):

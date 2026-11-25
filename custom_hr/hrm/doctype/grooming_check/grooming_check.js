@@ -1,7 +1,7 @@
 // The photos side by side, in the order they were taken, for the SOP review.
 const GROOMING_TITLES = {
-	right_hand: "Tangan kanan",
-	left_hand: "Tangan kiri",
+	right_hand: "Jari tangan kanan, celemek dan topi",
+	left_hand: "Jari tangan kiri, celemek dan topi",
 	cap: "Topi",
 	trousers: "Celana",
 	footwear: "Alas kaki",
@@ -21,5 +21,17 @@ frappe.ui.form.on("Grooming Check", {
 			})
 			.join("");
 		frm.get_field("photos_html").$wrapper.html(cards || `<p class="text-muted">${__("No photos")}</p>`);
+		if (!frm.is_new()) {
+			frm.add_custom_button(__("Run Auto Review"), async () => {
+				const { message } = await frappe.call({
+					method: "custom_hr.api.grooming.recheck_grooming",
+					type: "POST",
+					args: { name: frm.doc.name },
+					freeze: true,
+				});
+				frappe.show_alert({ message: `${__("Auto-review")}: ${__(message.review_status)}`, indicator: message.review_status === "Sesuai" ? "green" : "red" });
+				frm.reload_doc();
+			});
+		}
 	},
 });

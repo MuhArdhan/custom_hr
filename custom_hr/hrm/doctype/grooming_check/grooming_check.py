@@ -41,9 +41,23 @@ class GroomingCheck(Document):
 			frappe.throw(_("Karyawan, tanggal, dan foto grooming tidak dapat diubah. Hanya penilaian yang boleh diisi."))
 
 	def stamp_review(self, before):
-		status = self.review_status or "Menunggu"
-		if status not in REVIEWED:
-			self.reviewed_by = self.reviewed_on = None
-		elif status != (before.review_status if before else "Menunggu"):
-			self.reviewed_by = frappe.session.user
-			self.reviewed_on = now_datetime()
+		self._stamp_pair(
+			before, "review_status", "reviewed_by", "reviewed_on",
+			is_auto=bool(getattr(self.flags, "auto_review", False)),
+		)
+		self._stamp_pair(
+			before, "nail_review_status", "nail_reviewed_by", "nail_reviewed_on",
+			is_auto=False,
+		)
+
+	def _stamp_pair(self, before, status_field: str, by_field: str, on_field: str, *, is_auto: bool):
+		status = self.get(status_field) or "Menunggu"
+		if is_auto:
+			self.set(by_field, None)
+			self.set(on_field, now_datetime() if status in REVIEWED else None)
+		elif status not in REVIEWED:
+			self.set(by_field, None)
+			self.set(on_field, None)
+		elif status != (before.get(status_field) if before else "Menunggu") or not (before and before.get(by_field)):
+			self.set(by_field, frappe.session.user)
+			self.set(on_field, now_datetime())

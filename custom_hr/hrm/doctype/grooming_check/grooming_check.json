@@ -23,7 +23,13 @@
   "review_note",
   "column_break_review",
   "reviewed_by",
-  "reviewed_on"
+  "reviewed_on",
+  "nail_review_section",
+  "nail_review_status",
+  "nail_review_note",
+  "column_break_nail_review",
+  "nail_reviewed_by",
+  "nail_reviewed_on"
  ],
  "fields": [
   {
@@ -149,6 +155,41 @@
    "fieldname": "reviewed_on",
    "fieldtype": "Datetime",
    "label": "Reviewed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "nail_review_section",
+   "fieldtype": "Section Break",
+   "label": "Nail Review"
+  },
+  {
+   "default": "Menunggu",
+   "fieldname": "nail_review_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Nail Review Status",
+   "options": "Menunggu\nSesuai\nTidak Sesuai"
+  },
+  {
+   "fieldname": "nail_review_note",
+   "fieldtype": "Small Text",
+   "label": "Nail Review Note"
+  },
+  {
+   "fieldname": "column_break_nail_review",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "nail_reviewed_by",
+   "fieldtype": "Link",
+   "label": "Nail Reviewed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "nail_reviewed_on",
+   "fieldtype": "Datetime",
+   "label": "Nail Reviewed On",
    "read_only": 1
   }
  ],

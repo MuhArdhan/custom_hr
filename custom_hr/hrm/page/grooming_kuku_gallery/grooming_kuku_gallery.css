@@ -1,0 +1,37 @@
+/* Grooming Kuku Gallery — manual hand/nail check page */
+
+.gk-page { padding: 0 15px 32px; }
+
+/* filters */
+.gk-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 2px 0 12px; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }
+.gk-filters .gk-filter { flex: 1 1 auto; min-width: 130px; }
+.gk-filters .gk-f-company, .gk-filters .gk-f-search { min-width: 150px; }
+.gk-filters .gk-f-from_date, .gk-filters .gk-f-to_date { min-width: 115px; }
+.gk-filters .frappe-control, .gk-filters .form-group { margin-bottom: 0; }
+.gk-summary { color: var(--text-muted); font-size: 12.5px; margin-bottom: 12px; }
+.gk-summary:empty { display: none; }
+
+/* cards: right_hand and left_hand side by side */
+.gk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.gk-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.gk-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.gk-cover-wrap { position: relative; background: var(--gray-100); }
+.gk-cover-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.gk-cover { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; }
+.gk-pill { position: absolute; top: 8px; right: 8px; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
+.gk-pill-orange { background: #ea580c; }
+.gk-pill-green { background: #16a34a; }
+.gk-pill-red { background: #dc2626; }
+.gk-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.gk-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gk-line { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gk-muted { color: var(--text-muted); }
+
+.gk-empty { text-align: center; color: var(--text-muted); padding: 60px 0; grid-column: 1 / -1; }
+.gk-more { padding: 8px 0 24px; }
+
+/* review dialog: two large hand photos side by side */
+.gk-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 10px; }
+.gk-photo img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); display: block; }
+.gk-photo-title { font-size: 12.5px; color: var(--text-muted); margin-top: 5px; text-align: center; }
+.gk-reviewed { color: var(--text-muted); font-size: 12px; margin-bottom: 8px; }

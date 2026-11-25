@@ -73,3 +73,10 @@ test("the summary counts each review result", () => {
 	assert.deepEqual(historySummary([]), { Sesuai: 0, "Tidak Sesuai": 0, Menunggu: 0 })
 	assert.deepEqual(historySummary([{ review_status: null }]), { Sesuai: 0, "Tidak Sesuai": 0, Menunggu: 1 })
 })
+
+test("grooming capture and screen do not run live detection in the browser", () => {
+	const screen = read("../src/views/grooming/Grooming.vue")
+	const capture = read("../src/components/GroomingCapture.vue")
+	assert.doesNotMatch(screen, /photoCheck|PhotoBoxes/)
+	assert.doesNotMatch(capture, /photoCheck|liveLoop/)
+})

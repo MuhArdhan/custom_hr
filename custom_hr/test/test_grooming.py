@@ -22,7 +22,8 @@ class TestGroomingSteps(unittest.TestCase):
 	def test_steps_are_the_four_in_order(self):
 		self.assertEqual([step["key"] for step in GROOMING_STEPS], KEYS)
 		for step in GROOMING_STEPS:
-			self.assertTrue(step["title"] and step["hint"])
+			self.assertTrue(step["title"])
+		self.assertEqual([step["hint"] for step in GROOMING_STEPS[:2]], ["", ""])
 
 	def test_older_cap_photos_keep_their_title(self):
 		self.assertEqual(STEP_TITLES["cap"], "Topi")
@@ -99,3 +100,22 @@ class TestGroomingCheck(unittest.TestCase):
 
 	def test_review_note_can_change_after_creation(self):
 		check(review_note="kuku panjang", review_status="Tidak Sesuai").validate_unchanged(check())
+
+	def test_auto_review_leaves_reviewed_by_empty_and_manual_override_stamps_user(self):
+		auto = check(review_status="Sesuai")
+		auto.flags.auto_review = True
+		auto.stamp_review(None)
+		self.assertIsNone(auto.reviewed_by)
+		self.assertTrue(auto.reviewed_on)
+
+		manual = check(review_status="Sesuai", review_note="Dicek ulang HR")
+		manual.stamp_review(auto)
+		self.assertEqual(manual.reviewed_by, frappe.session.user)
+
+	def test_nail_review_stamps_independently_from_auto_review(self):
+		doc = check(review_status="Sesuai", nail_review_status="Tidak Sesuai")
+		doc.flags.auto_review = True
+		doc.stamp_review(None)
+		self.assertIsNone(doc.reviewed_by)
+		self.assertEqual(doc.nail_reviewed_by, frappe.session.user)
+		self.assertTrue(doc.nail_reviewed_on)

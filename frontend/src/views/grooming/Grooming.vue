@@ -60,7 +60,7 @@
 						<div>
 							<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ __("Step {0} of {1}", [index + 1, steps.length]) }}</p>
 							<h3 class="text-xl font-semibold text-gray-900 mt-1">{{ step.title }}</h3>
-							<p class="text-sm text-gray-600 mt-1">{{ step.hint }}</p>
+							<p v-if="step.hint" class="text-sm text-gray-600 mt-1">{{ step.hint }}</p>
 						</div>
 
 						<img v-if="photos[step.key]" :src="photos[step.key]" class="w-full aspect-[3/4] max-h-[52vh] object-cover rounded-lg border border-gray-200" :alt="step.title" />
@@ -168,8 +168,9 @@ async function send() {
 	sending.value = true
 	error.value = ""
 	try {
-		await submitResource.submit({ photos: JSON.stringify(toPayload(photos, steps.value)) })
-		toast({ title: __("Success"), text: __("Grooming sent"), icon: "check-circle", position: "bottom-center", iconClasses: "text-green-500" })
+		const res = await submitResource.submit({ photos: JSON.stringify(toPayload(photos, steps.value)) })
+		const verdict = res?.review_status ? __(reviewStyle(res.review_status).label) : __("Grooming sent")
+		toast({ title: __("Success"), text: verdict, icon: "check-circle", position: "bottom-center", iconClasses: "text-green-500" })
 		Object.keys(photos).forEach((key) => delete photos[key])
 		reviewing.value = false
 		index.value = 0
