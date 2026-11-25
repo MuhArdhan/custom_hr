@@ -160,12 +160,41 @@ class GroomingGallery {
 			secondary_action: () => frappe.set_route("Form", "Grooming Check", row.name),
 		});
 		dialog.fields_dict.photos.$wrapper.html(`
-			<div class="gg-photos">${row.photos.map((photo) => `
+			<div class="gg-photos">${row.photos.map((photo, idx) => {
+				const boxes = (photo.boxes || []).map((box) => {
+					const score = box.score != null ? ` ${Number(box.score).toFixed(2)}` : "";
+					return `
+					<div class="gg-box ${box.ok ? "" : "gg-box-fail"}" data-photo-idx="${idx}" data-x="${box.x}" data-y="${box.y}" data-w="${box.w}" data-h="${box.h}" style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.w * 100}%;height:${box.h * 100}%">
+						<span class="gg-box-label">${esc(box.label + score)}</span>
+					</div>`;
+				}).join("");
+				return `
 				<div class="gg-photo">
-					<a href="${esc(photo.photo)}" target="_blank" rel="noopener"><img src="${esc(photo.photo)}" alt="${esc(photo.title)}"></a>
+					<div class="gg-photo-frame">
+						<a href="${esc(photo.photo)}" target="_blank" rel="noopener"><img data-photo-idx="${idx}" src="${esc(photo.photo)}" alt="${esc(photo.title)}"></a>
+						${boxes}
+					</div>
 					<div class="gg-photo-title">${esc(photo.title)}</div>
-				</div>`).join("")}</div>
+				</div>`;
+			}).join("")}</div>
 			${row.reviewed_by ? `<div class="gg-reviewed">${esc(__("Reviewed by {0}", [row.reviewed_by]))}</div>` : ""}`);
+		dialog.fields_dict.photos.$wrapper.find(".gg-photo-frame img").each((_, img) => {
+			const align = () => {
+				if (!img.naturalWidth || !img.naturalHeight) return;
+				const scale = Math.max(3 / img.naturalWidth, 4 / img.naturalHeight);
+				const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+				const ox = (3 - dw) / 2, oy = (4 - dh) / 2;
+				$(img).closest(".gg-photo-frame").find(".gg-box").each((__, el) => {
+					const d = el.dataset;
+					el.style.left = `${((ox + Number(d.x) * dw) / 3) * 100}%`;
+					el.style.top = `${((oy + Number(d.y) * dh) / 4) * 100}%`;
+					el.style.width = `${((Number(d.w) * dw) / 3) * 100}%`;
+					el.style.height = `${((Number(d.h) * dh) / 4) * 100}%`;
+				});
+			};
+			if (img.complete) align();
+			else $(img).on("load", align);
+		});
 		dialog.show();
 	}
 }

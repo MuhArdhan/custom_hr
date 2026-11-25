@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "creation": "2026-11-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_auto_review",
+  "enable_box",
+  "column_break_settings",
+  "reject_crocs",
+  "thresholds_section",
+  "hat_threshold",
+  "apron_threshold",
+  "column_break_thresholds",
+  "shoes_threshold",
+  "jeans_threshold",
+  "crocs_threshold"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "description": "Klasifikasikan foto grooming secara otomatis setelah dikirim memakai model 5 kelas. Jika nonaktif, status awal tetap Menunggu untuk review manual.",
+   "fieldname": "enable_auto_review",
+   "fieldtype": "Check",
+   "label": "Enable Auto Review"
+  },
+  {
+   "default": "1",
+   "description": "Tampilkan kotak hasil deteksi pada foto di Grooming Gallery.",
+   "fieldname": "enable_box",
+   "fieldtype": "Check",
+   "label": "Enable Box"
+  },
+  {
+   "fieldname": "column_break_settings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Jika aktif, deteksi Crocs pada foto alas kaki di atas ambang akan ditandai Tidak Sesuai.",
+   "fieldname": "reject_crocs",
+   "fieldtype": "Check",
+   "label": "Reject Crocs"
+  },
+  {
+   "fieldname": "thresholds_section",
+   "fieldtype": "Section Break",
+   "label": "Confidence Thresholds"
+  },
+  {
+   "default": "0.3",
+   "description": "Ambang minimal confidence agar Topi dinyatakan terdeteksi (nilai 0 - 1).",
+   "fieldname": "hat_threshold",
+   "fieldtype": "Float",
+   "label": "Topi Threshold",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "default": "0.5",
+   "description": "Ambang minimal confidence agar Celemek dinyatakan terdeteksi (nilai 0 - 1).",
+   "fieldname": "apron_threshold",
+   "fieldtype": "Float",
+   "label": "Celemek Threshold",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_thresholds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.4",
+   "description": "Ambang minimal confidence agar Sepatu dinyatakan terdeteksi pada foto alas kaki (nilai 0 - 1).",
+   "fieldname": "shoes_threshold",
+   "fieldtype": "Float",
+   "label": "Sepatu Threshold",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "default": "0.5",
+   "description": "Ambang minimal confidence untuk menganggap karyawan memakai Jeans pada foto celana (nilai 0 - 1).",
+   "fieldname": "jeans_threshold",
+   "fieldtype": "Float",
+   "label": "Jeans Threshold",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "default": "0.5",
+   "depends_on": "eval:doc.reject_crocs",
+   "description": "Ambang minimal confidence untuk menolak Crocs pada foto alas kaki (nilai 0 - 1).",
+   "fieldname": "crocs_threshold",
+   "fieldtype": "Float",
+   "label": "Crocs Threshold",
+   "precision": "2"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HRM",
+ "name": "Grooming Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "HR Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "HR User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -7,7 +7,8 @@
  "field_order": [
   "step",
   "photo",
-  "taken_at"
+  "taken_at",
+  "detection_boxes"
  ],
  "fields": [
   {
@@ -28,6 +29,13 @@
    "fieldname": "taken_at",
    "fieldtype": "Datetime",
    "label": "Taken At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detection_boxes",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Detection Boxes",
    "read_only": 1
   }
  ],

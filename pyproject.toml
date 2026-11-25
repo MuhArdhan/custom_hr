@@ -10,6 +10,8 @@ dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
     "numpy>=1.20", # server-side face descriptor (sliding_window_view needs 1.20)
+    "onnxruntime",
+    "pillow",
 ]
 
 [build-system]
