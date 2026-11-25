@@ -33,7 +33,7 @@
 					<div class="flex flex-row items-start gap-3 grow">
 						<div class="flex flex-col items-start gap-1.5">
 							<div class="text-base font-normal text-gray-800">
-								{{ __(item.expense_type) }}
+								{{ item.expense_type }}
 							</div>
 							<div class="text-xs font-normal text-gray-500">
 								<span>

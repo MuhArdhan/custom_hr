@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
 import { beforeEach, test } from "node:test"
 
 const values = new Map()
@@ -38,4 +39,19 @@ test("language choice is persisted and reloads the app", () => {
 	setLanguage("en")
 	assert.equal(values.get(LANGUAGE_KEY), "en")
 	assert.equal(reloaded, true)
+})
+
+test("leave and expense master record names are displayed verbatim without translation", () => {
+	const files = [
+		"../src/components/LeaveRequestItem.vue",
+		"../src/components/LeaveBalance.vue",
+		"../src/components/LeaveUsageSummary.vue",
+		"../src/components/ExpenseClaimItem.vue",
+		"../src/components/ExpenseItems.vue",
+		"../src/components/ExpensesTable.vue",
+	]
+	for (const rel of files) {
+		const source = fs.readFileSync(new URL(rel, import.meta.url), "utf8")
+		assert.doesNotMatch(source, /__\(\s*(props\.doc\.leave_type|leave_type|row\.leave_type|props\.doc\.expense_type|item\.expense_type)/)
+	}
 })

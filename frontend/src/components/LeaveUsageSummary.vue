@@ -9,7 +9,7 @@
 				class="flex flex-row items-center justify-between py-2 border-b border-gray-100 last:border-b-0"
 			>
 				<span class="text-gray-700 text-sm font-medium">
-					{{ __(row.leave_type, null, "Leave Type") }}
+					{{ row.leave_type }}
 				</span>
 				<span class="text-gray-800 text-sm font-semibold">
 					{{ __("{0}x", [row.count]) }} &middot;

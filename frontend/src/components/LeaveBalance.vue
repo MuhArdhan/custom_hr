@@ -34,7 +34,7 @@
 					{{ `${allocation.balance_leaves}/${allocation.allocated_leaves}` }}
 				</div>
 				<div class="text-gray-600 font-normal text-sm w-24 leading-4">
-					{{ __("{0} balance", [__(leave_type, null, "Leave Type")]) }}
+					{{ __("{0} balance", [leave_type]) }}
 				</div>
 			</div>
 		</div>
