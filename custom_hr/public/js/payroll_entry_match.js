@@ -25,6 +25,17 @@ function open_payroll_match(frm) {
 		fields: [
 			{ fieldname: "file", fieldtype: "HTML" },
 			{ fieldname: "col", fieldtype: "Column Break" },
+			{
+				fieldname: "match_by",
+				fieldtype: "Select",
+				label: __("Cocokkan Berdasarkan"),
+				options: [
+					{ value: "nip", label: __("NIP") },
+					{ value: "name", label: __("Nama") },
+				],
+				default: "nip",
+				change: () => run_compare(),
+			},
 			{ fieldname: "sheet", fieldtype: "Select", label: __("Sheet"), hidden: 1, change: () => run_compare() },
 			{ fieldname: "sec", fieldtype: "Section Break" },
 			{ fieldname: "table", fieldtype: "HTML" },
@@ -69,8 +80,11 @@ function open_payroll_match(frm) {
 
 	function run_compare() {
 		const sheet = dialog.get_value("sheet");
+		const match_by = dialog.get_value("match_by") || "nip";
 		if (!content || !sheet) return;
-		call("compare", { content, sheet }).then((message) => {
+		dialog.get_primary_btn().prop("disabled", true);
+		$table.empty();
+		call("compare", { content, sheet, match_by }).then((message) => {
 			result = message;
 			render();
 		});
@@ -78,7 +92,8 @@ function open_payroll_match(frm) {
 
 	function render() {
 		const differing = result.columns.filter((column) => result.rows.some((row) => row.cells[column.key]));
-		const summary = __("{0} slip draft · {1} cocok NIP · {2} karyawan ada yang beda", [result.slips, result.matched, result.rows.length]);
+		const keyLabel = result.match_by === "name" ? __("Nama") : __("NIP");
+		const summary = __("{0} slip draft · {1} cocok {2} · {3} karyawan ada yang beda", [result.slips, result.matched, keyLabel, result.rows.length]);
 		const head = differing
 			.map((c) => `<th>${esc(c.label)}<div class="text-muted small">${esc(c.key)}</div></th>`)
 			.join("");
@@ -116,11 +131,12 @@ function open_payroll_match(frm) {
 						<thead><tr><th>NIP</th><th>${__("Nama")}</th>${head}</tr></thead>
 						<tbody>${body}</tbody>
 						<tfoot><tr><td colspan="2"></td>${foot}</tr></tfoot></table></div>`
-					: `<p class="text-success">${__("Semua slip yang NIP-nya ada di sheet sudah cocok.")}</p>`
+					: `<p class="text-success">${__("Semua slip yang datanya ada di sheet sudah cocok.")}</p>`
 			}
-			${only(__("NIP dobel di sheet, tidak dicocokkan"), result.duplicates)}
-			${only(__("NIP di Excel tanpa slip draft"), result.not_in_slips)}
-			${only(__("Slip tanpa NIP di Excel"), result.not_in_excel.map((r) => `${r.employee_name} (${r.nip || __("NIP kosong")})`))}`);
+			${only(__("{0} dobel di sheet, tidak dicocokkan", [keyLabel]), result.duplicates)}
+			${only(__("{0} dobel di slip draft, tidak dicocokkan", [keyLabel]), result.duplicate_slips || [])}
+			${only(__("{0} di Excel tanpa slip draft", [keyLabel]), result.not_in_slips)}
+			${only(__("Slip tanpa {0} di Excel", [keyLabel]), result.not_in_excel.map((r) => `${r.employee_name} (${r.nip || __("NIP kosong")})`))}`);
 		$table.find(".pm-all").on("click", (event) => {
 			$table.find(`td[data-col="${event.currentTarget.dataset.col}"] input[value=excel]`).prop("checked", true);
 			sync();

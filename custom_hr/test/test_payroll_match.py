@@ -54,3 +54,35 @@ class TestPayrollMatch(unittest.TestCase):
 		result = svc.compare_rows(sheet, slips, GROUPS)
 		self.assertEqual([(r.slip, r.cells) for r in result.rows], [("SS-1", {"E+F": {"system": 12000, "excel": 15000}})])
 		self.assertEqual((result.matched, result.not_in_slips, [r.employee for r in result.not_in_excel]), (2, ["777777"], ["E3"]))
+
+	def test_matching_by_name_accepts_nama_headers_normalizes_whitespace_and_guards_duplicates(self):
+		outlet_sheet = [
+			("OUTLET",),
+			(None, "NAMA CREW", None, "UANG MAKAN", "REGULER", "HOLIDAY", "KASBON"),
+			(None, "  budi   santoso ", None, 440000, 10000, 5000, None),
+			(None, "Siti Aminah", None, 300000, 0, 0, 50000),
+			(None, "SITI  AMINAH", None, 100000, 0, 0, 0),
+			(None, "", None, 1, 1, 1, 1),
+		]
+		amounts, duplicates = svc.read_sheet(outlet_sheet, GROUPS, match_by="name")
+		self.assertEqual(duplicates, ["SITI AMINAH"])
+		for dup in duplicates:
+			amounts.pop(dup)
+		self.assertEqual(amounts, {"BUDI SANTOSO": {"D": 440000, "E+F": 15000, "G": 0}})
+
+		slips = [
+			frappe._dict(name="SS-1", employee="E1", employee_name="Budi Santoso", nip="", amounts={"Uang Makan": 400000, "Upah Lembur": 15000}),
+			frappe._dict(name="SS-2", employee="E2", employee_name="Dewi", nip="", amounts={"Uang Makan": 100000}),
+			frappe._dict(name="SS-3", employee="E3", employee_name="Rina", nip="", amounts={"Uang Makan": 100000}),
+			frappe._dict(name="SS-4", employee="E4", employee_name="RINA", nip="", amounts={"Uang Makan": 200000}),
+		]
+		result = svc.compare_rows(amounts, slips, GROUPS, match_by="name")
+		self.assertEqual([(r.slip, r.cells) for r in result.rows], [("SS-1", {"D": {"system": 400000, "excel": 440000}})])
+		self.assertEqual(result.duplicate_slips, ["RINA"])
+		self.assertEqual((result.matched, result.not_in_slips, [r.employee for r in result.not_in_excel]), (1, [], ["E2"]))
+
+	def test_missing_name_header_or_bad_match_by_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			svc.read_sheet([("NIP", "GP")], GROUPS, match_by="name")
+		with self.assertRaises(frappe.ValidationError):
+			svc.read_sheet(SHEET, GROUPS, match_by="email")

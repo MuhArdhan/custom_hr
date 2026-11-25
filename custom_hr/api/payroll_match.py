@@ -11,6 +11,9 @@ import io
 import json
 import re
 
+from collections import Counter
+from collections.abc import Callable
+
 import frappe
 from frappe import _
 from frappe.utils import flt
@@ -18,8 +21,12 @@ from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 
 TOLERANCE = 1  # rupiah: the sheet rounds some amounts
-HEADER_ROWS = 20  # the NIP header is searched in this many top rows
+HEADER_ROWS = 20  # the key header is searched in this many top rows
 COLUMNS = re.compile(r"^[A-Z]{1,3}(\+[A-Z]{1,3})*$")
+MATCH_BY_HEADERS = {
+	"nip": ("NIP",),
+	"name": ("NAMA", "NAMA CREW", "NAMA KARYAWAN"),
+}
 
 
 def column_groups(rows, period_input: set) -> list:
@@ -47,35 +54,60 @@ def nip_text(value) -> str:
 	return str(value).strip() if value is not None else ""
 
 
-def read_sheet(rows, groups) -> tuple[dict, list]:
-	"""{nip: {group key: amount}} from the row under the NIP header down to the first row without a NIP."""
+def name_text(value) -> str:
+	"""Normalize employee names across case and extra spaces."""
+	return " ".join(str(value).split()).upper() if value is not None else ""
+
+
+def _resolve_match_by(match_by: str | None) -> tuple[str, Callable[[object], str]]:
+	mode = (match_by or "nip").strip().lower()
+	if mode not in MATCH_BY_HEADERS:
+		frappe.throw(_("Mode pencocokan tidak valid: pilih NIP atau Nama."))
+	return mode, (name_text if mode == "name" else nip_text)
+
+
+def read_sheet(rows, groups, match_by: str = "nip") -> tuple[dict, list]:
+	"""{key: {group key: amount}} from the row under the key header down to the first row without a key."""
+	mode, normalize = _resolve_match_by(match_by)
+	accepted = MATCH_BY_HEADERS[mode]
 	rows = iter(rows)
 	for _row, header in zip(range(HEADER_ROWS), rows):
-		nip_col = next((i for i, value in enumerate(header) if isinstance(value, str) and value.strip().upper() == "NIP"), None)
-		if nip_col is not None:
+		key_col = next(
+			(i for i, value in enumerate(header) if isinstance(value, str) and value.strip().upper() in accepted),
+			None,
+		)
+		if key_col is not None:
 			break
 	else:
-		frappe.throw(_("Kolom NIP tidak ditemukan di {0} baris teratas sheet.").format(HEADER_ROWS))
+		label = _("Nama") if mode == "name" else _("NIP")
+		frappe.throw(_("Kolom {0} tidak ditemukan di {1} baris teratas sheet.").format(label, HEADER_ROWS))
 
 	amounts, duplicates = {}, []
 	for row in rows:
-		nip = nip_text(row[nip_col] if len(row) > nip_col else None)
-		if not nip:
+		key = normalize(row[key_col] if len(row) > key_col else None)
+		if not key:
 			break  # below the main table the PH sheet holds other tables
-		if nip in amounts:
-			duplicates.append(nip)
-		amounts[nip] = {g.key: sum(row[i] for i in g.indexes if i < len(row) and isinstance(row[i], (int, float))) for g in groups}
+		if key in amounts:
+			duplicates.append(key)
+		amounts[key] = {g.key: sum(row[i] for i in g.indexes if i < len(row) and isinstance(row[i], (int, float))) for g in groups}
 	return amounts, duplicates
 
 
-def compare_rows(sheet: dict, slips: list, groups: list) -> frappe._dict:
+def compare_rows(sheet: dict, slips: list, groups: list, match_by: str = "nip") -> frappe._dict:
 	"""Rows of the slips with at least one differing cell, plus who is only on one side."""
-	rows, matched = [], 0
-	for slip in slips:
-		excel = sheet.get(slip.nip)
+	mode, normalize = _resolve_match_by(match_by)
+	slip_keys = [normalize(slip.employee_name if mode == "name" else slip.nip) for slip in slips]
+	duplicate_slips = sorted({k for k, count in Counter(k for k in slip_keys if k).items() if count > 1})
+	ambiguous = set(duplicate_slips)
+	rows, matched, matched_keys = [], 0, set()
+	for slip, key in zip(slips, slip_keys):
+		if not key or key in ambiguous:
+			continue
+		excel = sheet.get(key)
 		if excel is None:
 			continue
 		matched += 1
+		matched_keys.add(key)
 		cells = {}
 		for group in groups:
 			system = flt(sum(flt(slip.amounts.get(component)) for component in group.components), 2)
@@ -83,12 +115,16 @@ def compare_rows(sheet: dict, slips: list, groups: list) -> frappe._dict:
 				cells[group.key] = {"system": system, "excel": excel[group.key]}
 		if cells:
 			rows.append(frappe._dict(slip=slip.name, employee=slip.employee, employee_name=slip.employee_name, nip=slip.nip, cells=cells))
-	nips = {slip.nip for slip in slips}
 	return frappe._dict(
 		rows=rows,
 		matched=matched,
-		not_in_slips=sorted(nip for nip in sheet if nip not in nips),
-		not_in_excel=[frappe._dict(employee=s.employee, employee_name=s.employee_name, nip=s.nip) for s in slips if s.nip not in sheet],
+		duplicate_slips=duplicate_slips,
+		not_in_slips=sorted(key for key in sheet if key not in matched_keys),
+		not_in_excel=[
+			frappe._dict(employee=s.employee, employee_name=s.employee_name, nip=s.nip)
+			for s, key in zip(slips, slip_keys)
+			if key not in matched_keys and key not in ambiguous
+		],
 	)
 
 
@@ -132,10 +168,11 @@ def _slips(entry) -> list:
 
 
 @frappe.whitelist(methods=["POST"])
-def compare(payroll_entry: str, content: str, sheet: str | None = None) -> dict:
+def compare(payroll_entry: str, content: str, sheet: str | None = None, match_by: str = "nip") -> dict:
 	"""content is the .xlsx as base64. Without a sheet name it returns the sheet names to pick from."""
 	entry = _entry(payroll_entry)
 	groups = _groups()
+	mode, _normalize = _resolve_match_by(match_by)
 	try:
 		book = load_workbook(io.BytesIO(base64.b64decode(content)), read_only=True, data_only=True)
 	except Exception:
@@ -145,15 +182,16 @@ def compare(payroll_entry: str, content: str, sheet: str | None = None) -> dict:
 			return {"sheets": book.sheetnames}
 		if sheet not in book.sheetnames:
 			frappe.throw(_("Sheet {0} tidak ada di file.").format(sheet))
-		amounts, duplicates = read_sheet(book[sheet].iter_rows(values_only=True), groups)
+		amounts, duplicates = read_sheet(book[sheet].iter_rows(values_only=True), groups, match_by=mode)
 	finally:
 		book.close()
 	duplicates = sorted(set(duplicates))
-	for nip in duplicates:  # which row is right is HR's call: both are left out and listed
-		amounts.pop(nip)
+	for key in duplicates:  # which row is right is HR's call: both are left out and listed
+		amounts.pop(key)
 	slips = _slips(entry)
-	result = compare_rows(amounts, slips, groups)
+	result = compare_rows(amounts, slips, groups, match_by=mode)
 	result.duplicates = duplicates
+	result.match_by = mode
 	labels = {g.key: " + ".join(g.components) for g in groups}
 	result.columns = [{"key": g.key, "label": labels[g.key], "editable": g.editable, "component": g.components[0]} for g in groups]
 	result.slips = len(slips)
