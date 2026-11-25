@@ -40,6 +40,7 @@ function applyShiftTypeOptions() {
 	const shiftField = formFields.data.find((field) => field.fieldname === "shift_type")
 	if (shiftField) {
 		shiftField.documentList = allowedShiftOptions.value.map((name) => ({ label: name, value: name }))
+		shiftField.linkFilters = { name: ["in", allowedShiftOptions.value] }
 	}
 }
 
@@ -50,9 +51,9 @@ const formFields = createResource({
 	auto: true,
 	transform(data) {
 		if (props.id) return data
-		return data.filter(
-			(field) => !["employee", "employee_name", "status", "company"].includes(field.fieldname)
-		)
+		return data
+			.filter((field) => !["employee", "employee_name", "status", "company"].includes(field.fieldname))
+			.map((field) => (field.fieldname === "shift_type" ? { ...field, documentList: [] } : field))
 	},
 	onSuccess() {
 		applyShiftTypeOptions()
@@ -61,6 +62,7 @@ const formFields = createResource({
 
 createResource({
 	url: "custom_hr.services.employee_scope.get_allowed_shift_types",
+	method: "GET",
 	params: { employee: employee.data.name },
 	auto: !props.id,
 	onSuccess(data) {

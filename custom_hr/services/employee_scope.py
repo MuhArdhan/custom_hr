@@ -163,7 +163,7 @@ def validate_shift_request_scope(doc, method=None) -> None:
 		)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist()
 def get_allowed_shift_types(employee: str | None = None) -> list[str]:
 	employee = employee or get_current_employee()
 	return allowed_shift_types(employee)
