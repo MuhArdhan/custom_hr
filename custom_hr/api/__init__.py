@@ -110,6 +110,8 @@ def get_leave_usage_summary(year: int | None = None) -> list[dict]:
 def get_leave_types(employee: str, date: str) -> list:
 	from hrms.hr.doctype.leave_application.leave_application import get_leave_details
 
+	from custom_hr.services.employee_scope import employee_scope_info, filter_leave_types
+
 	date = date or getdate()
 
 	# Get leave details validate leave access internally
@@ -127,7 +129,8 @@ def get_leave_types(employee: str, date: str) -> list:
 		if leave_type not in leave_types:
 			leave_types.append(leave_type)
 
-	return leave_types
+	info = employee_scope_info(employee)
+	return filter_leave_types(leave_types, outlet=info.get("outlet"), department=info.get("department"))
 
 
 def require_page_access(page: str) -> None:

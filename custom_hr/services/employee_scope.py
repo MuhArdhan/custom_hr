@@ -71,6 +71,45 @@ def validate_overtime_type_scope(
 			)
 
 
+def filter_leave_types(leave_type_names: list[str], *, outlet: str | None = None, department: str | None = None) -> list[str]:
+	if not leave_type_names:
+		return []
+	rules = {
+		row.name: row
+		for row in frappe.get_all(
+			"Leave Type",
+			filters={"name": ["in", leave_type_names]},
+			fields=["name", "berlaku_untuk", "hanya_department"],
+		)
+	}
+	return [
+		name
+		for name in leave_type_names
+		if matches_scope(rules.get(name) or {}, outlet=outlet, department=department)
+	]
+
+
+def validate_leave_application_scope(doc, method=None) -> None:
+	"""Leave Application before_validate: block Leave Types restricted to a different outlet/department."""
+	if not doc.get("employee") or not doc.get("leave_type"):
+		return
+	if not (doc.is_new() or doc.has_value_changed("leave_type")):
+		return
+	rule = frappe.db.get_value(
+		"Leave Type",
+		doc.leave_type,
+		["berlaku_untuk", "hanya_department"],
+		as_dict=True,
+	)
+	if not isinstance(rule, dict):
+		return
+	info = employee_scope_info(doc.employee)
+	if not matches_scope(rule, outlet=info.get("outlet"), department=info.get("department")):
+		frappe.throw(
+			_("Jenis izin/cuti {0} tidak berlaku untuk outlet/departemen karyawan ini.").format(doc.leave_type)
+		)
+
+
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def overtime_type_query(doctype, txt, searchfield, start, page_len, filters):
@@ -88,5 +127,21 @@ def overtime_type_query(doctype, txt, searchfield, start, page_len, filters):
 			if (r.get("berlaku_untuk") or SCOPE_ALL) == SCOPE_ALL
 			or ((r.get("berlaku_untuk") == SCOPE_OUTLET) == bool(outlet))
 		]
+	return [(r.name,) for r in rows[int(start or 0) : int(start or 0) + int(page_len or 20)]]
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def leave_type_query(doctype, txt, searchfield, start, page_len, filters):
+	employee = (filters or {}).get("employee")
+	info = employee_scope_info(employee)
+	rows = frappe.get_all(
+		"Leave Type",
+		filters={"name": ["like", f"%{txt or ''}%"]},
+		fields=["name", "berlaku_untuk", "hanya_department"],
+		order_by="name asc",
+	)
+	if employee:
+		rows = [r for r in rows if matches_scope(r, outlet=info.get("outlet"), department=info.get("department"))]
 	return [(r.name,) for r in rows[int(start or 0) : int(start or 0) + int(page_len or 20)]]
 

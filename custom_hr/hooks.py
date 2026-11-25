@@ -58,6 +58,7 @@ app_include_js = "custom_hr.bundle.js"
 doctype_js = {
 	"Department": "public/js/shift_days.js",
 	"Employee": "public/js/employee_face.js",
+	"Leave Application": "public/js/leave_application.js",
 	"Outlet": ["public/js/outlet.js", "public/js/shift_days.js"],
 	"Overtime Request": "public/js/overtime_request.js",
 	"Payroll Entry": "public/js/payroll_entry_match.js",
@@ -147,6 +148,7 @@ doc_events = {
 		"before_validate": [
 			"custom_hr.services.leave_approver.fill_leave_approver",
 			"custom_hr.services.hourly_leave.validate_hourly_leave",
+			"custom_hr.services.employee_scope.validate_leave_application_scope",
 		],
 		"on_submit": "custom_hr.services.hourly_leave.stamp_attendance_izin",
 		"on_cancel": "custom_hr.services.hourly_leave.stamp_attendance_izin",
@@ -355,6 +357,8 @@ fixtures = [
 					"Overtime Type-disabled",
 					"Overtime Type-berlaku_untuk",
 					"Overtime Type-hanya_department",
+					"Leave Type-berlaku_untuk",
+					"Leave Type-hanya_department",
 				],
 			]
 		],

@@ -43,3 +43,28 @@ class TestEmployeeScope(unittest.TestCase):
 				["Lembur"],
 			)
 
+	def test_filter_leave_types_keeps_only_matching_scope(self):
+		rules = [
+			frappe._dict(name="Cuti", berlaku_untuk="Semua", hanya_department=None),
+			frappe._dict(name="Izin Outlet", berlaku_untuk="Khusus Outlet", hanya_department=None),
+			frappe._dict(name="WFH Kantor", berlaku_untuk="Khusus Non-Outlet", hanya_department=None),
+		]
+		with patch("frappe.get_all", return_value=rules):
+			self.assertEqual(
+				scope.filter_leave_types(["Cuti", "Izin Outlet", "WFH Kantor"], outlet="OUT-1"),
+				["Cuti", "Izin Outlet"],
+			)
+			self.assertEqual(
+				scope.filter_leave_types(["Cuti", "Izin Outlet", "WFH Kantor"], outlet=None, department="IT - ROPI"),
+				["Cuti", "WFH Kantor"],
+			)
+
+	def test_validate_leave_application_scope_blocks_mismatch(self):
+		doc = frappe._dict(employee="EMP-1", leave_type="Izin Kantor", is_new=lambda: True, has_value_changed=lambda f: True)
+		with (
+			patch("frappe.db.get_value", return_value={"berlaku_untuk": "Khusus Non-Outlet", "hanya_department": None}),
+			patch.object(scope, "employee_scope_info", return_value={"outlet": "OUT-1", "department": None}),
+		):
+			with self.assertRaisesRegex(frappe.ValidationError, "tidak berlaku"):
+				scope.validate_leave_application_scope(doc)
+
