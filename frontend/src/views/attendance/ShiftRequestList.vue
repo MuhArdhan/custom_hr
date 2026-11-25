@@ -3,7 +3,6 @@
 		<ListView
 			doctype="Shift Request"
 			:pageTitle="__('Shift Request History')"
-			:tabButtons="TAB_BUTTONS"
 			:fields="SHIFT_REQUEST_FIELDS"
 			:filterConfig="FILTER_CONFIG"
 		/>
@@ -16,7 +15,6 @@ import { IonPage } from "@ionic/vue"
 import ListView from "@/components/ListView.vue"
 
 const __ = inject("$translate")
-const TAB_BUTTONS = ["My Requests", "Team Requests"]
 const SHIFT_REQUEST_FIELDS = [
 	"name",
 	"employee",

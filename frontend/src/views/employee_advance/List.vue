@@ -3,7 +3,6 @@
 		<ListView
 			doctype="Employee Advance"
 			:pageTitle="__('Employee Advances')"
-			:tabButtons="TAB_BUTTONS"
 			:fields="EMPLOYEE_ADVANCE_FIELDS"
 			:filterConfig="FILTER_CONFIG"
 		/>
@@ -16,7 +15,6 @@ import ListView from "@/components/ListView.vue"
 import { inject } from "vue"
 
 const __ = inject("$translate")
-const TAB_BUTTONS = ["My Advances", "Team Advances"] // __("My Advances"), __("Team Advances")
 const EMPLOYEE_ADVANCE_FIELDS = [
 	"name",
 	"employee",

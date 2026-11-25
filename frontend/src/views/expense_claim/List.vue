@@ -3,7 +3,6 @@
 		<ListView
 			doctype="Expense Claim"
 			:pageTitle="__('Claim History')"
-			:tabButtons="TAB_BUTTONS"
 			:fields="EXPENSE_CLAIM_FIELDS"
 			groupBy="`tabExpense Claim`.name"
 			:filterConfig="FILTER_CONFIG"
@@ -16,7 +15,6 @@ import { IonPage } from "@ionic/vue"
 import ListView from "@/components/ListView.vue"
 
 
-const TAB_BUTTONS = ["My Claims", "Team Claims"] // __("My Claims"), __("Team Claims")
 const EXPENSE_CLAIM_FIELDS = [
 	"`tabExpense Claim`.name",
 	"`tabExpense Claim`.employee",

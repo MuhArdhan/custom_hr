@@ -87,7 +87,7 @@ export const teamShiftRequests = createResource({
 		for_approval: 1,
 		limit: 10,
 	},
-	auto: true,
+	auto: false,
 	cache: "hrms:team_shift_requests",
 	transform(data) {
 		return transformShiftRequests(data)
@@ -100,7 +100,7 @@ export const teamAttendanceRequests = createResource({
 		for_approval: 1,
 		limit: 10,
 	},
-	auto: true,
+	auto: false,
 	cache: "hrms:team_attendance_requests",
 	transform: (data) => {
 		return transformAttendanceRequests(data)

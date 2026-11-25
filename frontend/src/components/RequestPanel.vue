@@ -1,27 +1,18 @@
 <template>
 	<div class="w-full">
-		<TabButtons
-			:buttons="TAB_BUTTONS"
-			v-model="activeTab"
-		/>
-		<RequestList v-if="activeTab == 'My Requests'" :items="myRequests" />
-		<RequestList
-			v-else-if="activeTab == 'Team Requests'"
-			:items="teamRequests"
-			:teamRequests="true"
-		/>
+		<div class="text-lg text-gray-800 font-bold">{{ __("My Requests") }}</div>
+		<RequestList :items="myRequests" />
 	</div>
 </template>
 
 <script setup>
-import { ref, inject, onMounted, computed, markRaw } from "vue"
+import { inject, computed, markRaw } from "vue"
 
-import TabButtons from "@/components/TabButtons.vue"
 import RequestList from "@/components/RequestList.vue"
 
-import { myAttendanceRequests, myShiftRequests, teamShiftRequests, teamAttendanceRequests } from "@/data/attendance"
-import { myClaims, teamClaims } from "@/data/claims"
-import { myLeaves, teamLeaves } from "@/data/leaves"
+import { myAttendanceRequests, myShiftRequests } from "@/data/attendance"
+import { myClaims } from "@/data/claims"
+import { myLeaves } from "@/data/leaves"
 import { myOvertime } from "@/data/overtime"
 
 import AttendanceRequestItem from "@/components/AttendanceRequestItem.vue"
@@ -30,19 +21,10 @@ import LeaveRequestItem from "@/components/LeaveRequestItem.vue"
 import ShiftRequestItem from "@/components/ShiftRequestItem.vue"
 import OvertimeRequestItem from "@/components/OvertimeRequestItem.vue"
 
-import { useListUpdate } from "@/composables/realtime"
-
-const activeTab = ref("My Requests")
-const socket = inject("$socket")
-
-const TAB_BUTTONS = ["My Requests", "Team Requests"] // __("My Requests"), __("Team Requests")
+const __ = inject("$translate")
 
 const myRequests = computed(() =>
 	updateRequestDetails(myLeaves, myClaims, myShiftRequests, myAttendanceRequests, { data: myOvertime.data?.history })
-)
-
-const teamRequests = computed(() =>
-	updateRequestDetails(teamLeaves, teamClaims, teamShiftRequests, teamAttendanceRequests)
 )
 
 function updateRequestDetails(leaves, claims, shiftRequests, attendanceRequests, overtime = null) {
@@ -73,11 +55,4 @@ function getSortedRequests(list) {
 		})
 		.splice(0, 10)
 }
-
-onMounted(() => {
-	useListUpdate(socket, "Leave Application", () => teamLeaves.reload())
-	useListUpdate(socket, "Expense Claim", () => teamClaims.reload())
-	useListUpdate(socket, "Shift Request", () => teamShiftRequests.reload())
-	useListUpdate(socket, "Attendance Request", () => teamAttendanceRequests.reload())
-})
 </script>

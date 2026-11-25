@@ -44,7 +44,7 @@ export const teamLeaves = createResource({
 		for_approval: 1,
 		limit: 10,
 	},
-	auto: true,
+	auto: false,
 	cache: "hrms:team_leaves",
 	transform(data) {
 		return transformLeaveData(data)
