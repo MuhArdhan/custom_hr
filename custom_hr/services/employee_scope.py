@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
+from hrms.api import get_current_employee
+
 SCOPE_ALL = "Semua"
 SCOPE_OUTLET = "Khusus Outlet"
 SCOPE_NON_OUTLET = "Khusus Non-Outlet"
@@ -110,6 +112,63 @@ def validate_leave_application_scope(doc, method=None) -> None:
 		)
 
 
+def _opposite_exclusive_shifts(has_outlet: bool) -> set[str]:
+	outlet_shifts = set(
+		frappe.get_all("Outlet Shift", filters={"parenttype": "Outlet", "enabled": 1}, pluck="shift_type")
+	)
+	dept_shifts = set(
+		frappe.get_all("Outlet Shift", filters={"parenttype": "Department", "enabled": 1}, pluck="shift_type")
+	)
+	return (dept_shifts - outlet_shifts) if has_outlet else (outlet_shifts - dept_shifts)
+
+
+def allowed_shift_types(employee: str | None) -> list[str]:
+	"""Shift Types linked to employee's Outlet or Department, falling back to non-opposite shifts."""
+	info = employee_scope_info(employee)
+	outlet = info.get("outlet")
+	department = info.get("department")
+
+	configured: list[str] = []
+	if outlet:
+		configured = frappe.get_all(
+			"Outlet Shift",
+			filters={"parent": outlet, "parenttype": "Outlet", "enabled": 1},
+			pluck="shift_type",
+		)
+	elif department:
+		configured = frappe.get_all(
+			"Outlet Shift",
+			filters={"parent": department, "parenttype": "Department", "enabled": 1},
+			pluck="shift_type",
+		)
+
+	if configured:
+		return sorted(set(configured))
+
+	all_shifts = frappe.get_all("Shift Type", pluck="name", order_by="name asc")
+	excluded = _opposite_exclusive_shifts(bool(outlet))
+	return [name for name in all_shifts if name not in excluded]
+
+
+def validate_shift_request_scope(doc, method=None) -> None:
+	"""Shift Request before_validate: ensure chosen shift_type is allowed for the employee."""
+	if not doc.get("employee") or not doc.get("shift_type"):
+		return
+	if not (doc.is_new() or doc.has_value_changed("shift_type")):
+		return
+	allowed = allowed_shift_types(doc.employee)
+	if allowed and doc.shift_type not in allowed:
+		frappe.throw(
+			_("Shift Type {0} tidak berlaku untuk outlet/departemen karyawan ini.").format(doc.shift_type)
+		)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_allowed_shift_types(employee: str | None = None) -> list[str]:
+	employee = employee or get_current_employee()
+	return allowed_shift_types(employee)
+
+
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def overtime_type_query(doctype, txt, searchfield, start, page_len, filters):
@@ -145,3 +204,20 @@ def leave_type_query(doctype, txt, searchfield, start, page_len, filters):
 		rows = [r for r in rows if matches_scope(r, outlet=info.get("outlet"), department=info.get("department"))]
 	return [(r.name,) for r in rows[int(start or 0) : int(start or 0) + int(page_len or 20)]]
 
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def shift_type_query(doctype, txt, searchfield, start, page_len, filters):
+	employee = (filters or {}).get("employee")
+	if employee:
+		allowed = [name for name in allowed_shift_types(employee) if (txt or "").lower() in name.lower()]
+		return [(name,) for name in allowed[int(start or 0) : int(start or 0) + int(page_len or 20)]]
+	rows = frappe.get_all(
+		"Shift Type",
+		filters={"name": ["like", f"%{txt or ''}%"]},
+		pluck="name",
+		order_by="name asc",
+		start=int(start or 0),
+		page_length=int(page_len or 20),
+	)
+	return [(name,) for name in rows]

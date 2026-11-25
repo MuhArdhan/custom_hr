@@ -59,6 +59,22 @@ class TestEmployeeScope(unittest.TestCase):
 				["Cuti", "WFH Kantor"],
 			)
 
+	def test_allowed_shift_types_uses_outlet_or_department_table_and_fallback_exclusion(self):
+		# Configured outlet returns only that outlet's enabled shifts
+		with (
+			patch.object(scope, "employee_scope_info", return_value={"outlet": "OUT-1", "department": None}),
+			patch("frappe.get_all", return_value=["Shift 2", "Shift 1"]),
+		):
+			self.assertEqual(scope.allowed_shift_types("EMP-1"), ["Shift 1", "Shift 2"])
+
+		# Unconfigured department excludes shifts exclusively assigned to Outlets
+		with (
+			patch.object(scope, "employee_scope_info", return_value={"outlet": None, "department": None}),
+			patch("frappe.get_all", return_value=["07.30 - 16.30", "Senin - Kamis"]),
+			patch.object(scope, "_opposite_exclusive_shifts", return_value={"07.30 - 16.30"}),
+		):
+			self.assertEqual(scope.allowed_shift_types("EMP-2"), ["Senin - Kamis"])
+
 	def test_validate_leave_application_scope_blocks_mismatch(self):
 		doc = frappe._dict(employee="EMP-1", leave_type="Izin Kantor", is_new=lambda: True, has_value_changed=lambda f: True)
 		with (
@@ -68,3 +84,8 @@ class TestEmployeeScope(unittest.TestCase):
 			with self.assertRaisesRegex(frappe.ValidationError, "tidak berlaku"):
 				scope.validate_leave_application_scope(doc)
 
+	def test_validate_shift_request_scope_blocks_disallowed_shift(self):
+		doc = frappe._dict(employee="EMP-1", shift_type="Senin - Kamis", is_new=lambda: True, has_value_changed=lambda f: True)
+		with patch.object(scope, "allowed_shift_types", return_value=["OP Pagi", "OP Siang"]):
+			with self.assertRaisesRegex(frappe.ValidationError, "tidak berlaku"):
+				scope.validate_shift_request_scope(doc)

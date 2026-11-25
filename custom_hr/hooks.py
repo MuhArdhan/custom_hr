@@ -65,6 +65,7 @@ doctype_js = {
 	"Salary Structure": "public/js/salary_structure.js",
 	"Salary Structure Assignment": "public/js/salary_structure_assignment.js",
 	"Shift Location": "public/js/shift_location.js",
+	"Shift Request": "public/js/shift_request.js",
 }
 
 doctype_list_js = {
@@ -154,6 +155,9 @@ doc_events = {
 		"on_cancel": "custom_hr.services.hourly_leave.stamp_attendance_izin",
 		"after_insert": "custom_hr.services.leave_approver.submit_to_approver",
 		"on_update": "custom_hr.services.leave_approver.hand_over_to_approver_2",
+	},
+	"Shift Request": {
+		"before_validate": "custom_hr.services.employee_scope.validate_shift_request_scope",
 	},
 	"Leave Type": {
 		"validate": "custom_hr.services.leave_auto_allocation.validate_leave_type",
