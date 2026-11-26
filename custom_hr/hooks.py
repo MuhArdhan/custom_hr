@@ -70,6 +70,7 @@ doctype_js = {
 
 doctype_list_js = {
 	"Attendance": "public/js/attendance_list.js",
+	"Employee Advance": "public/js/employee_advance_list.js",
 	"Employee Checkin": "public/js/employee_checkin_list.js",
 	"Holiday List Assignment": "public/js/holiday_list_assignment_list.js",
 	"Outlet": "public/js/outlet.js",
