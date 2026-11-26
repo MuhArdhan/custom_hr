@@ -47,7 +47,7 @@ class TestPayrollPenalties(unittest.TestCase):
 			patch("frappe.get_cached_value", side_effect=lambda dt, name, field: DESK.get((dt, name, field))),
 			patch("frappe.db.count", return_value=self.absent) as count,
 			patch.object(svc, "paid_overtime", return_value=overtime or {}) as hours,
-			patch.object(svc, "overtime_pay", return_value=12345) as pay,
+			patch.object(svc, "overtime_pay_by_component", return_value={"Lembur Reguler": 10000, "Lembur Holiday": 2345}) as pay,
 			patch.object(svc, "izin_hours", return_value=3.5) as izin,
 		):
 			svc.fill_attendance_penalties(doc)
@@ -150,7 +150,7 @@ class TestPayrollPenalties(unittest.TestCase):
 		doc = slip()
 		overtime = {("EMP", "2026-10-01"): frappe._dict(hours=2, overtime_type="A"), ("EMP", "2026-10-02"): frappe._dict(hours=1.5, overtime_type="A")}
 		self.fill(doc, [], overtime=overtime)
-		self.assertEqual((doc.jam_lembur, doc.upah_lembur), (3.5, 12345))
+		self.assertEqual((doc.jam_lembur, doc.upah_lembur, doc.upah_lembur_reguler, doc.upah_lembur_holiday), (3.5, 12345, 10000, 2345))
 		self.hours.assert_called_once_with("2026-09-26", "2026-10-25", "EMP")
 		self.pay.assert_called_once_with("EMP", overtime, "2026-09-26", "2026-10-25")
 
@@ -168,4 +168,35 @@ class TestPayrollPenalties(unittest.TestCase):
 		filters = self.count.call_args.args[1]
 		self.assertEqual((filters["status"], filters["docstatus"]), ("Absent", 1))
 		self.assertEqual(filters["attendance_date"], ["between", ["2026-09-26", "2026-10-25"]])
+
+	def test_dynamic_overtime_injection_respects_legacy_and_structured_components(self):
+		from custom_hr.overrides.payroll import CustomSalarySlip
+
+		slip_doc = frappe._dict(
+			docstatus=0,
+			employee="EMP",
+			start_date="2026-09-26",
+			end_date="2026-10-25",
+			data={},
+			earnings=[],
+			_overtime_by_component={"Lembur Reguler": 50000, "Lembur Malam": 75000},
+			_evaluated_components={"earnings": [frappe._dict(salary_component="Lembur Reguler", formula="upah_lembur_reguler")]},
+		)
+		slip_doc.get = dict.get.__get__(slip_doc)
+		slip_doc.set = lambda k, v: slip_doc.__setitem__(k, v)
+		calls = []
+		slip_doc.update_component_row = lambda comp_data, amount, comp_type, **kw: calls.append((comp_data.salary_component, comp_data.depends_on_payment_days, amount))
+		with (
+			patch("frappe.get_all", return_value=["Lembur Reguler", "Lembur Malam"]),
+			patch("frappe.get_cached_value", return_value="Earning"),
+			patch("custom_hr.overrides.payroll.get_salary_component_data", return_value={"salary_component": "Lembur Malam", "abbr": "LM", "depends_on_payment_days": 1}),
+		):
+			CustomSalarySlip.add_overtime_components(slip_doc)
+		self.assertEqual(calls, [("Lembur Malam", 0, 75000.0)])
+
+		# Legacy catch-all structure skips dynamic injection to prevent double-counting.
+		slip_doc._evaluated_components = {"earnings": [frappe._dict(salary_component="Upah Lembur", formula="upah_lembur")]}
+		calls.clear()
+		CustomSalarySlip.add_overtime_components(slip_doc)
+		self.assertEqual(calls, [])
 

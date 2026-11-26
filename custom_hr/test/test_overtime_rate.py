@@ -40,3 +40,42 @@ class TestOvertimeRate(unittest.TestCase):
 
 	def test_no_overtime_pays_nothing(self):
 		self.assertEqual(svc.overtime_pay("EMP", {}, DAY, DAY), 0)
+
+	def test_overtime_pay_groups_amounts_by_overtime_salary_component(self):
+		reg = frappe._dict(FLAT, name="Lembur PH", overtime_salary_component="Lembur Reguler", hourly_rate=25000)
+		hol = frappe._dict(FLAT, name="Lembur Holiday PH", overtime_salary_component="Lembur Holiday", hourly_rate=18750, weekend_multiplier=1)
+		day2 = date(2026, 10, 2)
+		overtime = {
+			("EMP", DAY): frappe._dict(hours=2, overtime_type="Lembur PH"),
+			("EMP", day2): frappe._dict(hours=4, overtime_type="Lembur Holiday PH"),
+		}
+		types = {"Lembur PH": reg, "Lembur Holiday PH": hol}
+		with (
+			patch("frappe.get_cached_doc", side_effect=lambda _dt, name: types[name]),
+			patch("hrms.utils.holiday_list.get_holiday_dates_between_range", return_value=[]),
+		):
+			grouped = svc.overtime_pay_by_component("EMP", overtime, DAY, day2)
+			total = svc.overtime_pay("EMP", overtime, DAY, day2)
+		self.assertEqual(grouped, {"Lembur Reguler": 50000.0, "Lembur Holiday": 75000.0})
+		self.assertEqual(total, 125000.0)
+
+	def test_validate_overtime_type_requires_earning_and_warns_if_untaxed(self):
+		doc = frappe._dict(overtime_salary_component="Kasbon")
+		with patch("frappe.db.get_value", return_value=frappe._dict(type="Deduction", is_tax_applicable=0)):
+			with patch("frappe.throw", side_effect=frappe.ValidationError):
+				self.assertRaises(frappe.ValidationError, svc.validate_overtime_type, doc)
+
+		doc = frappe._dict(overtime_salary_component="Lembur Khusus")
+		with (
+			patch("frappe.db.get_value", return_value=frappe._dict(type="Earning", is_tax_applicable=0)),
+			patch("frappe.msgprint") as warn,
+		):
+			svc.validate_overtime_type(doc)
+		warn.assert_called_once()
+
+		with (
+			patch("frappe.db.get_value", return_value=frappe._dict(type="Earning", is_tax_applicable=1)),
+			patch("frappe.msgprint") as ok_msg,
+		):
+			svc.validate_overtime_type(doc)
+		ok_msg.assert_not_called()

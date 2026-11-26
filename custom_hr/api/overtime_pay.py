@@ -158,10 +158,10 @@ def overtime_multiplier(overtime_type, holiday) -> float:
 	return flt(overtime_type.standard_multiplier) or 1
 
 
-def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
-	"""Paid hours x the Overtime Type's fixed hourly rate x its day multiplier, summed."""
+def overtime_pay_by_component(employee, overtime: dict, from_date, to_date) -> dict[str, float]:
+	"""Paid hours x each Overtime Type's fixed hourly rate x day multiplier, grouped by Overtime Salary Component."""
 	if not overtime:
-		return 0.0
+		return {}
 	from hrms.utils.holiday_list import get_holiday_dates_between_range
 
 	holidays = {
@@ -170,7 +170,7 @@ def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
 			employee, from_date, to_date, raise_exception_for_holiday_list=False, as_dict=True
 		)
 	}
-	total = 0.0
+	totals = {}
 	for (_employee, date), row in overtime.items():
 		overtime_type = frappe.get_cached_doc("Overtime Type", row.overtime_type)
 		rate = flt(overtime_type.hourly_rate)
@@ -181,8 +181,32 @@ def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
 					"Overtime Type {0} belum memakai Fixed Hourly Rate dengan Hourly Rate terisi, jadi lembur {1} tanggal {2} belum bisa dibayar."
 				).format(overtime_type.name, employee, frappe.format(date, "Date"))
 			)
-		total += row.hours * rate * overtime_multiplier(overtime_type, holidays.get(date))
-	return flt(total, 2)
+		comp = overtime_type.overtime_salary_component or ""
+		totals[comp] = totals.get(comp, 0.0) + row.hours * rate * overtime_multiplier(overtime_type, holidays.get(date))
+	return {comp: flt(amount, 2) for comp, amount in totals.items()}
+
+
+def overtime_pay(employee, overtime: dict, from_date, to_date) -> float:
+	"""Paid hours x the Overtime Type's fixed hourly rate x its day multiplier, summed."""
+	return flt(sum(overtime_pay_by_component(employee, overtime, from_date, to_date).values()), 2)
+
+
+def validate_overtime_type(doc, method=None) -> None:
+	"""Ensure any linked Overtime Salary Component is an Earning and warn if excluded from PPh 21."""
+	component = doc.get("overtime_salary_component")
+	if not component:
+		return
+	info = frappe.db.get_value("Salary Component", component, ["type", "is_tax_applicable"], as_dict=True)
+	if not info:
+		return
+	if info.type != "Earning":
+		frappe.throw(_("Overtime Salary Component {0} harus bertipe Earning.").format(component))
+	if not info.is_tax_applicable:
+		frappe.msgprint(
+			_("Komponen {0} belum mencentang Is Tax Applicable, jadi tidak masuk dasar PPh 21 TER.").format(component),
+			alert=True,
+			indicator="orange",
+		)
 
 
 def collect_month(bulan=None):

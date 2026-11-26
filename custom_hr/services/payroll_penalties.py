@@ -4,12 +4,25 @@ import frappe
 from frappe.utils import add_days, cint, flt, getdate
 from frappe.utils.nestedset import get_ancestors_of
 
-from custom_hr.api.overtime_pay import overtime_pay, paid_overtime
+from custom_hr.api.overtime_pay import overtime_pay_by_component, paid_overtime
 from custom_hr.services.hourly_leave import izin_hours
 
 COUNTED_STATUSES = ("Present", "Half Day", "Work From Home")
 HALF_DAY = "Half Day"
 ON_LEAVE = "On Leave"
+
+
+def overtime_component_amounts(doc) -> dict[str, float]:
+	"""Cached or computed {overtime_salary_component: amount} for one draft Salary Slip."""
+	cached = getattr(doc, "_overtime_by_component", None)
+	if cached is not None:
+		return cached
+	if not (doc.get("employee") and doc.get("start_date") and doc.get("end_date")):
+		return {}
+	overtime = paid_overtime(doc.start_date, doc.end_date, doc.employee)
+	amounts = overtime_pay_by_component(doc.employee, overtime, doc.start_date, doc.end_date)
+	doc._overtime_by_component = amounts
+	return amounts
 
 
 def fill_attendance_penalties(doc, method=None):
@@ -55,7 +68,11 @@ def fill_attendance_penalties(doc, method=None):
 	doc.jam_izin = izin_hours(doc.employee, doc.start_date, doc.end_date)
 	overtime = paid_overtime(doc.start_date, doc.end_date, doc.employee)
 	doc.jam_lembur = sum(row.hours for row in overtime.values())
-	doc.upah_lembur = overtime_pay(doc.employee, overtime, doc.start_date, doc.end_date)
+	overtime_amounts = overtime_pay_by_component(doc.employee, overtime, doc.start_date, doc.end_date)
+	doc._overtime_by_component = overtime_amounts
+	doc.upah_lembur_reguler = flt(overtime_amounts.get("Lembur Reguler"), 2)
+	doc.upah_lembur_holiday = flt(overtime_amounts.get("Lembur Holiday"), 2)
+	doc.upah_lembur = flt(sum(overtime_amounts.values()), 2)
 	doc.jumlah_telat = sum(day.late_entry for day in worked)
 	doc.jumlah_pulang_cepat = sum(day.early_exit for day in worked)
 	doc.jumlah_tidak_out = sum(day.missing_checkout for day in worked)

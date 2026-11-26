@@ -1,14 +1,53 @@
-from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip
+import frappe
+from frappe.utils import flt
+from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip, get_salary_component_data
 from hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment import (
 	SalaryStructureAssignment,
 )
 
-from custom_hr.services.payroll_penalties import bpjs_values
+from custom_hr.services.payroll_penalties import bpjs_values, overtime_component_amounts
 from custom_hr.services.pph21_ter import TER_FORMULA_KEYS, pph21_ter_values
 
 
 class CustomSalarySlip(SalarySlip):
-	"""BPJS and PPh 21 TER variables join formula evaluation from Payroll Settings (tab HRM)."""
+	"""BPJS, PPh 21 TER, and dynamic Overtime Type components join formula evaluation."""
+
+	def add_structure_components(self, component_type):
+		super().add_structure_components(component_type)
+		if component_type == "earnings" and self.docstatus == 0:
+			self.add_overtime_components()
+
+	def add_overtime_components(self):
+		"""Inject any Overtime Type earning component not already defined as a row in the Salary Structure."""
+		struct_rows = (getattr(self, "_evaluated_components", None) or {}).get("earnings") or ()
+		# Legacy structures route all overtime into one catch-all formula "upah_lembur".
+		if any((getattr(row, "formula", "") or "").strip() == "upah_lembur" for row in struct_rows):
+			return
+
+		structured = {row.salary_component for row in struct_rows}
+		amounts = overtime_component_amounts(self)
+		overtime_linked = {c for c in frappe.get_all("Overtime Type", pluck="overtime_salary_component") if c}
+		for comp in sorted((overtime_linked | set(amounts)) - structured):
+			amount = flt(amounts.get(comp), 2)
+			if amount > 0:
+				if frappe.get_cached_value("Salary Component", comp, "type") != "Earning":
+					continue
+				component_data = frappe._dict(get_salary_component_data(comp) or {})
+				if not component_data:
+					continue
+				component_data.depends_on_payment_days = 0
+				component_data.deduct_full_tax_on_selected_payroll_date = 0
+				self.update_component_row(
+					component_data,
+					amount,
+					"earnings",
+					data=self.data,
+					default_amount=amount,
+					remove_if_zero_valued=1,
+				)
+			else:
+				# Drop stale dynamic overtime rows if Overtime Requests were cancelled before re-saving.
+				self.set("earnings", [row for row in self.get("earnings") if not (row.salary_component == comp and not row.additional_salary)])
 
 	def get_data_for_eval(self):
 		data, default_data = super().get_data_for_eval()

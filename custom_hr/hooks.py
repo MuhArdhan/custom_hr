@@ -159,6 +159,9 @@ doc_events = {
 	"Shift Request": {
 		"before_validate": "custom_hr.services.employee_scope.validate_shift_request_scope",
 	},
+	"Overtime Type": {
+		"validate": "custom_hr.api.overtime_pay.validate_overtime_type",
+	},
 	"Leave Type": {
 		"validate": "custom_hr.services.leave_auto_allocation.validate_leave_type",
 		"on_update": "custom_hr.services.leave_auto_allocation.on_leave_type_update",
@@ -278,6 +281,8 @@ fixtures = [
 					"Salary Slip-jam_izin",
 					"Salary Slip-jam_lembur",
 					"Salary Slip-upah_lembur",
+					"Salary Slip-upah_lembur_reguler",
+					"Salary Slip-upah_lembur_holiday",
 					"Salary Slip-tunjangan_shift",
 					"Salary Slip-tunjangan_jabatan",
 					"Salary Slip-tunjangan_resiko",
