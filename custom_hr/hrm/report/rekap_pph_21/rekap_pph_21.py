@@ -36,6 +36,7 @@ MONTH_NAMES_ID = (
 PREFERRED_EARNING_ORDER = (
 	"Gaji Pokok",
 	"Gaji Harian",
+	"Harian Proporsional",
 	"Basic",
 	"Uang Makan",
 	"Tunjangan Transport",

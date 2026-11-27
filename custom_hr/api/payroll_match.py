@@ -72,7 +72,7 @@ IGNORED_HEADERS = {
 # Ordered aliases per component; entries with '+' are merged only when explicitly handled below.
 AUTO_ALIASES = (
 	("Gaji Pokok", ("GP", "GAJI POKOK", "POKOK PROPORSIONAL")),
-	("Uang Makan", ("UANG MAKAN", "HARIAN PROPORSIONAL")),
+	("Uang Makan", ("UANG MAKAN",)),
 	("Tunjangan Transport", ("TUNJANGAN TRANSPORT", "TUNJ TRANSPORT", "TRANSPORT")),
 	("Tunjangan Jabatan", ("TUNJANGAN JABATAN", "TUNJ JABATAN", "JABATAN")),
 	("Resiko", ("RESIKO", "TUNJANGAN RESIKO")),
@@ -325,6 +325,25 @@ def auto_detect_groups(
 		if hit and hit["letter"] not in used_letters:
 			matched_rows.append((hit["letter"], [comp]))
 			used_letters.add(hit["letter"])
+
+	# 4b. Outlet "Harian Proporsional": dedicated component when slips use it, else Uang Makan / Gaji Harian
+	harian_col = pick(("HARIAN PROPORSIONAL",))
+	if harian_col and harian_col["letter"] not in used_letters:
+		matched_comps_so_far = {comp for _, comps in matched_rows for comp in comps}
+		use_dedicated = (
+			"Harian Proporsional" in db_components
+			and (not slip_components or "Harian Proporsional" in slip_components)
+			and "Harian Proporsional" not in matched_comps_so_far
+		)
+		if use_dedicated:
+			harian_comps = ["Harian Proporsional"]
+		else:
+			has_um = (not slip_components or "Uang Makan" in slip_components) and (not db_components or "Uang Makan" in db_components) and "Uang Makan" not in matched_comps_so_far
+			has_gh = "Gaji Harian" in slip_components and (not db_components or "Gaji Harian" in db_components) and "Gaji Harian" not in matched_comps_so_far
+			harian_comps = [comp for comp, present in (("Uang Makan", has_um), ("Gaji Harian", has_gh)) if present]
+		if harian_comps:
+			matched_rows.append((harian_col["letter"], harian_comps))
+			used_letters.add(harian_col["letter"])
 
 	# 5. Fallback combined BPJS if individual KS/KT columns weren't present
 	if not any(comps == ["BPJS Kesehatan"] or comps == ["BPJS Ketenagakerjaan"] for _, comps in matched_rows):

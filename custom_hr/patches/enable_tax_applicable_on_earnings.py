@@ -12,6 +12,7 @@ TAXABLE_EARNINGS = (
 	"Tunjangan Tempat Tinggal",
 	"Tunjangan Tetap",
 	"Uang Makan",
+	"Harian Proporsional",
 	"Upah Lembur",
 	"Lembur",
 	"Lembur Driver",

@@ -146,6 +146,33 @@ class TestPayrollMatch(unittest.TestCase):
 		self.assertEqual(mapped[("Pinalty",)], ("M", False))
 		self.assertNotIn("O", [o["key"] for o in options])  # stopped at No. rek
 
+		mixed_groups, _ = svc.auto_detect_groups(
+			[row],
+			match_by="name",
+			slip_components={"Gaji Pokok", "Uang Makan", "Gaji Harian"},
+			db_components=["Gaji Pokok", "Uang Makan", "Gaji Harian"],
+		)
+		mixed_mapped = {tuple(g.components): (g.key, g.editable) for g in mixed_groups}
+		self.assertEqual(mixed_mapped[("Uang Makan", "Gaji Harian")], ("D", False))
+
+		daily_only_groups, _ = svc.auto_detect_groups(
+			[row],
+			match_by="name",
+			slip_components={"Gaji Harian"},
+			db_components=["Gaji Harian", "Uang Makan"],
+		)
+		daily_mapped = {tuple(g.components): (g.key, g.editable) for g in daily_only_groups}
+		self.assertEqual(daily_mapped[("Gaji Harian",)], ("D", True))
+
+		dedicated_groups, _ = svc.auto_detect_groups(
+			[row],
+			match_by="name",
+			slip_components={"Gaji Pokok", "Harian Proporsional"},
+			db_components=["Gaji Pokok", "Harian Proporsional", "Uang Makan", "Gaji Harian"],
+		)
+		dedicated_mapped = {tuple(g.components): (g.key, g.editable) for g in dedicated_groups}
+		self.assertEqual(dedicated_mapped[("Harian Proporsional",)], ("D", True))
+
 	def test_compare_tolerates_empty_and_null_custom_columns(self):
 		self.assertIsNone(svc._parse_json_arg(None))
 		self.assertIsNone(svc._parse_json_arg(""))
