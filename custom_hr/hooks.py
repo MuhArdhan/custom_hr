@@ -56,6 +56,7 @@ app_include_js = "custom_hr.bundle.js"
 # ----------------------------------------------------------------------------
 
 doctype_js = {
+	"Bulk Salary Structure Assignment": "public/js/bulk_salary_structure_assignment.js",
 	"Department": "public/js/shift_days.js",
 	"Employee": "public/js/employee_face.js",
 	"Leave Application": "public/js/leave_application.js",
@@ -110,12 +111,14 @@ override_doctype_class = {
 	"Attendance": "custom_hr.overrides.attendance.CustomAttendance",
 	"Salary Slip": "custom_hr.overrides.payroll.CustomSalarySlip",
 	"Salary Structure Assignment": "custom_hr.overrides.payroll.CustomSalaryStructureAssignment",
+	"Payroll Entry": "custom_hr.overrides.payroll.CustomPayrollEntry",
 }
 
 override_whitelisted_methods = {
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_approver": "custom_hr.services.leave_approver.get_leave_approver",
 	"hrms.api.get_leave_approval_details": "custom_hr.services.leave_approver.get_leave_approval_details",
 	"hrms.api.get_current_employee_info": "custom_hr.services.employee_outlet.get_current_employee_info",
+	"hrms.payroll.doctype.payroll_entry.payroll_entry.employee_query": "custom_hr.overrides.payroll.payroll_entry_employee_query",
 }
 
 doc_events = {
@@ -174,11 +177,8 @@ doc_events = {
 		"before_validate": "custom_hr.services.payroll_payable.fill_payable_account",
 	},
 	"Salary Structure": {
-		"validate": "custom_hr.services.salary_structure_template.validate_template",
-		"on_update_after_submit": "custom_hr.services.salary_structure_template.validate_template",
-	},
-	"Outlet": {
-		"after_insert": "custom_hr.services.salary_structure_template.on_outlet_insert",
+		"validate": "custom_hr.services.salary_structure_scope.validate_salary_structure",
+		"on_update_after_submit": "custom_hr.services.salary_structure_scope.validate_salary_structure",
 	},
 	"Payroll Settings": {
 		"validate": [
@@ -229,6 +229,8 @@ fixtures = [
 					"Attendance-department-in_standard_filter",
 					"Employee-employee_number-label",
 					"Salary Slip-main-default_print_format",
+					"Bulk Salary Structure Assignment-company-fetch_from",
+					"Bulk Salary Structure Assignment-company-read_only",
 				],
 			]
 		],
@@ -361,9 +363,9 @@ fixtures = [
 					"Payroll Settings-pph21_ter_rates",
 					"Salary Slip-dasar_bruto_pph21",
 					"Salary Slip-tarif_ter_pph21",
-					"Salary Structure-is_master_template",
-					"Salary Structure-template_prefix",
-					"Salary Structure-source_template",
+					"Salary Structure-lintas_company",
+					"Salary Structure-berlaku_untuk",
+					"Salary Structure-hanya_department",
 					"Overtime Type-disabled",
 					"Overtime Type-berlaku_untuk",
 					"Overtime Type-hanya_department",

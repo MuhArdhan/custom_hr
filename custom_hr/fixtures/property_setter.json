@@ -295,5 +295,27 @@
   "property": "default_print_format",
   "property_type": "Data",
   "value": "Slip Gaji JURI"
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Bulk Salary Structure Assignment-company-fetch_from",
+  "doctype_or_field": "DocField",
+  "doc_type": "Bulk Salary Structure Assignment",
+  "field_name": "company",
+  "property": "fetch_from",
+  "property_type": "Small Text",
+  "value": "",
+  "module": "HRM"
+ },
+ {
+  "doctype": "Property Setter",
+  "name": "Bulk Salary Structure Assignment-company-read_only",
+  "doctype_or_field": "DocField",
+  "doc_type": "Bulk Salary Structure Assignment",
+  "field_name": "company",
+  "property": "read_only",
+  "property_type": "Check",
+  "value": "0",
+  "module": "HRM"
  }
 ]

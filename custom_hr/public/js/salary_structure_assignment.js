@@ -1,4 +1,13 @@
 frappe.ui.form.on("Salary Structure Assignment", {
+	setup(frm) {
+		frm.set_query("salary_structure", () => ({
+			query: "custom_hr.services.salary_structure_scope.salary_structure_query",
+			filters: {
+				company: frm.doc.company,
+				employee: frm.doc.employee,
+			},
+		}));
+	},
 	company(frm) {
 		if (!frm.doc.company || frm.doc.payroll_payable_account) return;
 		frappe.call({
