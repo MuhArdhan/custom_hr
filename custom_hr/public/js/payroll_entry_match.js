@@ -259,14 +259,14 @@ function open_payroll_match(frm) {
 		</div>`;
 
 		const head = differing
-			.map((c) => `<th><div>${esc(c.label)}</div><div class="pm-th-sub">${esc(c.key)}${c.editable ? "" : ` · ${c.label.includes("+") ? __("Gabungan") : __("Input Periodik")}`}</div></th>`)
+			.map((c) => `<th><div>${esc(c.label)}</div><div class="pm-th-sub">${esc(c.key)}${c.editable ? "" : ` · ${c.label.includes("+") ? __("Gabungan") : __("Terkunci")}`}</div></th>`)
 			.join("");
 
 		const foot = differing
 			.map((c) =>
 				c.editable
 					? `<td><button type="button" class="btn btn-xs btn-default pm-all" data-col="${esc(c.key)}">${__("Semua → Excel")}</button></td>`
-					: `<td class="text-muted small">${c.label.includes("+") ? __("Gabungan, cek manual") : __("Ubah di Input Additional Salary")}</td>`
+					: `<td class="text-muted small">${c.label.includes("+") ? __("Gabungan, cek manual") : __("Ubah lewat modul terkait / Input Additional Salary")}</td>`
 			)
 			.join("");
 

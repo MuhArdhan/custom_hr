@@ -85,7 +85,7 @@ AUTO_ALIASES = (
 	("Pending", ("PENDING",)),
 	("Training", ("TRAINING",)),
 	("Insentif", ("INSENTIF",)),
-	("Vending Mesin", ("VENDING MESIN",)),
+	("Vending Mesin", ("VENDING MESIN", "VENDING MACHINE")),
 	("Bonus Target", ("BONUS TARGET",)),
 	("Bonus Performance", ("BONUS PERFORMANCE",)),
 	("Pinalty", ("PINALTY", "PENALTY")),
@@ -447,11 +447,18 @@ def _entry(name: str):
 	return entry
 
 
+def _locked_components() -> set[str]:
+	"""Components flagged disallow_excel_override=1 cannot be overwritten via Cocokkan Gaji Excel cells."""
+	if not frappe.db.has_column("Salary Component", "disallow_excel_override"):
+		return set()
+	return set(frappe.get_all("Salary Component", filters={"disallow_excel_override": 1}, pluck="name"))
+
+
 def _groups() -> list:
 	rows = frappe.get_cached_doc("Payroll Settings").match_columns
 	if not rows:
 		frappe.throw(_("Isi dulu tabel Kolom Cocokkan Gaji di Payroll Settings (tab HRM)."))
-	return column_groups(rows, set(frappe.get_all("Salary Component", filters={"show_in_period_input": 1}, pluck="name")))
+	return column_groups(rows, _locked_components())
 
 
 def _slips(entry) -> list:
@@ -512,7 +519,7 @@ def compare(
 		book.close()
 
 	slips = _slips(entry)
-	period_input = set(frappe.get_all("Salary Component", filters={"show_in_period_input": 1}, pluck="name"))
+	locked = _locked_components()
 	header_options = []
 	try:
 		hdr_idx, key_col = _header_key_row(sheet_rows, mode)
@@ -523,7 +530,7 @@ def compare(
 	parsed_custom = _parse_json_arg(custom_columns)
 	if parsed_custom:
 		rows = [frappe._dict(r) for r in parsed_custom if r.get("excel_column") and r.get("salary_component")]
-		groups = column_groups(rows, period_input)
+		groups = column_groups(rows, locked)
 		active_mode = "custom"
 	elif (mapping_mode or "auto").strip().lower() == "settings":
 		groups = _groups()
@@ -535,7 +542,7 @@ def compare(
 			sheet_rows,
 			match_by=mode,
 			slip_components=slip_components,
-			period_input=period_input,
+			period_input=locked,
 			db_components=db_components,
 			overtime_components=_overtime_alias_components(),
 		)
@@ -563,8 +570,7 @@ def compare(
 	]
 	result.slips = len(slips)
 	result.all_components = sorted(
-		set(frappe.get_all("Salary Component", filters={"disabled": 0, "show_in_period_input": 0}, pluck="name"))
-		- period_input
+		set(frappe.get_all("Salary Component", filters={"disabled": 0}, pluck="name")) - locked
 	)
 	return result
 
@@ -577,9 +583,9 @@ def apply(payroll_entry: str, changes: str | list) -> dict:
 	"""
 	entry = _entry(payroll_entry)
 	changes = _parse_json_arg(changes) or []
-	period_input = set(frappe.get_all("Salary Component", filters={"show_in_period_input": 1}, pluck="name"))
+	locked = _locked_components()
 	settings_rows = frappe.get_cached_doc("Payroll Settings").match_columns or []
-	editable = {g.key: g.components[0] for g in column_groups(settings_rows, period_input) if g.editable} if settings_rows else {}
+	editable = {g.key: g.components[0] for g in column_groups(settings_rows, locked) if g.editable} if settings_rows else {}
 	slips = {s.name: s for s in frappe.get_all("Salary Slip", filters={"payroll_entry": entry.name, "docstatus": 0}, fields=["name", "employee", "company", "end_date"])}
 	touched, cancelled = set(), set()
 	for change in changes:
@@ -588,7 +594,7 @@ def apply(payroll_entry: str, changes: str | list) -> dict:
 		amount = flt(change.get("amount"))
 		if not slip:
 			frappe.throw(_("Slip {0} bukan slip draft Payroll Entry ini.").format(change["slip"]))
-		if not component or not frappe.db.exists("Salary Component", component) or component in period_input:
+		if not component or not frappe.db.exists("Salary Component", component) or component in locked:
 			frappe.throw(_("Kolom {0} tidak bisa diambil dari Excel.").format(change.get("column") or component))
 		if amount < 0:
 			frappe.throw(_("Nilai Excel {0} untuk {1} minus.").format(component, slip.employee))

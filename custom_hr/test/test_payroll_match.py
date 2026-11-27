@@ -127,24 +127,25 @@ class TestPayrollMatch(unittest.TestCase):
 		self.assertNotIn("W", [o["key"] for o in options])  # stopped at EMAIL
 
 	def test_auto_detect_handles_outlet_sheet_headers_and_izin_variant(self):
-		row = ["NAMA CREW", "Total", "Pokok Proporsional", "Harian Proporsional", "Take Home Pay", "Pending", "Tunj Jabatan", "JAM Lembur", "Lembur", "JUMLAH TELAT", "POTONGAN TELAT", "Potongan IZIN DLL", "PINALTY", "No. rek", "THP"]
+		row = ["NAMA CREW", "Total", "Pokok Proporsional", "Harian Proporsional", "Take Home Pay", "Pending", "Tunj Jabatan", "JAM Lembur", "Lembur", "JUMLAH TELAT", "POTONGAN TELAT", "Vending Machine", "Potongan IZIN DLL", "PINALTY", "No. rek", "THP"]
 		groups, options = svc.auto_detect_groups(
 			[row],
 			match_by="name",
 			slip_components={"Gaji Pokok", "Uang Makan", "Lembur Reguler", "Terlambat", "Izin"},
-			period_input={"Pending", "Izin", "Pinalty"},
-			db_components=["Gaji Pokok", "Uang Makan", "Tunjangan Jabatan", "Lembur Reguler", "Terlambat", "Izin", "Potongan Izin", "Pinalty", "Pending"],
+			period_input={"Lembur Reguler"},
+			db_components=["Gaji Pokok", "Uang Makan", "Tunjangan Jabatan", "Lembur Reguler", "Terlambat", "Vending Mesin", "Izin", "Potongan Izin", "Pinalty", "Pending"],
 		)
 		mapped = {tuple(g.components): (g.key, g.editable) for g in groups}
 		self.assertEqual(mapped[("Gaji Pokok",)], ("C", True))
 		self.assertEqual(mapped[("Uang Makan",)], ("D", True))
-		self.assertEqual(mapped[("Pending",)], ("F", False))
+		self.assertEqual(mapped[("Pending",)], ("F", True))
 		self.assertEqual(mapped[("Tunjangan Jabatan",)], ("G", True))
-		self.assertEqual(mapped[("Lembur Reguler",)], ("I", True))
+		self.assertEqual(mapped[("Lembur Reguler",)], ("I", False))
 		self.assertEqual(mapped[("Terlambat",)], ("K", True))
-		self.assertEqual(mapped[("Izin",)], ("L", False))
-		self.assertEqual(mapped[("Pinalty",)], ("M", False))
-		self.assertNotIn("O", [o["key"] for o in options])  # stopped at No. rek
+		self.assertEqual(mapped[("Vending Mesin",)], ("L", True))
+		self.assertEqual(mapped[("Izin",)], ("M", True))
+		self.assertEqual(mapped[("Pinalty",)], ("N", True))
+		self.assertNotIn("P", [o["key"] for o in options])  # stopped at No. rek
 
 		mixed_groups, _ = svc.auto_detect_groups(
 			[row],

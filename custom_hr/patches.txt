@@ -36,3 +36,4 @@ custom_hr.patches.add_payroll_pph21_report_link
 custom_hr.patches.add_grooming_settings_sidebar_link
 custom_hr.patches.add_grooming_kuku_gallery_sidebar_link
 custom_hr.patches.remove_legacy_salary_structure_template_fields
+custom_hr.patches.add_salary_component_excel_lock

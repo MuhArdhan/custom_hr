@@ -891,6 +891,18 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "Salary Component",
+  "name": "Salary Component-disallow_excel_override",
+  "fieldname": "disallow_excel_override",
+  "fieldtype": "Check",
+  "label": "Kunci dari Pakai Excel (Cocokkan Gaji)",
+  "description": "Jika dicentang, komponen ini tidak bisa ditimpa langsung dari tombol Excel di Cocokkan Gaji (mis. Kasbon atau Lembur otomatis).",
+  "insert_after": "show_in_period_input",
+  "module": "HRM",
+  "default": "0"
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Salary Slip",
   "name": "Salary Slip-attendance_penalty_section",
   "fieldname": "attendance_penalty_section",

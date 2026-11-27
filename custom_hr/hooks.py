@@ -335,6 +335,7 @@ fixtures = [
 					"Payroll Settings-intercompany_receivable_account_number",
 					"Payroll Settings-intercompany_payable_account_name",
 					"Salary Component-show_in_period_input",
+					"Salary Component-disallow_excel_override",
 					"Department-auto_shift_section",
 					"Department-enable_auto_shift",
 					"Department-manual_shift_choice",
